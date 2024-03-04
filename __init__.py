@@ -8,6 +8,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_register_admin_service
 from homeassistant.helpers import config_validation
+from homeassistant.components.fan import FanEntity
 import voluptuous as vol
 
 # The domain of your component. Should be equal to the name of your component.
@@ -115,6 +116,52 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     
     # Register services with Home Assistant.
     hass.services.async_register(DOMAIN, 'update_light', update_light_service_wrapper)
-    hass.services.async_register(DOMAIN, 'update_fan', update_fan_service_wrapper)   
+    hass.services.async_register(DOMAIN, 'update_fan', update_fan_service_wrapper) 
+
+    class ThermexFanEntity(FanEntity):
+        """Representation of a fan."""
+
+        def __init__(self, ip_address, code):
+            self._ip_address = ip_address
+            self._code = code
+            self._state = None
+            self._speed = None
+
+        @property
+        def name(self):
+            """Return the name of the fan."""
+            return "Thermex Fan"
+
+        @property
+        def is_on(self):
+            """Return true if fan is on."""
+            return self._state == "on"
+
+        @property
+        def speed(self):
+            """Return the current speed."""
+            return self._speed
+
+        async def async_turn_on(self, speed=None, **kwargs):
+            """Turn the fan on."""
+            self._state = "on"
+            self._speed = speed
+            await update_fan_service(hass, ServiceCall(DOMAIN, 'update_fan', {'fanonoff': 'on', 'fanspeed': speed}))
+
+        async def async_turn_off(self, **kwargs):
+            """Turn the fan off."""
+            self._state = "off"
+            await update_fan_service(hass, ServiceCall(DOMAIN, 'update_fan', {'fanonoff': 'off'}))
+
+        async def async_set_speed(self, speed: str, **kwargs):
+            """Set the speed of the fan."""
+            self._speed = speed
+            await update_fan_service(hass, ServiceCall(DOMAIN, 'update_fan', {'fanspeed': speed}))
+
+    # Create and add the fan entity to Home Assistant
+    fan_entity = MyFanEntity(ip_address, code)
+    hass.data[DOMAIN] = fan_entity
+    await fan_entity.async_update()
+
     # Return boolean to indicate that initialization was successful.
     return True
