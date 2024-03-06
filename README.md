@@ -3,7 +3,7 @@ quick guide:
 2) install this custume component in a folder named "thermex"
 3) added
    <code>thermex:
-   ip: x.x.x.x {adress of extractor hood}
+   ip: x.x.x.x {IP address of hood}
    kode: {password set in app}</code>
 5) restart home-assistant
 
