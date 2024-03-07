@@ -1,0 +1,14 @@
+{
+    "en": {
+        "config": {
+            "host": "Host",
+            "code": "Code"
+        }
+    },
+    "da": {
+        "config": {
+            "host": "Vært",
+            "code": "Kode"
+        }
+    }
+}
