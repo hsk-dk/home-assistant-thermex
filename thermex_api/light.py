@@ -1,5 +1,4 @@
 import logging
-#from homeassistant.helpers.entity import Entity
 from homeassistant.components.light import ColorMode, LightEntity, LightEntityFeature
 
 from .const import DOMAIN
@@ -26,6 +25,33 @@ class ThermexLight(LightEntity):
         self._state = None
         self._brightness = None
 
+    @property
+    def name(self):
+        """Return the name of the light."""
+        return self._name
+
+    @property
+    def supported_color_modes(self):
+        """Set of supported color modes."""
+        return {ColorMode.ONOFF, ColorMode.BRIGHTNESS}
+
+    @property
+    def color_mode(self):
+        """Current color mode of the light."""
+        if self._brightness is not None:
+            return ColorMode.BRIGHTNESS
+        return ColorMode.ONOFF
+
+    @property
+    def is_on(self):
+        """Return true if the light is on."""
+        return self._state
+    
+        @property
+    def brightness(self):
+        """Return the brightness of the light."""
+        return self._brightness
+
     async def async_update(self):
         """Fetch the latest data from the coordinator."""
         data = await self._coordinator.async_get_data()
@@ -46,28 +72,6 @@ class ThermexLight(LightEntity):
         _LOGGER.debug("Light status sat: %s", self._state)
         self._brightness = light_data.get("lightbrightness")
 
-    @property
-    def supported_color_modes(self):
-        """Set of supported color modes."""
-        return {ColorMode.ONOFF, ColorMode.BRIGHTNESS}
-
-    @property
-    def color_mode(self):
-        """Current color mode of the light."""
-        if self._brightness is not None:
-            return ColorMode.BRIGHTNESS
-        return ColorMode.ONOFF
-
-    @property
-    def name(self):
-        """Return the name of the light."""
-        return self._name
-
-    @property
-    def is_on(self):
-        """Return true if the light is on."""
-        return self._state
-
     async def async_turn_on(self, **kwargs):
         """Turn on the light."""
         brightness = kwargs.get("brightness")
@@ -76,8 +80,3 @@ class ThermexLight(LightEntity):
     async def async_turn_off(self, **kwargs):
         """Turn off the light."""
         await self._coordinator.update_light(lightonoff=0)
-
-    @property
-    def brightness(self):
-        """Return the brightness of the light."""
-        return self._brightness

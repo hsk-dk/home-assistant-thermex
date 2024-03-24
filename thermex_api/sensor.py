@@ -31,12 +31,6 @@ class ThermexFanSensor(Entity):
         }
         _LOGGER.debug("Sensor.py Thermex ThermexFanSensor initialiseret")
 
-    async def async_update(self):
-        """Fetch the latest data from the coordinator."""
-        data = await self._coordinator.async_get_data()
-        fan_data = data.get("Fan", {})
-        self._state = self._speeds.get(fan_data.get("fanspeed", 0), "ukendt")
-    
     @property
     def name(self):
         """Return the name of the sensor."""
@@ -51,3 +45,10 @@ class ThermexFanSensor(Entity):
     def unit_of_measurement(self):
         """Return the unit of measurement."""
         return None
+
+    async def async_update(self):
+        """Fetch the latest data from the coordinator."""
+        data = await self._coordinator.async_get_data()
+        fan_data = data.get("Fan", {})
+        self._state = self._speeds.get(fan_data.get("fanspeed", 0), "ukendt")
+    

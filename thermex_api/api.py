@@ -15,6 +15,22 @@ class ThermexAPI:
         self._password = code
         self._coordinator = None
 
+    @property
+    def coordinator(self):
+        """Return the coordinator."""
+        return self._coordinator
+
+    async def async_setup_coordinator(self):
+        """Set up data update coordinator."""
+        self._coordinator = DataUpdateCoordinator(
+            self._host,
+            _LOGGER,
+            name="thermex_data",
+            update_method=self.async_get_data,
+            update_interval=timedelta(seconds=10),
+        )
+        await self._coordinator.async_refresh()
+
     async def authenticate(self, websocket):
         auth_message = {
             "Request": "Authenticate",
@@ -31,6 +47,26 @@ class ThermexAPI:
             _LOGGER.error("Authentication failed")
             return False
     
+    async def fetch_status(self):
+        """Fetch status of fan and light."""
+        async with aiohttp.ClientSession() as session:
+            async with session.ws_connect(f'ws://{self._host}:9999/api') as websocket:
+                await self.authenticate(websocket)
+                _LOGGER.debug("Fetching fan and light status")
+                await websocket.send_json({"Request": "STATUS"})
+                response = await websocket.receive()
+                response = json.loads(response.data)
+                _LOGGER.debug("Status response: %s", response)
+                if response.get("Response") == "Status":
+                    return response.get("Data")
+                else:
+                    _LOGGER.error("Error fetching status: %s", response)
+                    raise Exception("Unexpected response from Thermex API")
+
+    async def async_get_data(self):
+        """Fetch and return status data."""
+        return await self.fetch_status()
+
     async def get_fan_status(self):
         """Get the status of the fan."""
         async with aiohttp.ClientSession() as session:
@@ -69,42 +105,6 @@ class ThermexAPI:
                     _LOGGER.info("Update successful")
                 else:
                     _LOGGER.error("Update failed due to authentication failure")
-    
-    async def fetch_status(self):
-        """Fetch status of fan and light."""
-        async with aiohttp.ClientSession() as session:
-            async with session.ws_connect(f'ws://{self._host}:9999/api') as websocket:
-                await self.authenticate(websocket)
-                _LOGGER.debug("Fetching fan and light status")
-                await websocket.send_json({"Request": "STATUS"})
-                response = await websocket.receive()
-                response = json.loads(response.data)
-                _LOGGER.debug("Status response: %s", response)
-                if response.get("Response") == "Status":
-                    return response.get("Data")
-                else:
-                    _LOGGER.error("Error fetching status: %s", response)
-                    raise Exception("Unexpected response from Thermex API")
-
-    async def async_get_data(self):
-        """Fetch and return status data."""
-        return await self.fetch_status()
-
-    async def async_setup_coordinator(self):
-        """Set up data update coordinator."""
-        self._coordinator = DataUpdateCoordinator(
-            self._host,
-            _LOGGER,
-            name="thermex_data",
-            update_method=self.async_get_data,
-            update_interval=timedelta(seconds=10),
-        )
-        await self._coordinator.async_refresh()
-
-    @property
-    def coordinator(self):
-        """Return the coordinator."""
-        return self._coordinator
 
     async def update_light(self, lightonoff, brightness=None):
         """Update light settings."""
