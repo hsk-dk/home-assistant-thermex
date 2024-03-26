@@ -19,7 +19,6 @@ class ThermexFanSensor(Entity):
 
     def __init__(self, coordinator):
         """Initialize the sensor."""
-        #self._api = api
         self._state = None
         self._coordinator = coordinator
         self._speeds = {
@@ -29,7 +28,14 @@ class ThermexFanSensor(Entity):
             3: "høj",
             4: "boost"
         }
+        self._attr_unique_id = "fdddsfdsfsdfsdf3r" 
+
         _LOGGER.debug("Sensor.py Thermex ThermexFanSensor initialiseret")
+
+    @property
+    def unique_id(self):
+        """Return the name of the light."""
+        return self._attr_unique_id
 
     @property
     def name(self):
@@ -45,6 +51,20 @@ class ThermexFanSensor(Entity):
     def unit_of_measurement(self):
         """Return the unit of measurement."""
         return None
+
+    @property
+    def icon(self) -> str | None:
+        """Icon based on state."""
+        if self._attr_state == "Lav":
+            return "mdi:fan-speed-1"
+        elif self._attr_state == "Mellem":
+            return "mdi:fan-speed-2"
+        elif self._attr_state == "Høj":
+            return "mdi:fan-speed-3"
+        elif self._attr_state == "Boost":
+            return "mdi:fan-plus"
+        else:
+            return "mdi:fan-off"
 
     async def async_update(self):
         """Fetch the latest data from the coordinator."""
