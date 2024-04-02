@@ -1,3 +1,4 @@
+"""Thermex API module"""
 import aiohttp
 import json
 import logging
@@ -30,7 +31,7 @@ class ThermexAPI:
         else:
             _LOGGER.error("Authentication failed")
             return False
-    
+
     async def get_fan_status(self):
         """Get the status of the fan."""
         async with aiohttp.ClientSession() as session:
@@ -48,7 +49,7 @@ class ThermexAPI:
                         raise Exception("api.py Uventet svar fra Thermex API")
                 else:
                     _LOGGER.error("api.py Fejl under hentning af fan status")
-    
+
     async def update_fan(self, fanonoff, fanspeed):
         """Update fan settings."""
         async with aiohttp.ClientSession() as session:
@@ -69,7 +70,7 @@ class ThermexAPI:
                     _LOGGER.info("Update successful")
                 else:
                     _LOGGER.error("Update failed due to authentication failure")
-    
+
     async def fetch_status(self):
         """Fetch status of fan and light."""
         async with aiohttp.ClientSession() as session:
