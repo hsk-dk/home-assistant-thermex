@@ -17,4 +17,14 @@ Setup Home-Assistant
    password:"password" {password set in app}</code>
 4) restart home-assistant
 
-if everything works 2 services, a sensor and a light entity have been added to home-assistant.
+if everything works 2 actions, a sensor, a light entity and a switch have been added to home-assistant.
+2 Actions:
+ - Thermex (api): update_fan
+ - Thermex (api): update_light
+Choose YAML mode for help.
+1 sensor:
+ - sensor.thermex_fan_sensor - showing the status of the hood
+1 lighy
+ - light.thermex_light - control of the hood light
+1 switch
+ - switch.thermex_fan_switch - on/off switch for the hood (use actions to control speed) 
