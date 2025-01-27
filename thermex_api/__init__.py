@@ -1,24 +1,25 @@
-"""Module for Thermex api"""
 import logging
-from homeassistant.core import HomeAssistant,  ServiceCall
+from .const import DOMAIN
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers.discovery import load_platform
 from .sensor import ThermexFanSensor  # Importer sensorklassen fra sensor.py
 from .light import ThermexLight  # Importer sensorklassen fra sensor.py
 from .api import ThermexAPI  # Importer ThermexAPI-klassen fra api.py
-from .const import DOMAIN
+
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the Thermex_fan component."""
-    _LOGGER.debug("Setting up Thermex_fan component")
-
+    _LOGGER.debug("Setting up Thermex_api component")
+    
     # Hent konfigurationsoplysninger
     conf = config.get(DOMAIN)
     host = conf.get("host")
     password = conf.get("password")
-
+    
     # Opret API-instansen
     api = ThermexAPI(host, password)
-
+    
     # Authenticate med API
     hass.data[DOMAIN] = api
     _LOGGER.debug("API created and saved in hass.data")
@@ -55,9 +56,12 @@ async def async_setup(hass: HomeAssistant, config: dict):
     hass.services.async_register(DOMAIN, 'update_light', update_light_service)
     hass.services.async_register(DOMAIN, 'update_fan', update_fan_service)
 
-    # Opret og tilføj sensoren
-    hass.helpers.discovery.load_platform('sensor', DOMAIN, {}, config)
-    hass.helpers.discovery.load_platform('light', DOMAIN, {}, config)
-    _LOGGER.debug("Fan sensor created and added to Home Assistant")
 
+        # Opret og tilføj sensoren
+    load_platform(hass, 'sensor', DOMAIN, {}, config)
+    _LOGGER.debug("Thermex Fan sensor created and added to Home Assistant")
+    load_platform(hass,'light', DOMAIN, {}, config)
+    _LOGGER.debug("Thermex Light created and added to Home Assistant")
+    load_platform(hass,'switch', DOMAIN, {}, config)
+    _LOGGER.debug("Thermex Fan Switch created and added to Home Assistant")
     return True
