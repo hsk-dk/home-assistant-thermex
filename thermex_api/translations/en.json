@@ -1,15 +1,30 @@
 {
-  "title": "Thermex",
-  "config": {
-    "step": {
-      "user": {
-        "title": "Thermex Setup",
-        "description": "Enter IP and password for your Thermex device"
-      }
-    },
-    "error": {
-      "auth_failed": "Authentication failed. Check your code.",
-      "cannot_connect": "Unable to connect to Thermex device."
+    "title": "Thermex",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Thermex Setup",
+                "description": "Enter IP and password for your Thermex device"
+            },
+            "reauth_confirm": {
+                "title": "Reauthenticate Thermex"
+            }
+        },
+        "error": {
+            "auth_failed": "Authentication failed. Check your code.",
+            "cannot_connect": "Unable to connect to Thermex device.",
+            "unknown": "An unknown error occurred."
+        },
+        "fields": {
+            "host": {
+                "name": "IP Address",
+                "description": "The IP of your Thermex hood"
+            },
+            "password": {
+                "name": "Password",
+                "description": "The Thermex API password",
+                "hide": true
+            }
+        }
     }
-  }
 }
