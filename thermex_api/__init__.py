@@ -6,9 +6,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 
 from .api import ThermexAPI, ThermexConnectionError, ThermexAuthError
+from .const import __version__
 
-_LOGGER = logging.getLogger(__name__)
-
+_LOGGER.info("Setting up Thermex integration v%s", __version__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Thermex integration from a config entry."""
     host = entry.data.get("host")
