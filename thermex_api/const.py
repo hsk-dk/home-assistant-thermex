@@ -1,0 +1,1 @@
+DOMAIN = "thermex_api"
