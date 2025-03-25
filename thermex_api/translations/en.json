@@ -1,0 +1,15 @@
+{
+  "title": "Thermex",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermex Setup",
+        "description": "Enter IP and password for your Thermex device"
+      }
+    },
+    "error": {
+      "auth_failed": "Authentication failed. Check your code.",
+      "cannot_connect": "Unable to connect to Thermex device."
+    }
+  }
+}
