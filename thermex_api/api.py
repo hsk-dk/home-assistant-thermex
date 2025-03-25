@@ -3,12 +3,8 @@ import aiohttp
 import json
 import logging
 
-from .const import DOMAIN
-
+from .const import DOMAIN, DEFAULT_PORT, WEBSOCKET_PATH
 _LOGGER = logging.getLogger(__name__)
-
-API_PORT = 9999
-API_PATH = "/api"
 
 class ThermexAuthError(Exception):
     pass
@@ -31,7 +27,7 @@ class ThermexAPI:
 
     async def connect(self, hass):
         """Establish the WebSocket connection and authenticate."""
-        url = f"ws://{self._host}:{API_PORT}{API_PATH}"
+        url = f"ws://{self._host}:{DEFAULT_PORT}{WEBSOCKET_PATH}"
         self._session = aiohttp.ClientSession()
 
         try:
