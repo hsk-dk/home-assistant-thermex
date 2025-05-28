@@ -1,0 +1,30 @@
+{
+  "title": "Thermex",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Opsætning af Thermex",
+        "description": "Indtast IP og adgangskode til din Thermex-enhed"
+      },
+      "reauth_confirm": {
+        "title": "Genautorisér Thermex"
+      }
+    },
+    "error": {
+      "auth_failed": "Godkendelse mislykkedes. Tjek din adgangskode.",
+      "cannot_connect": "Kan ikke oprette forbindelse til Thermex-enheden.",
+      "unknown": "Der opstod en ukendt fejl."
+    },
+    "fields": {
+      "host": {
+        "name": "IP",
+        "description": "IP-adressen til Thermex-emhætten"
+      },
+      "password": {
+        "name": "Adgangskode",
+        "description": "Adgangskode til Thermex API",
+        "hide": true
+      }
+    }
+  }
+}
