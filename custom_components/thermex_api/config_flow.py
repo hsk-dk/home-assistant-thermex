@@ -27,6 +27,7 @@ class ThermexConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.entry = None
 
     async def async_step_user(self, user_input=None):
+    _LOGGER.debug('Starting user step for Thermex config flow')
         errors = {}
 
         if user_input is not None:

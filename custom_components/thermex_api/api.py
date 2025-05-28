@@ -85,8 +85,15 @@ class ThermexAPI:
         if not self._ws:
             raise ThermexConnectionError("WebSocket not connected")
 
-        async for msg in self._ws:
+        try:
+            async for msg in self._ws:
             if msg.type == aiohttp.WSMsgType.TEXT:
+            else:
+                _LOGGER.warning('Unexpected message: %%s', msg)
+            except aiohttp.ClientConnectionError as e:
+                _LOGGER.warning('WebSocket connection lost: %%s', e)
+            except Exception as e:
+                _LOGGER.error('Unexpected error in WebSocket loop: %%s', e)
                 data = json.loads(msg.data)
                 if "Notify" in data:
                     yield data
