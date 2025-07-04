@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermex Integration",
+        "data": {
+          "host": "Enhedens IP",
+          "password": "Adgangskode"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor.filter_usage": {
+      "name": "Filterforbrug"
+    },
+    "sensor.diagnostic": {
+      "name": "Thermex Diagnostic"
+    }
+  },
+  "services": {
+    "set_fan": {
+      "name": "Indstil blæser",
+      "description": "Styr Thermex blæserens tilstand og hastighed."
+    },
+    "set_light": {
+      "name": "Indstil lys",
+      "description": "Styr Thermex emhættens lys."
+    },
+    "reset_filter_usage": {
+      "name": "Nulstil filterforbrug",
+      "description": "Nulstil filterets forbrugstæller efter rengøring."
+    }
+  }
+}

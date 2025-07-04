@@ -28,3 +28,21 @@ Choose YAML mode for help.
  - light.thermex_light - control of the hood light
 1 switch
  - switch.thermex_fan_switch - on/off switch for the hood (use actions to control speed) 
+
+
+## Installation via HACS
+
+1. Go to HACS → Integrations → Custom Repositories.
+2. Add your repository: `https://github.com/hsk-dk/home-assistant-thermex`
+3. Select Integration as the category.
+4. Install the integration.
+5. Restart Home Assistant.
+6. Go to Settings → Devices & Services → Add Integration and search for “Thermex”.
+
+## Example
+
+Configuration is handled through the UI config flow. No YAML required.
+
+## Support
+
+Please file issues at: [GitHub Issues](https://github.com/hsk-dk/home-assistant-thermex/issues)

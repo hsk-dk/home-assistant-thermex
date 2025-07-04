@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermex Integration",
+        "data": {
+          "host": "Device IP",
+          "password": "Password"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor.filter_usage": {
+      "name": "Filter Usage"
+    },
+    "sensor.diagnostic": {
+      "name": "Thermex Diagnostic"
+    }
+  },
+  "services": {
+    "set_fan": {
+      "name": "Set Fan State",
+      "description": "Control the Thermex fan state and speed."
+    },
+    "set_light": {
+      "name": "Set Light State",
+      "description": "Control the Thermex hood lighting."
+    },
+    "reset_filter_usage": {
+      "name": "Reset Filter Usage",
+      "description": "Reset the filter usage timer after cleaning."
+    }
+  }
+}

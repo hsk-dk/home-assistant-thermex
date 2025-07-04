@@ -1,0 +1,6 @@
+reset_filter:
+  description: "Reset the Thermex fan's filter runtime counter to zero"
+  fields:
+    entry_id:
+      description: "The config entry id of the Thermex API integration"
+      example: "01JZA5NK0CRTS2YKY4P4Q5TYZ5"
