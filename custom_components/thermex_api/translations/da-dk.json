@@ -1,30 +1,35 @@
 {
-  "title": "Thermex",
   "config": {
     "step": {
       "user": {
-        "title": "Opsætning af Thermex",
-        "description": "Indtast IP og adgangskode til din Thermex-enhed"
-      },
-      "reauth_confirm": {
-        "title": "Genautorisér Thermex"
+        "title": "Thermex Integration",
+        "data": {
+          "host": "Enhedens IP",
+          "password": "Adgangskode"
+        }
       }
+    }
+  },
+  "entity": {
+    "sensor.filter_usage": {
+      "name": "Filterforbrug"
     },
-    "error": {
-      "auth_failed": "Godkendelse mislykkedes. Tjek din adgangskode.",
-      "cannot_connect": "Kan ikke oprette forbindelse til Thermex-enheden.",
-      "unknown": "Der opstod en ukendt fejl."
+    "sensor.diagnostic": {
+      "name": "Thermex Diagnostic"
+    }
+  },
+  "services": {
+    "set_fan": {
+      "name": "Indstil blæser",
+      "description": "Styr Thermex blæserens tilstand og hastighed."
     },
-    "fields": {
-      "host": {
-        "name": "IP",
-        "description": "IP-adressen til Thermex-emhætten"
-      },
-      "password": {
-        "name": "Adgangskode",
-        "description": "Adgangskode til Thermex API",
-        "hide": true
-      }
+    "set_light": {
+      "name": "Indstil lys",
+      "description": "Styr Thermex emhættens lys."
+    },
+    "reset_filter_usage": {
+      "name": "Nulstil filterforbrug",
+      "description": "Nulstil filterets forbrugstæller efter rengøring."
     }
   }
 }

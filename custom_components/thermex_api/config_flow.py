@@ -1,94 +1,70 @@
-"""Config flow for Thermex integration."""
+"""Config and options flow for Thermex API."""
 import logging
+
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+
 from .const import DOMAIN
-from .api import ThermexAPI, ThermexAuthError, ThermexConnectionError  # Make sure ThermexConnectionError is imported
+from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
 
-DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required("host"): str,
-        vol.Required("password"): str,
-    }
-)
+STEP_USER_DATA_SCHEMA = vol.Schema({
+    vol.Required("host"): str,
+    vol.Required("api_key"): str,
+})
 
-class ThermexConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Thermex."""
-
+class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
-
-    def __init__(self):
-        self.host = None
-        self.password = None
-        self.entry = None
+    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
 
     async def async_step_user(self, user_input=None):
-    _LOGGER.debug('Starting user step for Thermex config flow')
-        errors = {}
+        if user_input is None:
+            return self.async_show_form(
+                step_id="user", data_schema=STEP_USER_DATA_SCHEMA
+            )
 
-        if user_input is not None:
-            self.host = user_input["host"]
-            self.password = user_input["password"]
-            api = ThermexAPI(self.host, self.password)
+        hub = ThermexHub(self.hass, user_input["host"], user_input["api_key"])
+        try:
+            await hub.connect()
+        except Exception as err:
+            _LOGGER.error("Unable to connect to Thermex: %s", err)
+            return self.async_show_form(
+                step_id="user",
+                data_schema=STEP_USER_DATA_SCHEMA,
+                errors={"base": "cannot_connect"},
+            )
 
-            try:
-                await api.connect(self.hass)  # Connect and authenticate
-                await api.authenticate()
-                await self.async_set_unique_id(f"thermex_{self.host}")
-                # Fix: return after abort to avoid continuing the flow
-                abort_result = self._abort_if_unique_id_configured()
-                if abort_result is not None:
-                    return abort_result
-                return self.async_create_entry(title=f"Thermex {self.host}", data=user_input)
-            except ThermexAuthError:
-                _LOGGER.debug("Authentication failed for Thermex at %s", self.host)
-                errors["base"] = "auth_failed"
-            except ThermexConnectionError:
-                _LOGGER.debug("Could not connect to Thermex at %s", self.host)
-                errors["base"] = "cannot_connect"
-            except Exception as ex:
-                _LOGGER.exception("Unknown error in Thermex config flow: %s", ex)
-                errors["base"] = "unknown"
-
-        return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA, errors=errors)
-
-    async def async_step_reauth(self, entry_data):
-        self.host = entry_data["host"]
-        self.context["title_placeholders"] = {"host": self.host}
-        return await self.async_step_reauth_confirm()
-
-    async def async_step_reauth_confirm(self, user_input=None):
-        errors = {}
-
-        if user_input is not None:
-            self.password = user_input["password"]
-
-            api = ThermexAPI(self.host, self.password)
-            try:
-                await api.connect(self.hass)
-                await api.authenticate()
-                existing_entry = await self.async_set_unique_id(f"thermex_{self.host}")
-                if existing_entry:
-                    self.hass.config_entries.async_update_entry(
-                        existing_entry, data={"host": self.host, "password": self.password}
-                    )
-                    return self.async_abort(reason="reauth_successful")
-            except ThermexAuthError:
-                _LOGGER.debug("Reauthentication failed for Thermex at %s", self.host)
-                errors["base"] = "auth_failed"
-            except ThermexConnectionError:
-                _LOGGER.debug("Could not connect to Thermex at %s during reauth", self.host)
-                errors["base"] = "cannot_connect"
-            except Exception as ex:
-                _LOGGER.exception("Unknown error in Thermex reauth flow: %s", ex)
-                errors["base"] = "unknown"
-
-        return self.async_show_form(
-            step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required("password"): str}),
-            errors=errors,
+        return self.async_create_entry(
+            title=user_input["host"], data=user_input
         )
+
+    @staticmethod
+    def async_get_options_flow(entry: ConfigEntry):
+        return OptionsFlowHandler(entry)
+
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    def __init__(self, entry: ConfigEntry):
+        self.entry = entry
+
+    async def async_step_init(self, user_input=None):
+        """Manage options for Thermex integration."""
+        if user_input is None:
+            data_schema = vol.Schema({
+                vol.Optional(
+                    "enable_decolight",
+                    default=self.entry.options.get("enable_decolight", False)
+                ): bool,
+                vol.Optional(
+                    "fan_alert_hours",
+                    default=self.entry.options.get("fan_alert_hours", 30)
+                ): int,
+            })
+            return self.async_show_form(
+                step_id="init", data_schema=data_schema
+            )
+
+        return self.async_create_entry(title="Options", data=user_input)

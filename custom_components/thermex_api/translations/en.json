@@ -1,30 +1,35 @@
 {
-    "title": "Thermex",
-    "config": {
-        "step": {
-            "user": {
-                "title": "Thermex Setup",
-                "description": "Enter IP and password for your Thermex device"
-            },
-            "reauth_confirm": {
-                "title": "Reauthenticate Thermex"
-            }
-        },
-        "error": {
-            "auth_failed": "Authentication failed. Check your code.",
-            "cannot_connect": "Unable to connect to Thermex device.",
-            "unknown": "An unknown error occurred."
-        },
-        "fields": {
-            "host": {
-                "name": "IP Address",
-                "description": "The IP of your Thermex hood"
-            },
-            "password": {
-                "name": "Password",
-                "description": "The Thermex API password",
-                "hide": true
-            }
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermex Integration",
+        "data": {
+          "host": "Device IP",
+          "password": "Password"
         }
+      }
     }
+  },
+  "entity": {
+    "sensor.filter_usage": {
+      "name": "Filter Usage"
+    },
+    "sensor.diagnostic": {
+      "name": "Thermex Diagnostic"
+    }
+  },
+  "services": {
+    "set_fan": {
+      "name": "Set Fan State",
+      "description": "Control the Thermex fan state and speed."
+    },
+    "set_light": {
+      "name": "Set Light State",
+      "description": "Control the Thermex hood lighting."
+    },
+    "reset_filter_usage": {
+      "name": "Reset Filter Usage",
+      "description": "Reset the filter usage timer after cleaning."
+    }
+  }
 }

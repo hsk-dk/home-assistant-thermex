@@ -1,89 +1,51 @@
-import asyncio
+# File: __init__.py
+"""Thermex API integration."""
 import logging
 
-from .const import DOMAIN
-from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 
-from .api import ThermexAPI, ThermexConnectionError, ThermexAuthError
-from .const import __version__
+from .const import DOMAIN
+from .hub import ThermexHub
+
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.info("Setting up Thermex integration v%s", __version__)
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Thermex integration."""
-    hass.data.setdefault(DOMAIN, {})
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up Thermex API from a config entry."""
+    host = entry.data["host"]
+    api_key = entry.data["api_key"]
+
+    hub = ThermexHub(hass, host, api_key)
+    try:
+        await hub.connect()
+    except Exception as err:
+        _LOGGER.error("Failed to connect to Thermex at %s: %s", host, err)
+        raise ConfigEntryNotReady from err
+
+    # Store hub instance for this entry
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
+
+    # Reload integration when options change
+    entry.async_on_unload(
+        entry.add_update_listener(_async_update_listener)
+    )
+    # Forward setup to all platforms
+    await hass.config_entries.async_forward_entry_setups(
+        entry, ["light", "fan", "sensor", "binary_sensor","button"]
+    )
     return True
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Set up Thermex integration from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
-    host = entry.data.get("host")
-    password = entry.data.get("password")
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update by reloading the entry."""
+    _LOGGER.debug("Options updated, reloading Thermex entry %s", entry.entry_id)
+    await hass.config_entries.async_reload(entry.entry_id)
 
-    api = ThermexAPI(host, password)
-
-    try:
-        await api.connect(hass)
-        status = await api.get_status()
-        _LOGGER.debug("Initial Thermex status: %s", status)
-
-        # Store API and status data in hass.data
-        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-            "api": api,
-            "status": status,
-            "listeners": []
-        }
-
-        # Start background listener for Notify updates
-        hass.loop.create_task(_thermex_notify_listener(hass, entry.entry_id, api))
-
-        # Forward entry to platforms
-        for platform in ("light", "sensor", "switch"):
-            hass.async_create_task(
-                hass.config_entries.async_forward_entry_setup(entry, platform)
-            )
-
-        return True
-
-    except ThermexAuthError:
-        _LOGGER.error("Authentication with Thermex failed.")
-        return False
-    except ThermexConnectionError:
-        _LOGGER.error("Connection to Thermex WebSocket failed.")
-        return False
-    except Exception as e:
-        _LOGGER.exception("Unexpected error during Thermex setup: %s", str(e))
-        return False
-
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Unload a config entry."""
-    data = hass.data.get(DOMAIN, {}).pop(entry.entry_id, {})
-    api = data.get("api")
-    if api:
-        await api.close()
-
-    unload_ok = all(
-        await asyncio.gather(
-            *[hass.config_entries.async_forward_entry_unload(entry, platform)
-              for platform in ("light", "sensor", "switch")]
-        )
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry and clean up the hub."""
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        entry, ["light", "fan", "sensor", "binary_sensor"]
     )
+    hub: ThermexHub = hass.data[DOMAIN].pop(entry.entry_id)
+    await hub.close()
     return unload_ok
-
-async def _thermex_notify_listener(hass: HomeAssistant, entry_id: str, api: ThermexAPI):
-    """Background task that listens for Notify messages from the API."""
-    try:
-        async for notify in api.listen():
-            _LOGGER.debug("Received Notify: %s", notify)
-            data = notify.get("Data", {})
-
-            # Update the latest cached status
-            hass.data[DOMAIN][entry_id]["status"].update(data)
-
-            # Notify registered listeners (entities)
-            for update_callback in hass.data[DOMAIN][entry_id]["listeners"]:
-                hass.async_create_task(update_callback())
-
-    except Exception as e:
-        _LOGGER.error("Notify listener stopped due to error: %s", e)
