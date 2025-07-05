@@ -2,34 +2,30 @@
   "config": {
     "step": {
       "user": {
-        "title": "Thermex Integration",
+        "title": "Forbind til Thermex",
+        "description": "Indtast Thermex Emhætte ip og API-password.",
         "data": {
-          "host": "Enhedens IP",
-          "password": "Adgangskode"
+          "host": "Emhætte IP-adresse",
+          "api_key": "API-password"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Kunne ikke oprette forbindelse til Thermex Emhætte. Tjek IP og password."
+    },
+    "abort": {
+      "already_configured": "Denne Thermex-enhed er allerede konfigureret."
     }
   },
-  "entity": {
-    "sensor.filter_usage": {
-      "name": "Filterforbrug"
-    },
-    "sensor.diagnostic": {
-      "name": "Thermex Diagnostic"
-    }
-  },
-  "services": {
-    "set_fan": {
-      "name": "Indstil blæser",
-      "description": "Styr Thermex blæserens tilstand og hastighed."
-    },
-    "set_light": {
-      "name": "Indstil lys",
-      "description": "Styr Thermex emhættens lys."
-    },
-    "reset_filter_usage": {
-      "name": "Nulstil filterforbrug",
-      "description": "Nulstil filterets forbrugstæller efter rengøring."
+  "options": {
+    "step": {
+      "init": {
+        "title": "Thermex indstillinger",
+        "data": {
+          "enable_decolight": "Aktivér DecoLight",
+          "fan_alert_hours": "Filter rengøringsadvarsel efter (timer)"
+        }
+      }
     }
   }
 }

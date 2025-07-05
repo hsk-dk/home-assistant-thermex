@@ -2,7 +2,8 @@
     "domain": "thermex_api",
     "name": "Thermex Hood",
     "version": "2.0.1",
-    "documentation": "",
+    "documentation": "https://github.com/hsk-dk/home-assistant-thermex",
+    "issue_tracker": "https://github.com/hsk-dk/home-assistant-thermex/issues",
     "requirements": ["aiohttp"],
     "codeowners": ["@hsk-dk"],
     "iot_class": "local_push",
@@ -14,11 +15,5 @@
     "binary_sensor",
     "button"
   ],
-    "services": {
-    "reset_runtime": {
-      "name": "Reset runtime counter",
-      "description": "Resets the Thermex fan runtime hours and last_reset timestamp.",
-      "fields": {}
-    }
-  }
+   "translations": ["en", "da"]
 }

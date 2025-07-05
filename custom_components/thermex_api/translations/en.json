@@ -2,20 +2,26 @@
   "config": {
     "step": {
       "user": {
-        "title": "Thermex Integration",
+        "title": "Thermex Hood Integration",
         "data": {
           "host": "Device IP",
-          "password": "Password"
+          "api-key": "Password"
         }
       }
     }
   },
   "entity": {
-    "sensor.filter_usage": {
-      "name": "Filter Usage"
+    "sensor.themex_fan_last_reset": {
+      "name": "Time since last fan reset",
     },
-    "sensor.diagnostic": {
-      "name": "Thermex Diagnostic"
+    "sensor.thermex_fan_rumtime": {
+      "name": "Fan rumtime since last reset",
+    },
+    "sensor.thermex_fan_threshold_alert": {
+      "name": "Fan threshold alert",
+    },
+    "button.reset_filter_timer": {
+      "name": "Rest fan runtime",
     }
   },
   "services": {
