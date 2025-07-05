@@ -2,10 +2,28 @@
   "config": {
     "step": {
       "user": {
-        "title": "Thermex Hood Integration",
+        "title": "Thermex Hood Connection",
+        "description": "Enter Thermex Hood IP og API-password.",
         "data": {
-          "host": "Device IP",
-          "api-key": "Password"
+          "host": "Hood IP-adress",
+          "api_key": "API-password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect. Check IP and password."
+    },
+    "abort": {
+      "already_configured": "This Thermex Hood have already been configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Thermex options",
+        "data": {
+          "enable_decolight": "Aktivate DecoLight",
+          "fan_alert_hours": "Filter cleaning notice after (hours)"
         }
       }
     }
@@ -13,18 +31,18 @@
   "entity": {
     "sensor": {
       "themex_fan_last_reset": {
-        "name": "Time since last fan reset"
+        "name": "Last filter time reset"
       },
       "thermex_fan_rumtime": {
-        "name": "Fan rumtime since last reset"
+        "name": "Filter runtime since last reset"
       },
       "thermex_fan_threshold_alert": {
-        "name": "Fan threshold alert"
+        "name": "Filter cleaning"
       }
     },
     "button": {
       "reset_filter_timer": {
-        "name": "Rest fan runtime"
+        "name": "Reset filter time"
       
       }
     } 

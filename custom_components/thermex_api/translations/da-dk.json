@@ -27,5 +27,24 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "themex_fan_last_reset": {
+        "name": "Sidste filter rens"
+      },
+      "thermex_fan_rumtime": {
+        "name": "Filtertid siden sidste rensning"
+      },
+      "thermex_fan_threshold_alert": {
+        "name": "Filter rensning"
+      }
+    },
+    "button": {
+      "reset_filter_timer": {
+        "name": "Nulstil filter tid"
+      
+      }
+    } 
   }
 }
