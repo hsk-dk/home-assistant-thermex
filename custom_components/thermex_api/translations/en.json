@@ -11,31 +11,22 @@
     }
   },
   "entity": {
-    "sensor.themex_fan_last_reset": {
-      "name": "Time since last fan reset"
+    "sensor": {
+      "themex_fan_last_reset": {
+        "name": "Time since last fan reset"
+      },
+      "thermex_fan_rumtime": {
+        "name": "Fan rumtime since last reset"
+      },
+      "thermex_fan_threshold_alert": {
+        "name": "Fan threshold alert"
+      }
     },
-    "sensor.thermex_fan_rumtime": {
-      "name": "Fan rumtime since last reset"
-    },
-    "sensor.thermex_fan_threshold_alert": {
-      "name": "Fan threshold alert"
-    },
-    "button.reset_filter_timer": {
-      "name": "Rest fan runtime"
-    }
-  },
-  "services": {
-    "set_fan": {
-      "name": "Set Fan State",
-      "description": "Control the Thermex fan state and speed."
-    },
-    "set_light": {
-      "name": "Set Light State",
-      "description": "Control the Thermex hood lighting."
-    },
-    "reset_filter_usage": {
-      "name": "Reset Filter Usage",
-      "description": "Reset the filter usage timer after cleaning."
-    }
+    "button": {
+      "reset_filter_timer": {
+        "name": "Rest fan runtime"
+      
+      }
+    } 
   }
 }
