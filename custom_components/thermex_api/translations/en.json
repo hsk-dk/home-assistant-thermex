@@ -12,16 +12,16 @@
   },
   "entity": {
     "sensor.themex_fan_last_reset": {
-      "name": "Time since last fan reset",
+      "name": "Time since last fan reset"
     },
     "sensor.thermex_fan_rumtime": {
-      "name": "Fan rumtime since last reset",
+      "name": "Fan rumtime since last reset"
     },
     "sensor.thermex_fan_threshold_alert": {
-      "name": "Fan threshold alert",
+      "name": "Fan threshold alert"
     },
     "button.reset_filter_timer": {
-      "name": "Rest fan runtime",
+      "name": "Rest fan runtime"
     }
   },
   "services": {
