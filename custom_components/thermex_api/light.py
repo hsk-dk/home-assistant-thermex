@@ -63,7 +63,7 @@ class ThermexLight(LightEntity):
 
         # 2) Fetch initial state
         try:
-            status = await self._hub.send_request("status", {})
+            status = await self._hub.send_request("Status", {})
             light = status.get("Data", {}).get("Light", {})
             self._is_on = bool(light.get("lightonoff", 0))
             self._brightness = light.get("lightbrightness", 0)
