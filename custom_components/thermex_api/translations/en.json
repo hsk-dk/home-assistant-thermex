@@ -46,8 +46,8 @@
       }
     }, 
     "fan": {
-      "state": {
-        "thermex_api__thermex_fan": {
+      "thermex_api_thermex_fan": {
+        "state": {
           "off": "Off",
           "low": "Low",
           "medium": "Medium",
