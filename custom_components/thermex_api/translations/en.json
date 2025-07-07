@@ -45,9 +45,8 @@
         "name": "Reset filter time"
       
       }
-    } 
-  },
-  "state": {
+    }, 
+    "state": {
     "fan": {
       "thermex_api__thermex_fan": {
         "preset_mode": {
@@ -56,6 +55,7 @@
           "medium": "Medium",
           "high": "High",
           "boost": "Boost"
+          }
         }
       }
     }

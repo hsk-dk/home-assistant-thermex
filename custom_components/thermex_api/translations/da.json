@@ -45,17 +45,17 @@
         "name": "Nulstil filter tid"
       
       }
-    } 
-  },
-  "state": {
-    "fan": {
-      "thermex_api__thermex_fan": {
-        "preset_mode": {
-          "off": "Slukket",
-          "low": "Lav",
-          "medium": "Mellem",
-          "high": "Høj",
-          "boost": "Boost"
+    },
+    "state": {
+      "fan": {
+        "thermex_api__thermex_fan": {
+          "preset_mode": {
+            "off": "Slukket",
+            "low": "Lav",
+            "medium": "Mellem",
+            "high": "Høj",
+            "boost": "Boost"
+          }
         }
       }
     }
