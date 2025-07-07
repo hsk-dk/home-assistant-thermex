@@ -25,6 +25,7 @@ _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
 
 #STORAGE_VERSION = 1
 #STORAGE_KEY = f"{DOMAIN}_runtime"
+RUNTIME_STORAGE_FILE = f"{DOMAIN}_{{entry_id}}_runtime.json"
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -179,19 +180,19 @@ class ThermexFan(FanEntity):
             mode = "medium"
 
         # Cancel previous timer if it exists
-        if self._auto_off_handle:
-            self._auto_off_handle()
-            self._auto_off_handle = None
+        #if self._auto_off_handle:
+        #    self._auto_off_handle()
+        #    self._auto_off_handle = None
 
         # Read the setting from config entry options
-        auto_off_minutes = self._config_entry.options.get("fan_auto_off_minutes", 10)
+        #auto_off_minutes = self._config_entry.options.get("fan_auto_off_minutes", 10)
 
         # Schedule turn off
-        self._auto_off_handle = async_call_later(
-            self.hass,
-            timedelta(minutes=auto_off_minutes),
-            self._handle_auto_off
-        )
+        #self._auto_off_handle = async_call_later(
+        #    self.hass,
+        #    timedelta(minutes=auto_off_minutes),
+        #    self._handle_auto_off
+        #)
 
         # actually send the API command
         await self.async_set_preset_mode(mode)
