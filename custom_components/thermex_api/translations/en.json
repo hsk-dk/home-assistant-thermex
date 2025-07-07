@@ -14,7 +14,7 @@
       "cannot_connect": "Unable to connect. Check IP and password."
     },
     "abort": {
-      "already_configured": "This Thermex Hood haa already been configured."
+      "already_configured": "This Thermex Hood has already been configured."
     }
   },
   "options": {
@@ -33,7 +33,7 @@
       "thermex_fan_last_reset": {
         "name": "Last filter time reset"
       },
-      "thermex_fan_rumtime": {
+      "thermex_fan_runtime": {
         "name": "Filter runtime since last reset"
       },
       "thermex_fan_threshold_alert": {
@@ -43,18 +43,17 @@
     "button": {
       "reset_filter_timer": {
         "name": "Reset filter time"
-      
       }
     }, 
-    "state": {
     "fan": {
-      "thermex_api__thermex_fan": {
-        "off": "Off",
-        "low": "Low",
-        "medium": "Medium",
-        "high": "High",
-        "boost": "Boost"
-        }
+      "state": {
+        "thermex_api__thermex_fan": {
+          "off": "Off",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "boost": "Boost"
+        } 
       }
     }
   }
