@@ -14,7 +14,7 @@ from homeassistant.helpers.event import async_call_later
 
 
 from .hub import ThermexHub
-from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, STORAGE_KEY, RUNTIME_STORAGE_FILE
+from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, STORAGE_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
