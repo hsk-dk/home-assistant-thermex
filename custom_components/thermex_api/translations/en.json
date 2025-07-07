@@ -50,11 +50,13 @@
   "state": {
     "fan": {
       "thermex_api__thermex_fan": {
-        "off": "Off",
-        "low": "LavLow",
-        "medium": "Medium",
-        "high": "High",
-        "boost": "Boost"
+        "preset_mode": {
+          "off": "Off",
+          "low": "LavLow",
+          "medium": "Medium",
+          "high": "High",
+          "boost": "Boost"
+        }
       }
     }
   }
