@@ -30,7 +30,7 @@
   },
   "entity": {
     "sensor": {
-      "themex_fan_last_reset": {
+      "thermex_fan_last_reset": {
         "name": "Sidste filter rens"
       },
       "thermex_fan_rumtime": {
@@ -46,15 +46,14 @@
       
       }
     },
-    "state": {
-      "fan": {
-        "thermex_api__thermex_fan": {
-          "preset_mode": {
-            "off": "Slukket",
-            "low": "Lav",
-            "medium": "Mellem",
-            "high": "Høj",
-            "boost": "Boost"
+    "fan": {
+      "state": {
+        "thermex_api_thermex_fan": {
+          "off": "Slukket",
+          "low": "Lav",
+          "medium": "Mellem",
+          "high": "Høj",
+          "boost": "Boost"
           }
         }
       }
