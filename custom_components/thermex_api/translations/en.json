@@ -46,5 +46,14 @@
       
       }
     } 
+  },
+  "state": {
+    "fan": {
+      "off": "Off",
+      "low": "LavLow",
+      "medium": "Medium",
+      "high": "High",
+      "boost": "Boost"
+    }
   }
 }

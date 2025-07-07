@@ -46,5 +46,14 @@
       
       }
     } 
+  },
+  "state": {
+    "fan": {
+      "off": "Slukket",
+      "low": "Lav",
+      "medium": "Mellem",
+      "high": "Høj",
+      "boost": "Boost"
+    }
   }
 }

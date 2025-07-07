@@ -14,7 +14,7 @@ from homeassistant.helpers.event import async_call_later
 
 
 from .hub import ThermexHub
-from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, STORAGE_KEY
+from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, STORAGE_KEY, RUNTIME_STORAGE_FILE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,11 +22,6 @@ _LOGGER = logging.getLogger(__name__)
 PRESET_MODES = ["off", "low", "medium", "high", "boost"]
 _MODE_TO_VALUE = {"off": 0, "low": 1, "medium": 2, "high": 3, "boost": 4}
 _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
-
-#STORAGE_VERSION = 1
-#STORAGE_KEY = f"{DOMAIN}_runtime"
-
-
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Thermex fan with runtime storage."""
