@@ -49,11 +49,13 @@
   },
   "state": {
     "fan": {
-      "off": "Slukket",
-      "low": "Lav",
-      "medium": "Mellem",
-      "high": "Høj",
-      "boost": "Boost"
+      "thermex_api__thermex_fan": {
+          "off": "Slukket",
+          "low": "Lav",
+          "medium": "Mellem",
+          "high": "Høj",
+          "boost": "Boost"
+      }
     }
   }
 }
