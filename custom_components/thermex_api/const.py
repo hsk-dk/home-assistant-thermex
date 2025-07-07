@@ -1,3 +1,13 @@
+STARTUP = """
+-------------------------------------------------------------------
+Thermex Hood API integration
+
+Version: %s
+This is a custom integration
+If you have any issues with this you need to open an issue here:
+https://github.com/hsk-dk/home-assistant-thermex/issues
+-------------------------------------------------------------------
+"""
 DOMAIN = "thermex_api"
 DEFAULT_PORT = 9999
 WEBSOCKET_PATH = "/api"

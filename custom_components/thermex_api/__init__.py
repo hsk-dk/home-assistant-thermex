@@ -5,14 +5,17 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.loader import async_get_integration
 
-from .const import DOMAIN
+from .const import DOMAIN, STARTUP
 from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Thermex API from a config entry."""
+    integration = await async_get_integration(hass, DOMAIN)
+    _LOGGER.info(STARTUP, integration.version)
     host = entry.data["host"]
     api_key = entry.data["api_key"]
 

@@ -1,7 +1,7 @@
 """Thermex Fan entity with discrete presets and persistent runtime tracking."""
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
@@ -10,6 +10,8 @@ from homeassistant.helpers import entity_platform
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util.dt import utcnow
+from homeassistant.helpers.event import async_call_later
+
 
 from .hub import ThermexHub
 from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, STORAGE_KEY, RUNTIME_STORAGE_FILE
@@ -57,6 +59,8 @@ class ThermexFan(FanEntity):
         self._store = store
         self._data = data
         self._options = options
+        self._auto_off_handle = None
+
 
         # persistent state
         self._is_on = False
@@ -67,6 +71,7 @@ class ThermexFan(FanEntity):
 
         # Device info / unique ID
         self._attr_unique_id = f"{hub.unique_id}_fan"
+        self._attr_icon = "mdi:fan"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, hub.unique_id)},
             manufacturer="Thermex",
@@ -173,6 +178,21 @@ class ThermexFan(FanEntity):
         else:
             mode = "medium"
 
+        # Cancel previous timer if it exists
+        if self._auto_off_handle:
+            self._auto_off_handle()
+            self._auto_off_handle = None
+
+        # Read the setting from config entry options
+        auto_off_minutes = self._config_entry.options.get("fan_auto_off_minutes", 10)
+
+        # Schedule turn off
+        self._auto_off_handle = async_call_later(
+            self.hass,
+            timedelta(minutes=auto_off_minutes),
+            self._handle_auto_off
+        )
+
         # actually send the API command
         await self.async_set_preset_mode(mode)
         # ——— START YOUR RUNTIME CLOCK ———
@@ -213,3 +233,9 @@ class ThermexFan(FanEntity):
         })
         await self._store.async_save(self._data)
         self.schedule_update_ha_state()
+
+    async def _handle_auto_off(self, _now):
+        self._auto_off_handle = None
+        _LOGGER.info("Auto turning off fan after timeout")
+        await self.async_turn_off()
+        self.async_write_ha_state()
