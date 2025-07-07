@@ -15,3 +15,4 @@ WEBSOCKET_PATH = "/api"
 THERMEX_NOTIFY = "thermex_api_notify"
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_runtime"
+RUNTIME_STORAGE_FILE = f"{DOMAIN}_{{entry_id}}_runtime.json"
