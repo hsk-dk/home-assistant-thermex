@@ -214,6 +214,12 @@ class ThermexFan(FanEntity):
         self._is_on = False
         self._preset_mode = "off"
         self._data["last_preset"] = "off"
+        now = datetime.utcnow().timestamp()
+        run = now - float(self._last_start)
+        self._runtime += run / 3600.0
+        self._data["runtime_hours"] = self._runtime
+        self._last_start = None
+        self._data["last_start"] = None
         self.hass.async_create_task(self._store.async_save(self._data))
         self.schedule_update_ha_state()
 
