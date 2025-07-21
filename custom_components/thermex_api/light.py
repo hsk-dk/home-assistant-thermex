@@ -84,6 +84,19 @@ class ThermexLight(LightEntity):
         self._brightness = 0
         self.schedule_update_ha_state()
 
+    async def _fallback_status(self, _now):
+        if self._got_initial_state:
+            return
+        _LOGGER.warning("ThermexLight: no notify in 10s, fetching fallback status")
+        try:
+            resp = await self._hub.send_request("status", {})
+            light = resp.get("Data", {}).get("Light", {})
+            self._is_on = bool(light.get("lightonoff", 0))
+            self._brightness = light.get("lightbrightness", 0)
+            self.schedule_update_ha_state()
+        except Exception as err:
+            _LOGGER.error("ThermexLight: fallback status failed: %s", err)
+
 class ThermexDecoLight(LightEntity):
     _attr_name = "Thermex Deco Light"
     _attr_supported_color_modes = {ColorMode.HS, ColorMode.BRIGHTNESS}
@@ -166,21 +179,6 @@ class ThermexDecoLight(LightEntity):
         self._is_on = False
         self._brightness = 0
         self.schedule_update_ha_state()
-
-
-    async def _fallback_status(self, _now):
-        if self._got_initial_state:
-            return
-        _LOGGER.warning("ThermexLight: no notify in 10s, fetching fallback status")
-        try:
-            resp = await self._hub.send_request("status", {})
-            light = resp.get("Data", {}).get("Light", {})
-            self._is_on = bool(light.get("lightonoff", 0))
-            self._brightness = light.get("lightbrightness", 0)
-            self.schedule_update_ha_state()
-        except Exception as err:
-            _LOGGER.error("ThermexLight: fallback status failed: %s", err)
-
 
     async def _fallback_status(self, _now):
         if self._got_initial_state:
