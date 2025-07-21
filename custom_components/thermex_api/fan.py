@@ -95,6 +95,7 @@ class ThermexFan(FanEntity):
         }
 
     async def async_added_to_hass(self):
+        self._got_initial_state = False
         """Subscribe to hub notifications and fetch initial state."""
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("ThermexFan: awaiting initial notify for state")
@@ -109,7 +110,7 @@ class ThermexFan(FanEntity):
         """Handle incoming fan notifications and update runtime/state."""
         if ntf_type.lower() != "fan":
             return
-
+        self._got_initial_state = True
         fan = data.get("Fan", {})
         new_speed = fan.get("fanspeed", 0)
         new_on = bool(fan.get("fanonoff", 0)) and new_speed != 0

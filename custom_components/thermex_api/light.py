@@ -66,6 +66,7 @@ class ThermexLight(LightEntity):
     def _handle_notify(self, ntf_type, data):
         if ntf_type.lower() != "light":
             return
+        self._got_initial_state = True
         light = data.get("Light", {})
         self._is_on = bool(light.get("lightonoff", 0))
         self._brightness = light.get("lightbrightness", 0)
@@ -145,6 +146,7 @@ class ThermexDecoLight(LightEntity):
     def _handle_notify(self, ntf_type, data):
         if ntf_type.lower() != "decolight":
             return
+        self._got_initial_state = True
         deco = data.get("Decolight", {})
         self._is_on = bool(deco.get("decolightonoff", 0))
         self._brightness = deco.get("decolightbrightness", 0)
