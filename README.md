@@ -1,4 +1,4 @@
-# Thermex API Custom Component
+# Thermex Hood Integration Custom Component
 
 This custom component integrates Thermex extractor hoods into Home Assistant, providing control over lighting, fan speed, and monitoring filter usage.
 
@@ -6,7 +6,7 @@ This custom component integrates Thermex extractor hoods into Home Assistant, pr
 
 ## Installation
 
-Install through [HACS](https://hacs.xyz/) by adding this repository as a custom repository and selecting the integration type.
+Install through [HACS](https://hacs.xyz/) by seaching for "Thermex Hood Integration".
 
 ---
 
