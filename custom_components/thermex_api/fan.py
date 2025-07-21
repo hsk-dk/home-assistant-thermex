@@ -100,6 +100,7 @@ class ThermexFan(FanEntity):
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("ThermexFan: awaiting initial notify for state")
         async_call_later(self.hass, 10, self._fallback_status)
+
     async def async_will_remove_from_hass(self):
         """Unsubscribe on removal."""
         if self._unsub:

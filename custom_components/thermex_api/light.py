@@ -6,6 +6,7 @@ from homeassistant.components.light import (
     ATTR_RGB_COLOR,
     ColorMode,
 )
+from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util.color import color_RGB_to_hs, color_hs_to_RGB
@@ -62,8 +63,8 @@ class ThermexLight(LightEntity):
     async def async_will_remove_from_hass(self):
         if self._unsub:
             self._unsub()
-
-    def _handle_notify(self, ntf_type, data):
+    @callback
+    def _handle_notify(self, ntf_type: str, data: dict) -> None:
         if ntf_type.lower() != "light":
             return
         self._got_initial_state = True
