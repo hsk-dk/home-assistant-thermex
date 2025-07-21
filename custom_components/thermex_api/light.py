@@ -6,7 +6,6 @@ from homeassistant.components.light import (
     ATTR_RGB_COLOR,
     ColorMode,
 )
-from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util.color import color_RGB_to_hs, color_hs_to_RGB
@@ -34,8 +33,9 @@ class ThermexLight(LightEntity):
         self._hub = hub
         self._attr_unique_id = f"{hub.unique_id}_light"
         self._is_on = False
-        self._brightness = 0
+        self._brightness = 25
         self._unsub = None
+        self._got_initial_state = False
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -55,7 +55,7 @@ class ThermexLight(LightEntity):
         return self._brightness
 
     async def async_added_to_hass(self):
-        self._got_initial_state = False
+        #self._got_initial_state = False
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("ThermexLight: awaiting initial notify for state")
         async_call_later(self.hass, 10, self._fallback_status)
@@ -63,11 +63,11 @@ class ThermexLight(LightEntity):
     async def async_will_remove_from_hass(self):
         if self._unsub:
             self._unsub()
-    @callback
-    def _handle_notify(self, ntf_type: str, data: dict) -> None:
+
+    def _handle_notify(self, ntf_type, data):
         if ntf_type.lower() != "light":
+            _LOGGER.debug("ThermexLight - lower != light - %s", data)
             return
-        self._got_initial_state = True
         light = data.get("Light", {})
         self._is_on = bool(light.get("lightonoff", 0))
         self._brightness = light.get("lightbrightness", 0)
@@ -75,13 +75,16 @@ class ThermexLight(LightEntity):
 
     async def async_turn_on(self, **kwargs):
         brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
-        await self._hub.send_request("update", {"Light": {"lightonoff": 1, "lightbrightness": brightness}})
+        if brightness < 0:
+            brightness = 10
+        _LOGGER.debug("ThermexLight: Turn on - Brightness: %s",brightness)
+        await self._hub.send_request("Update", {"Light": {"lightonoff": 1, "lightbrightness": brightness}})
         self._is_on = True
         self._brightness = brightness
         self.schedule_update_ha_state()
 
     async def async_turn_off(self, **kwargs):
-        await self._hub.send_request("update", {"Light": {"lightonoff": 0, "lightbrightness": 0}})
+        await self._hub.send_request("Update", {"Light": {"lightonoff": 0, "lightbrightness": 0}})
         self._is_on = False
         self._brightness = 0
         self.schedule_update_ha_state()
@@ -96,6 +99,7 @@ class ThermexLight(LightEntity):
             self._is_on = bool(light.get("lightonoff", 0))
             self._brightness = light.get("lightbrightness", 0)
             self.schedule_update_ha_state()
+            self._got_initial_state = True
         except Exception as err:
             _LOGGER.error("ThermexLight: fallback status failed: %s", err)
 
@@ -147,7 +151,6 @@ class ThermexDecoLight(LightEntity):
     def _handle_notify(self, ntf_type, data):
         if ntf_type.lower() != "decolight":
             return
-        self._got_initial_state = True
         deco = data.get("Decolight", {})
         self._is_on = bool(deco.get("decolightonoff", 0))
         self._brightness = deco.get("decolightbrightness", 0)
@@ -171,14 +174,14 @@ class ThermexDecoLight(LightEntity):
             "decolightg": g,
             "decolightb": b,
         }
-        await self._hub.send_request("update", {"Decolight": payload})
+        await self._hub.send_request("Update", {"Decolight": payload})
         self._is_on = True
         self._brightness = brightness
         self._hs_color = color_RGB_to_hs(r, g, b)
         self.schedule_update_ha_state()
 
     async def async_turn_off(self, **kwargs):
-        await self._hub.send_request("update", {"Decolight": {"decolightonoff": 0, "decolightbrightness": 0}})
+        await self._hub.send_request("Update", {"Decolight": {"decolightonoff": 0, "decolightbrightness": 0}})
         self._is_on = False
         self._brightness = 0
         self.schedule_update_ha_state()
