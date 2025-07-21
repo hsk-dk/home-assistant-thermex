@@ -14,7 +14,7 @@ from homeassistant.helpers.event import async_call_later
 
 
 from .hub import ThermexHub
-from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, STORAGE_KEY, RUNTIME_STORAGE_FILE
+from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, RUNTIME_STORAGE_FILE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Thermex fan with runtime storage."""
     hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
-    store = Store(hass, STORAGE_VERSION,RUNTIME_STORAGE_FILE.format(entry_id=entry.entry_id))
+    store = Store(hass, STORAGE_VERSION, RUNTIME_STORAGE_FILE.format(entry_id=entry.entry_id))
     data = await store.async_load() or {}
     async_add_entities([ThermexFan(hub, store, data, entry.options)], update_before_add=True)
 
@@ -96,22 +96,9 @@ class ThermexFan(FanEntity):
 
     async def async_added_to_hass(self):
         """Subscribe to hub notifications and fetch initial state."""
-        self._unsub = async_dispatcher_connect(
-            self.hass, THERMEX_NOTIFY, self._handle_notify
-        )
-
-        try:
-            resp = await self._hub.send_request("Status", {})
-            fan = resp.get("Data", {}).get("Fan", {})
-            speed = fan.get("fanspeed", 0)
-            on = bool(fan.get("fanonoff", 0)) and speed != 0
-            self._is_on = on
-            self._preset_mode = _VALUE_TO_MODE.get(speed, "off")
-        except asyncio.TimeoutError:
-            _LOGGER.warning("ThermexFan: initial STATUS timed out")
-        except Exception as err:
-            _LOGGER.error("ThermexFan: error fetching initial STATUS: %s", err)
-
+        self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
+        _LOGGER.debug("ThermexFan: awaiting initial notify for state")
+        async_call_later(self.hass, 10, self._fallback_status)
     async def async_will_remove_from_hass(self):
         """Unsubscribe on removal."""
         if self._unsub:
@@ -127,7 +114,6 @@ class ThermexFan(FanEntity):
         new_speed = fan.get("fanspeed", 0)
         new_on = bool(fan.get("fanonoff", 0)) and new_speed != 0
         new_mode = _VALUE_TO_MODE.get(new_speed, "off")
-
         now = datetime.utcnow().timestamp()
 
         # turned on?
@@ -241,3 +227,16 @@ class ThermexFan(FanEntity):
         _LOGGER.info("Auto turning off fan after timeout")
         await self.async_turn_off()
         self.async_write_ha_state()
+    
+    async def _fallback_status(self, _now):
+        if self._got_initial_state:
+            return
+        _LOGGER.warning("ThermexFan: no notify received in 10s, fetching fallback status")
+        try:
+            resp = await self._hub.send_request("status", {})
+            fan = resp.get("Data", {}).get("Fan", {})
+            self._is_on = bool(fan.get("fanonoff", 0)) and fan.get("fanspeed", 0) != 0
+            self._preset_mode = _VALUE_TO_MODE.get(fan.get("fanspeed", 0), "off")
+            self.schedule_update_ha_state()
+        except Exception as err:
+            _LOGGER.error("ThermexFan: fallback status failed: %s", err)
