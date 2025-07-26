@@ -35,7 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     # Forward setup to all platforms
     await hass.config_entries.async_forward_entry_setups(
-        entry, ["light", "fan", "sensor", "binary_sensor","button","diagnostics"]
+        entry, ["light", "fan", "sensor", "binary_sensor","button"]
     )
     return True
 
@@ -47,7 +47,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry and clean up the hub."""
     unload_ok = await hass.config_entries.async_unload_platforms(
-        entry, ["light", "fan", "sensor", "binary_sensor","button","diagnostics"]
+        entry, ["light", "fan", "sensor", "binary_sensor","button"]
     )
     hub: ThermexHub = hass.data[DOMAIN].pop(entry.entry_id)
     await hub.close()
