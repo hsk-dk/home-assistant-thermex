@@ -12,7 +12,6 @@ from .const import THERMEX_NOTIFY, DEFAULT_PORT, WEBSOCKET_PATH
 
 _LOGGER = logging.getLogger(__name__)
 
-# Map internal keys to API request strings
 _REQUEST_MAP: Dict[str, str] = {
     "authenticate":    "Authenticate",
     "update":          "Update",
@@ -25,7 +24,6 @@ class ThermexHub:
         self._hass = hass
         self._host = host
         self._api_key = api_key
-        # stable identifier for device grouping
         self.unique_id = f"thermex_{host.replace('.', '_')}"
         self._pending: Dict[str, asyncio.Future] = {}
         self._ws_lock = asyncio.Lock()
@@ -33,14 +31,43 @@ class ThermexHub:
         self._recv_task: asyncio.Task | None = None
         self._session: aiohttp.ClientSession | None = None
 
-        # Diagnostics attributes
-        self._connection_state: str = "disconnected"  # "connected", "disconnected", "error"
-        self.last_status: dict | None = None          # Last status message from device
-        self.last_error: str | None = None            # Last error message/exception
-        self.recent_messages = collections.deque(maxlen=10)  # Recent received messages
+        self._connection_state: str = "disconnected"
+        self.last_status: dict | None = None
+        self.last_error: str | None = None
+        self.recent_messages = collections.deque(maxlen=10)
+
+        self._reconnect_lock = asyncio.Lock()
+        self._reconnect_delay = 2  # seconds, backoff could be added
+        self._reconnecting = False
+
+    async def _ensure_connected(self) -> None:
+        """Ensure that the WebSocket connection is alive, reconnect if needed."""
+        if self._ws and not self._ws.closed:
+            return
+
+        async with self._reconnect_lock:
+            if self._ws and not self._ws.closed:
+                return  # another coroutine already reconnected
+
+            # Clean up old session and ws if not already done
+            await self.close()
+
+            # Try to reconnect
+            _LOGGER.warning("ThermexHub: WebSocket disconnected, attempting to reconnect...")
+            attempt = 0
+            while True:
+                try:
+                    await self.connect()
+                    _LOGGER.info("ThermexHub: WebSocket reconnected successfully.")
+                    break
+                except Exception as err:
+                    attempt += 1
+                    self.last_error = f"Reconnect attempt {attempt} failed: {err}"
+                    _LOGGER.error("ThermexHub: Reconnect attempt %d failed: %s", attempt, err)
+                    await asyncio.sleep(self._reconnect_delay)
+                    # Optionally add a backoff strategy here
 
     async def connect(self) -> None:
-        """Connect and authenticate to the Thermex WebSocket API."""
         try:
             self._session = aiohttp.ClientSession()
             url = f"ws://{self._host}:{DEFAULT_PORT}{WEBSOCKET_PATH}"
@@ -68,10 +95,8 @@ class ThermexHub:
             raise ConnectionError(f"Authentication failed: {data}")
         _LOGGER.debug("Authenticated successfully with Thermex (status=200)")
 
-        # Start receive loop *before* further RPCs
         self._recv_task = asyncio.create_task(self._recv_loop())
 
-        # Negotiate protocol version (optional)
         try:
             proto_resp = await self.send_request("protocolversion", {})
             if proto_resp.get("Status") == 200:
@@ -83,17 +108,13 @@ class ThermexHub:
         except Exception as err:
             _LOGGER.error("ProtocolVersion request failed: %s", err)
             self.last_error = f"ProtocolVersion request failed: {err}"
-        # Dispatch an initial full STATUS so entities get startup state
-        # Sleep briefly to ensure entities have subscribed
         await asyncio.sleep(0.1)
         asyncio.create_task(self._dispatch_initial_status())
 
     async def _recv_loop(self) -> None:
-        """Consume incoming WebSocket messages and track diagnostics."""
         assert self._ws is not None
         try:
             async for msg in self._ws:
-                # Track recent messages for diagnostics
                 self.recent_messages.append(msg.data if hasattr(msg, 'data') else str(msg))
                 if msg.type == WSMsgType.TEXT:
                     try:
@@ -103,7 +124,6 @@ class ThermexHub:
                             fut = self._pending.pop(key, None)
                             if fut and not fut.done():
                                 fut.set_result(payload)
-                            # Track status message for diagnostics
                             if payload["Response"] == "Status":
                                 self.last_status = payload
                         elif "Notify" in payload:
@@ -122,17 +142,14 @@ class ThermexHub:
             self.last_error = f"Receive loop error: {err}"
         finally:
             self._connection_state = "disconnected"
+            # Optionally, trigger reconnection or notify
 
     async def send_request(self, request: str, body: Dict[str, Any]) -> Dict[str, Any]:
-        """Send a JSON-RPC request and wait for its matching response."""
-        # Ensure websocket is open
-        if not self._ws or self._ws.closed:
-            self._connection_state = "disconnected"
-            self.last_error = "Attempted to send request with closed connection"
-            raise ConnectionError("WebSocket is not connected.")
+        """Send a JSON-RPC request and wait for its matching response, reconnecting if necessary."""
+        # Ensure websocket is open (and reconnect if not)
+        await self._ensure_connected()
         fut = asyncio.get_running_loop().create_future()
         key = request.lower()
-        # Warn if a request with the same key is already pending
         if key in self._pending:
             _LOGGER.warning("Overwriting pending request for key %s", key)
         self._pending[key] = fut
@@ -141,9 +158,15 @@ class ThermexHub:
         try:
             async with self._ws_lock:
                 payload = {"Request": req_type}
-                if req_type not in ("Status", "ProtocolVersion"): 
+                if req_type not in ("Status", "ProtocolVersion"):
                     payload["Data"] = body
-                await self._ws.send_json(payload)
+                try:
+                    await self._ws.send_json(payload)
+                except aiohttp.ClientConnectionError as err:
+                    _LOGGER.warning("WebSocket send failed, will attempt reconnect: %s", err)
+                    self._connection_state = "disconnected"
+                    await self._ensure_connected()
+                    await self._ws.send_json(payload)
         except Exception as err:
             self.last_error = f"Send request error: {err}"
             self._connection_state = "error"
@@ -154,7 +177,6 @@ class ThermexHub:
             self._pending.pop(key, None)
 
     async def _dispatch_initial_status(self) -> None:
-        """Fetch and dispatch the full STATUS as individual notifications."""
         try:
             resp = await self.send_request("status", {})
             data = resp.get("Data", {}) or {}
@@ -172,7 +194,10 @@ class ThermexHub:
                 await self._recv_task
             except asyncio.CancelledError:
                 pass
+            self._recv_task = None
         if self._ws:
             await self._ws.close()
+            self._ws = None
         if self._session:
             await self._session.close()
+            self._session = None
