@@ -48,6 +48,9 @@ class ResetRuntimeButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press: reset runtime and filter time."""
+        if self._runtime_manager is None:
+            _LOGGER.error("Runtime manager is not initialized!")
+            return
         await self._runtime_manager.reset()
         await self._runtime_manager.save()
         _LOGGER.info("Thermex runtime/filter time has been reset.")
