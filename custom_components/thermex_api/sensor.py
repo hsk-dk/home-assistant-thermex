@@ -128,18 +128,18 @@ class LastResetSensor(BaseRuntimeSensor):
             return parse_datetime(iso)
         return None
      
-  class FilterTimeSensor(CoordinatorEntity, SensorEntity):
-     """Sensor to display current filter time from the Thermex hub."""
+class FilterTimeSensor(CoordinatorEntity, SensorEntity):
+    """Sensor to display current filter time from the Thermex hub."""
 
-     _attr_name = "Thermex Filter Time"
-     _attr_icon = "mdi:clock"
-     _attr_native_unit_of_measurement = "h"
-     _attr_state_class = "measurement"
+    _attr_name = "Thermex Filter Time"
+    _attr_icon = "mdi:clock"
+    _attr_native_unit_of_measurement = "h"
+    _attr_state_class = "measurement"
 
-   def __init__(self, coordinator, hub):
-      super().__init__(coordinator)
-      self._hub = hub
-      self._attr_unique_id = f"{hub.unique_id}_filter_time"
+    def __init__(self, coordinator, hub):        
+        super().__init__(coordinator)
+        self._hub = hub
+        self._attr_unique_id = f"{hub.unique_id}_filter_time"
 
     @property
     def native_value(self):
