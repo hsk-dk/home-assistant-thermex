@@ -1,9 +1,10 @@
-# File: sensor.py
+# File: custom_components/thermex_api/sensor.py
 """
 Thermex API sensors for runtime tracking of the Thermex Fan.
 Creates persistent sensors for:
  - runtime_hours
  - last_reset
+ - filter_time
 """
 import logging
 from datetime import datetime
@@ -13,10 +14,11 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.core import callback
-from homeassistant.util.dt import utc_from_timestamp, parse_datetime
+from homeassistant.util.dt import parse_datetime
 
 from .const import DOMAIN, THERMEX_NOTIFY
 from .hub import ThermexHub
+from .runtime_manager import RuntimeManager  # Ensure this is implemented as discussed
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +32,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
         STORAGE_VERSION,
         f"{DOMAIN}_{entry.entry_id}_runtime.json"
     )
-    data = await store.async_load() or {}
+    runtime_manager = RuntimeManager(store, hub)
+    await runtime_manager.load()
 
     device_info = DeviceInfo(
         identifiers={(DOMAIN, hub.unique_id)},
@@ -40,19 +43,16 @@ async def async_setup_entry(hass, entry, async_add_entities):
     )
 
     async_add_entities([
-        RuntimeHoursSensor(hub, store, data, entry.options, device_info),
-        #LastStartSensor(hub, store, data, entry.options, device_info),
-        LastResetSensor(hub, store, data, entry.options, device_info),
+        RuntimeHoursSensor(runtime_manager, device_info),
+        LastResetSensor(runtime_manager, device_info),
+        FilterTimeSensor(runtime_manager, device_info),
     ], update_before_add=True)
 
 
 class BaseRuntimeSensor(SensorEntity):
     """Base class for runtime sensors that listen to THERMEX_NOTIFY."""
-    def __init__(self, hub, store, data, options, device_info):
-        self._hub = hub
-        self._store = store
-        self._data = data
-        self._options = options
+    def __init__(self, runtime_manager, device_info):
+        self._runtime_manager = runtime_manager
         self._attr_device_info = device_info
         self._unsub = None
 
@@ -60,7 +60,6 @@ class BaseRuntimeSensor(SensorEntity):
         self._unsub = async_dispatcher_connect(
             self.hass, THERMEX_NOTIFY, self._handle_notify
         )
-        # push initial state
         self.async_write_ha_state()
 
     async def async_will_remove_from_hass(self):
@@ -80,32 +79,13 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
     _attr_unit_of_measurement = "h"
     _attr_state_class = "measurement"
 
-    def __init__(self, hub, store, data, options, device_info):
-        super().__init__(hub, store, data, options, device_info)
-        self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
+    def __init__(self, runtime_manager, device_info):
+        super().__init__(runtime_manager, device_info)
+        self._attr_unique_id = f"{device_info.identifiers[0][1]}_runtime_hours"
 
     @property
     def native_value(self):
-        return round(self._data.get("runtime_hours", 0.0), 2)
-
-
-#class LastStartSensor(BaseRuntimeSensor):
-#    """Timestamp when the Thermex fan was last turned ON."""
-#    _attr_name = "Thermex Fan Last Start"
-#    _attr_device_class = SensorDeviceClass.TIMESTAMP
-#
-#    def __init__(self, hub, store, data, options, device_info):
-#        super().__init__(hub, store, data, options, device_info)
-#        self._attr_unique_id = f"{hub.unique_id}_last_start"
-#
-#    @property
-#    def native_value(self):
-#        """Return `datetime` of last ON timestamp, or None."""
-#        ts = self._data.get("last_start")
-#        if ts is not None:
-#            # convert stored Unix timestamp -> aware UTC datetime
-#            return utc_from_timestamp(ts)
-#        return None
+        return self._runtime_manager.get_runtime_hours()
 
 
 class LastResetSensor(BaseRuntimeSensor):
@@ -113,15 +93,33 @@ class LastResetSensor(BaseRuntimeSensor):
     _attr_name = "Thermex Fan Last Reset"
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
-    def __init__(self, hub, store, data, options, device_info):
-        super().__init__(hub, store, data, options, device_info)
-        self._attr_unique_id = f"{hub.unique_id}_last_reset"
+    def __init__(self, runtime_manager, device_info):
+        super().__init__(runtime_manager, device_info)
+        self._attr_unique_id = f"{device_info.identifiers[0][1]}_last_reset"
 
     @property
     def native_value(self):
-        """Return `datetime` of last reset, or None."""
-        iso = self._data.get("last_reset")
+        iso = self._runtime_manager.get_last_reset()
         if iso:
-            # parse stored ISO string -> aware datetime
             return parse_datetime(iso)
         return None
+
+
+class FilterTimeSensor(BaseRuntimeSensor):
+    """Sensor to display current filter time from the runtime manager."""
+
+    _attr_name = "Thermex Filter Time"
+    _attr_icon = "mdi:clock"
+    _attr_native_unit_of_measurement = "h"
+    _attr_state_class = "measurement"
+
+    def __init__(self, runtime_manager, device_info):
+        super().__init__(runtime_manager, device_info)
+        self._attr_unique_id = f"{device_info.identifiers[0][1]}_filter_time"
+
+    @property
+    def native_value(self):
+        # If filter time is equivalent to runtime_hours, simply return that
+        return self._runtime_manager.get_filter_time()
+        # If you want to display runtime_hours as filter time, use:
+        # return self._runtime_manager.get_runtime_hours()

@@ -1,36 +1,39 @@
 # File: custom_components/thermex_api/button.py
+
 import logging
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.util.dt import utcnow
 
 from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, RUNTIME_STORAGE_FILE
 from .hub import ThermexHub
+from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up the Reset Filter Timer button for Thermex API."""
+    """Set up the Reset Runtime button for Thermex API."""
     hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
     store = Store(
         hass,
         STORAGE_VERSION,
         RUNTIME_STORAGE_FILE.format(entry_id=entry.entry_id),
     )
+    runtime_manager = RuntimeManager(store, hub)
+    await runtime_manager.load()
 
     async_add_entities([
-        ResetFilterButton(hub, store, entry.entry_id),
+        ResetRuntimeButton(hub, runtime_manager, entry.entry_id),
     ])
 
 
-class ResetFilterButton(ButtonEntity):
+class ResetRuntimeButton(ButtonEntity):
     """Button that resets the fan runtime (filter usage) counter."""
 
-    def __init__(self, hub: ThermexHub, store: Store, entry_id: str):
+    def __init__(self, hub: ThermexHub, runtime_manager: RuntimeManager, entry_id: str):
         self._hub = hub
-        self._store = store
+        self._runtime_manager = runtime_manager
         self._entry_id = entry_id
 
         self._attr_unique_id = f"{hub.unique_id}_reset_runtime"
@@ -44,21 +47,26 @@ class ResetFilterButton(ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Handle the button press: reset runtime, stamp new reset time, notify."""
-        # load existing data, then overwrite runtime fields
-        data = await self._store.async_load() or {}
-        data.update({
-            "runtime_hours": 0.0,
-            "last_start": None,
-            "last_reset": utcnow().isoformat(),
-        })
-        await self._store.async_save(data)
-        _LOGGER.info("Thermex filter runtime has been reset: %s", data)
+        """Handle the button press: reset runtime and filter time."""
+        await self._runtime_manager.reset()
+        await self._runtime_manager.save()
+        _LOGGER.info("Thermex runtime/filter time has been reset.")
 
-        # dispatch a 'fan' notify so sensors + fan entity refresh
+        # If the hub tracks filter time separately, reset it.
+        if hasattr(self._hub, "reset_filter_time"):
+            self._hub.reset_filter_time()
+            _LOGGER.info("Thermex filter time counter has been reset to 0.")
+
+        # Trigger fan + filter sensor updates
         async_dispatcher_send(
             self.hass,
             THERMEX_NOTIFY,
             "fan",
             {"Fan": {}},
         )
+
+        # Coordinator refresh (per entry)
+        entry_data = self.hass.data[DOMAIN].get(self._entry_id)
+        coordinator = getattr(entry_data, "coordinator", None) if entry_data else None
+        if coordinator:
+            await coordinator.async_request_refresh()

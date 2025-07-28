@@ -1,7 +1,6 @@
 """Thermex Fan entity with discrete presets and persistent runtime tracking."""
-import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
@@ -12,37 +11,37 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util.dt import utcnow
 from homeassistant.helpers.event import async_call_later
 
-
 from .hub import ThermexHub
 from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, RUNTIME_STORAGE_FILE
+from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
 
-# Preset names in the UI, mapped to the numeric API values
 PRESET_MODES = ["off", "low", "medium", "high", "boost"]
 _MODE_TO_VALUE = {"off": 0, "low": 1, "medium": 2, "high": 3, "boost": 4}
 _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Thermex fan with runtime storage."""
     hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
     store = Store(hass, STORAGE_VERSION, RUNTIME_STORAGE_FILE.format(entry_id=entry.entry_id))
-    data = await store.async_load() or {}
-    async_add_entities([ThermexFan(hub, store, data, entry.options)], update_before_add=True)
+    runtime_manager = RuntimeManager(store, hub)
+    await runtime_manager.load()
+    async_add_entities([ThermexFan(hub, runtime_manager, entry.options)], update_before_add=True)
 
-    # register a service so users can call thermost_api.reset_runtime
     platform = entity_platform.async_get_current_platform()
     platform.async_register_entity_service(
-        "reset_runtime",    # service name: thermost_api.reset_runtime
-        {},                 # no extra service schema
-        "async_reset"       # method to call on the entity
+        "reset_runtime",
+        {},
+        "async_reset"
     )
+
 
 class ThermexFan(FanEntity):
     """Thermex extractor fan with presets and runtime tracking."""
 
     _attr_name = "Thermex Fan"
-    # Show presets + on/off buttons, no slider
     _attr_supported_features = (
         FanEntityFeature.PRESET_MODE
         | FanEntityFeature.TURN_ON
@@ -50,23 +49,13 @@ class ThermexFan(FanEntity):
     )
     _attr_preset_modes = PRESET_MODES
 
-    def __init__(self, hub: ThermexHub, store: Store, data: dict, options: dict):
+    def __init__(self, hub: ThermexHub, runtime_manager: RuntimeManager, options: dict):
         self._hub = hub
-        self._store = store
-        self._data = data
+        self._runtime_manager = runtime_manager
         self._options = options
-        self._got_initial_state = False
         self._auto_off_handle = None
+        self._unsub = None
 
-
-        # persistent state
-        self._is_on = False
-        self._preset_mode = data.get("last_preset", "off")
-        self._runtime = data.get("runtime_hours", 0.0)
-        self._last_start = data.get("last_start")  # timestamp float or None
-        self._last_reset = data.get("last_reset")  # ISO timestamp str or None
-
-        # Device info / unique ID
         self._attr_unique_id = f"{hub.unique_id}_fan"
         self._attr_icon = "mdi:fan"
         self._attr_device_info = DeviceInfo(
@@ -75,7 +64,11 @@ class ThermexFan(FanEntity):
             name=f"Thermex Hood ({hub._host})",
             model="ESP-API",
         )
-        self._unsub = None
+
+        # State
+        self._is_on = False
+        self._preset_mode = self._runtime_manager.get_last_preset()
+        self._got_initial_state = False
 
     @property
     def is_on(self) -> bool:
@@ -88,20 +81,21 @@ class ThermexFan(FanEntity):
     @property
     def extra_state_attributes(self) -> dict:
         return {
-            "runtime_hours": round(self._runtime, 2),
-            "last_start": self._last_start or "unknown",
-            "last_reset": self._last_reset or "never",
+            "runtime_hours": self._runtime_manager.get_runtime_hours(),
+            "filter_time": self._runtime_manager.get_filter_time(),
+            "last_reset": self._runtime_manager.get_last_reset() or "never",
+            "last_preset": self._runtime_manager.get_last_preset(),
             "threshold": self._options.get("runtime_threshold", 30),
-            "alert": self._runtime >= self._options.get("runtime_threshold", 30),
+            "alert": self._runtime_manager.get_runtime_hours() >= self._options.get("runtime_threshold", 30),
+            "is_on": self._is_on,
         }
 
     async def async_added_to_hass(self):
-        """Subscribe to hub notifications and fetch initial state."""
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("ThermexFan: awaiting initial notify for state")
         async_call_later(self.hass, 10, self._fallback_status)
+
     async def async_will_remove_from_hass(self):
-        """Unsubscribe on removal."""
         if self._unsub:
             self._unsub()
 
@@ -115,45 +109,37 @@ class ThermexFan(FanEntity):
         new_speed = fan.get("fanspeed", 0)
         new_on = bool(fan.get("fanonoff", 0)) and new_speed != 0
         new_mode = _VALUE_TO_MODE.get(new_speed, "off")
-        now = datetime.utcnow().timestamp()
 
         # turned on?
         if new_on and not self._is_on:
-            self._last_start = now
-            self._data["last_start"] = now
+            self._runtime_manager.start()
+            self.hass.async_create_task(self._runtime_manager.save())
 
         # turned off?
-        if not new_on and self._is_on and self._last_start:
-            run = now - float(self._last_start)
-            self._runtime += run / 3600.0
-            self._data["runtime_hours"] = self._runtime
-            self._last_start = None
-            self._data["last_start"] = None
+        if not new_on and self._is_on:
+            self._runtime_manager.stop()
+            self.hass.async_create_task(self._runtime_manager.save())
 
         # always record last_reset on first on
-        if new_on and self._last_reset is None:
-            iso = utcnow().isoformat()
-            self._last_reset = iso
-            self._data["last_reset"] = iso
+        if new_on and self._runtime_manager.get_last_reset() is None:
+            self._runtime_manager.reset()
+            self.hass.async_create_task(self._runtime_manager.save())
 
-        # update
+        # update local state
         self._is_on = new_on
         self._preset_mode = new_mode
+        self._runtime_manager.set_last_preset(new_mode)
 
-        # persist storage
-        self.hass.async_create_task(self._store.async_save(self._data))
+        self.hass.async_create_task(self._runtime_manager.save())
 
-        # update entity
+        self._got_initial_state = True  # Mark that we've received initial state
         self.schedule_update_ha_state()
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
-        """Switch API on/off with speed, let _handle_notify do the rest."""
         speed = _MODE_TO_VALUE[preset_mode]
         await self._hub.send_request("Update", {"Fan": {"fanonoff": int(speed > 0), "fanspeed": speed}})
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs) -> None:
-        """Turn on via preset (or last known)."""
-        # decide which speed to send
         if preset_mode:
             mode = preset_mode
         elif self._preset_mode and self._preset_mode != "off":
@@ -161,66 +147,26 @@ class ThermexFan(FanEntity):
         else:
             mode = "medium"
 
-        # Cancel previous timer if it exists
-        #if self._auto_off_handle:
-        #    self._auto_off_handle()
-        #    self._auto_off_handle = None
-
-        # Read the setting from config entry options
-        #auto_off_minutes = self._config_entry.options.get("fan_auto_off_minutes", 10)
-
-        # Schedule turn off
-        #self._auto_off_handle = async_call_later(
-        #    self.hass,
-        #    timedelta(minutes=auto_off_minutes),
-        #    self._handle_auto_off
-        #)
-
-        # actually send the API command
         await self.async_set_preset_mode(mode)
-        # ——— START YOUR RUNTIME CLOCK ———
-        now_ts = datetime.utcnow().timestamp()
-        if not self._last_start:
-            self._last_start = now_ts
-            self._data["last_start"] = now_ts
-        if self._last_reset is None:
-            iso = utcnow().isoformat()
-            self._last_reset = iso
-            self._data["last_reset"] = iso 
-        # ——— OPTIMISTIC STATE UPDATE ———
+        self._runtime_manager.start()
+        self._runtime_manager.set_last_preset(mode)
+        await self._runtime_manager.save()
         self._is_on = True
         self._preset_mode = mode
-        self._data["last_preset"] = mode
-        self.hass.async_create_task(self._store.async_save(self._data))
         self.schedule_update_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
-        """Turn off."""
         await self.async_set_preset_mode("off")
-        # ——— OPTIMISTIC STATE UPDATE ———
+        self._runtime_manager.stop()
+        self._runtime_manager.set_last_preset("off")
+        await self._runtime_manager.save()
         self._is_on = False
         self._preset_mode = "off"
-        self._data["last_preset"] = "off"
-        now = datetime.utcnow().timestamp()
-        run = now - float(self._last_start)
-        self._runtime += run / 3600.0
-        self._data["runtime_hours"] = self._runtime
-        self._last_start = None
-        self._data["last_start"] = None
-        self.hass.async_create_task(self._store.async_save(self._data))
         self.schedule_update_ha_state()
 
     async def async_reset(self, **kwargs) -> None:
-        """Reset the runtime counter."""
-        self._runtime = 0.0
-        self._last_start = None
-        self._last_reset = utcnow().isoformat()
-        self._data.update({
-            "runtime_hours": self._runtime,
-            "last_start": None,
-            "last_reset": self._last_reset,
-        })
-        await self._store.async_save(self._data)
+        self._runtime_manager.reset()
+        await self._runtime_manager.save()
         self.schedule_update_ha_state()
 
     async def _handle_auto_off(self, _now):
@@ -238,6 +184,8 @@ class ThermexFan(FanEntity):
             fan = resp.get("Data", {}).get("Fan", {})
             self._is_on = bool(fan.get("fanonoff", 0)) and fan.get("fanspeed", 0) != 0
             self._preset_mode = _VALUE_TO_MODE.get(fan.get("fanspeed", 0), "off")
+            self._runtime_manager.set_last_preset(self._preset_mode)
+            self._got_initial_state = True
             self.schedule_update_ha_state()
         except Exception as err:
             _LOGGER.error("ThermexFan: fallback status failed: %s", err)
