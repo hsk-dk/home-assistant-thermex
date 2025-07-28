@@ -127,6 +127,7 @@ class ThermexFan(FanEntity):
             run = now - float(self._last_start)
             self._runtime += run / 3600.0
             self._data["runtime_hours"] = self._runtime
+            self._hub.update_filter_time_from_runtime(self._runtime)
             self._last_start = None
             self._data["last_start"] = None
 
@@ -209,6 +210,8 @@ class ThermexFan(FanEntity):
         self._data["last_start"] = None
         self.hass.async_create_task(self._store.async_save(self._data))
         self.schedule_update_ha_state()
+        # Sync to hub filter time (if value changed)
+        self._hub.update_filter_time_from_runtime(self._runtime)
 
     async def async_reset(self, **kwargs) -> None:
         """Reset the runtime counter."""
