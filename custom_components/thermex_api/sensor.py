@@ -82,7 +82,7 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
 
     def __init__(self, runtime_manager, device_info):
         super().__init__(runtime_manager, device_info)
-        self._attr_unique_id = f"{entry_id}_runtime_hours"
+        self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
 
     @property
     def native_value(self):
@@ -96,7 +96,7 @@ class LastResetSensor(BaseRuntimeSensor):
 
     def __init__(self, runtime_manager, device_info):
         super().__init__(runtime_manager, device_info)
-        self._attr_unique_id = f"{entry_id}_last_reset"
+        self._attr_unique_id = f"{hub.unique_id}_last_reset"
 
     @property
     def native_value(self):
@@ -116,7 +116,7 @@ class FilterTimeSensor(BaseRuntimeSensor):
 
     def __init__(self, runtime_manager, device_info):
         super().__init__(runtime_manager, device_info)
-        self._attr_unique_id = f"{entry_id}_filter_time"
+        self._attr_unique_id = f"{hub.unique_id}_filter_time"
 
     @property
     def native_value(self):
