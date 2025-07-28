@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.entity import DeviceInfo
@@ -43,6 +44,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         RuntimeHoursSensor(hub, store, data, entry.options, device_info),
         #LastStartSensor(hub, store, data, entry.options, device_info),
         LastResetSensor(hub, store, data, entry.options, device_info),
+        FilterTimeSensor(coordinator, hub),
     ], update_before_add=True)
 
 
@@ -125,3 +127,20 @@ class LastResetSensor(BaseRuntimeSensor):
             # parse stored ISO string -> aware datetime
             return parse_datetime(iso)
         return None
+     
+  class FilterTimeSensor(CoordinatorEntity, SensorEntity):
+     """Sensor to display current filter time from the Thermex hub."""
+
+     _attr_name = "Thermex Filter Time"
+     _attr_icon = "mdi:clock"
+     _attr_native_unit_of_measurement = "h"
+     _attr_state_class = "measurement"
+
+   def __init__(self, coordinator, hub):
+      super().__init__(coordinator)
+      self._hub = hub
+      self._attr_unique_id = f"{hub.unique_id}_filter_time"
+
+    @property
+    def native_value(self):
+        return self.coordinator.data.get("filtertime", 0)
