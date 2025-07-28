@@ -44,21 +44,31 @@ class ResetFilterButton(ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Handle the button press: reset runtime, stamp new reset time, notify."""
-        # load existing data, then overwrite runtime fields
+        """Handle the button press: reset runtime and filter time."""
+        # Reset persistent runtime tracking (fan)
         data = await self._store.async_load() or {}
+        reset_time = utcnow().isoformat()
         data.update({
             "runtime_hours": 0.0,
             "last_start": None,
-            "last_reset": utcnow().isoformat(),
+            "last_reset": reset_time,
         })
         await self._store.async_save(data)
-        _LOGGER.info("Thermex filter runtime has been reset: %s", data)
+        _LOGGER.info("Thermex runtime has been reset: %s", data)
 
-        # dispatch a 'fan' notify so sensors + fan entity refresh
+        # Reset global filtertime (hub)
+        self._hub.reset_filter_time()
+        _LOGGER.info("Thermex filter time counter has been reset to 0.")
+
+        # Trigger fan + filter sensor updates
         async_dispatcher_send(
             self.hass,
             THERMEX_NOTIFY,
             "fan",
             {"Fan": {}},
         )
+
+        # If you use a coordinator-based sensor (like filter time), force refresh
+        coordinator = self.hass.data[DOMAIN].get("coordinator")
+        if coordinator:
+            await coordinator.async_request_refresh()
