@@ -64,9 +64,3 @@ class ResetRuntimeButton(ButtonEntity):
             "fan",
             {"Fan": {}},
         )
-
-        # Coordinator refresh (per entry)
-        entry_data = self.hass.data[DOMAIN].get(self._entry_id)
-        coordinator = getattr(entry_data, "coordinator", None) if entry_data else None
-        if coordinator:
-            await coordinator.async_request_refresh()

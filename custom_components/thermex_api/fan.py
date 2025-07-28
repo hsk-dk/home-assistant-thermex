@@ -163,6 +163,8 @@ class ThermexFan(FanEntity):
         self._is_on = False
         self._preset_mode = "off"
         self.schedule_update_ha_state()
+        # Sync to hub filter time (if value changed)
+        self._hub.update_filter_time_from_runtime(self._runtime)
 
     async def async_reset(self, **kwargs) -> None:
         self._runtime_manager.reset()

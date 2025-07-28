@@ -6,12 +6,28 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.loader import async_get_integration
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from datetime import timedelta
 
 from .const import DOMAIN, STARTUP
 from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
+async def async_create_coordinator(hass: HomeAssistant, hub: ThermexHub) -> DataUpdateCoordinator:
+    async def async_update_data():
+        try:
+            return hub.get_coordinator_data()
+        except Exception as err:
+            raise UpdateFailed(f"Failed to fetch data: {err}") from err
 
+    return DataUpdateCoordinator(
+        hass,
+        _LOGGER,
+        name="thermex_coordinator",
+        update_method=async_update_data,
+        update_interval=timedelta(seconds=30),
+    )
+    
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Thermex API from a config entry."""
     integration = await async_get_integration(hass, DOMAIN)
@@ -29,13 +45,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Store hub instance for this entry
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
 
+    # Create and refresh coordinator
+    coordinator = await async_create_coordinator(hass, hub)
+    await coordinator.async_config_entry_first_refresh()
+
+    # Store coordinator globally
+    hass.data[DOMAIN]["coordinator"] = coordinator
+
     # Reload integration when options change
     entry.async_on_unload(
         entry.add_update_listener(_async_update_listener)
     )
     # Forward setup to all platforms
     await hass.config_entries.async_forward_entry_setups(
-        entry, ["light", "fan", "sensor", "binary_sensor","button","diagnostics"]
+        entry, ["light", "fan", "sensor", "binary_sensor","button"]
     )
     return True
 
@@ -47,8 +70,9 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry and clean up the hub."""
     unload_ok = await hass.config_entries.async_unload_platforms(
-        entry, ["light", "fan", "sensor", "binary_sensor","button","diagnostics"]
+        entry, ["light", "fan", "sensor", "binary_sensor","button"]
     )
     hub: ThermexHub = hass.data[DOMAIN].pop(entry.entry_id)
     await hub.close()
+    hass.data[DOMAIN].pop("coordinator", None)
     return unload_ok
