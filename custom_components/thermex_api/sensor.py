@@ -52,7 +52,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 class BaseRuntimeSensor(SensorEntity):
     """Base class for runtime sensors that listen to THERMEX_NOTIFY."""
-    def __init__(self, runtime_manager, device_info):
+    def __init__(self, hub, runtime_manager, device_info):
+        self._hub = hub
         self._runtime_manager = runtime_manager
         self._attr_device_info = device_info
         self._unsub = None
@@ -80,8 +81,8 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
     _attr_unit_of_measurement = "h"
     _attr_state_class = "measurement"
 
-    def __init__(self, runtime_manager, device_info):
-        super().__init__(runtime_manager, device_info)
+    def __init__(self, hub, runtime_manager, device_info):
+        super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
 
     @property
@@ -94,8 +95,8 @@ class LastResetSensor(BaseRuntimeSensor):
     _attr_name = "Thermex Fan Last Reset"
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
-    def __init__(self, runtime_manager, device_info):
-        super().__init__(runtime_manager, device_info)
+    def __init__(self, hub, runtime_manager, device_info):
+        super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_last_reset"
 
     @property
@@ -114,8 +115,8 @@ class FilterTimeSensor(BaseRuntimeSensor):
     _attr_native_unit_of_measurement = "h"
     _attr_state_class = "measurement"
 
-    def __init__(self, runtime_manager, device_info):
-        super().__init__(runtime_manager, device_info)
+    def __init__(self, hub, runtime_manager, device_info):
+        super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_filter_time"
 
     @property
