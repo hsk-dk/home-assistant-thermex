@@ -1,0 +1,3 @@
+reset_runtime:
+  description: "Reset the Thermex fan’s runtime counter to zero"
+  fields: {}
