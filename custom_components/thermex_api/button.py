@@ -32,6 +32,7 @@ class ResetRuntimeButton(ButtonEntity):
         self._entry_id = entry_id
 
         self._attr_unique_id = f"{hub.unique_id}_reset_runtime"
+        self._attr_translation_key = "thermex_button_reset_runtime"
         self._attr_name = "Reset Filter Timer"
         self._attr_icon = "mdi:refresh"
         self._attr_device_info = DeviceInfo(
