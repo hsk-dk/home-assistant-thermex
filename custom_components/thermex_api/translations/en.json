@@ -3,10 +3,10 @@
     "step": {
       "user": {
         "title": "Thermex Hood Connection",
-        "description": "Enter Thermex Hood IP and API-password.",
+        "description": "Enter Thermex hood IP and API password.",
         "data": {
-          "host": "Hood IP-address",
-          "api_key": "API-password"
+          "host": "Hood IP address",
+          "api_key": "API password"
         }
       }
     },
@@ -14,7 +14,7 @@
       "cannot_connect": "Unable to connect. Check IP and password."
     },
     "abort": {
-      "already_configured": "This Thermex Hood has already been configured."
+      "already_configured": "This Thermex hood has already been configured."
     }
   },
   "options": {
@@ -30,30 +30,44 @@
   },
   "entity": {
     "sensor": {
-      "thermex_fan_last_reset": {
+      "thermex_sensor_last_reset": {
         "name": "Last filter time reset"
       },
-      "thermex_fan_runtime": {
+      "thermex_sensor_runtime_hours": {
         "name": "Filter runtime since last reset"
       },
-      "thermex_fan_threshold_alert": {
-        "name": "Filter cleaning"
+      "thermex_sensor_filter_time": {
+        "name": "Filter time"
       }
     },
     "button": {
-      "reset_filter_timer": {
+      "thermex_button_reset_runtime": {
         "name": "Reset filter time"
       }
-    }, 
+    },
     "fan": {
-      "thermex_api_thermex_fan": {
+      "thermex_fan": {
+        "name": "Thermex Fan",
         "state": {
           "off": "Off",
           "low": "Low",
           "medium": "Medium",
           "high": "High",
           "boost": "Boost"
-        } 
+        }
+      }
+    },
+    "binary_sensor": {
+      "thermex_binary_sensor_threshold_alert": {
+        "name": "Filter cleaning needed"
+      }
+    },
+    "light": {
+      "thermex_light": {
+        "name": "Thermex Light"
+      },
+      "thermex_decolight": {
+        "name": "Thermex Deco Light"
       }
     }
   }
