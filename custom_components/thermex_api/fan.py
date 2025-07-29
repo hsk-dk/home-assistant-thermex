@@ -41,7 +41,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class ThermexFan(FanEntity):
     """Thermex extractor fan with presets and runtime tracking."""
 
-    _attr_name = "Thermex Fan"
     _attr_supported_features = (
         FanEntityFeature.PRESET_MODE
         | FanEntityFeature.TURN_ON
@@ -57,6 +56,7 @@ class ThermexFan(FanEntity):
         self._unsub = None
         
         self._attr_translation_key = "thermex_fan"
+        self._attr_has_entity_name = True
         self._attr_unique_id = f"{hub.unique_id}_fan"
         self._attr_icon = "mdi:fan"
         self._attr_device_info = DeviceInfo(
