@@ -79,7 +79,7 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
     def __init__(self, hub, runtime_manager, device_info):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
-
+        self._attr_translation_key = "thermex_sensor_runtime_hours"
     @property
     def native_value(self):
         return self._runtime_manager.get_runtime_hours()
@@ -93,7 +93,7 @@ class LastResetSensor(BaseRuntimeSensor):
     def __init__(self, hub, runtime_manager, device_info):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_last_reset"
-
+        self._attr_translation_key = "thermex_sensor_last_reset"
     @property
     def native_value(self):
         iso = self._runtime_manager.get_last_reset()
@@ -113,7 +113,8 @@ class FilterTimeSensor(BaseRuntimeSensor):
     def __init__(self, hub, runtime_manager, device_info):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_filter_time"
-
+        self._attr_translation_key = "thermex_sensor_filter_time"
+     
     @property
     def native_value(self):
         # If filter time is equivalent to runtime_hours, simply return that
