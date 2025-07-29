@@ -1,15 +1,13 @@
 import asyncio
-import json
-from pathlib import Path
 import logging
 from typing import Any, Dict
 import collections
-
+import json
 import aiohttp
 from aiohttp import WSMsgType, ClientWebSocketResponse
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from .const import THERMEX_NOTIFY, DEFAULT_PORT, WEBSOCKET_PATH
+from .const import DOMAIN, THERMEX_NOTIFY, DEFAULT_PORT, WEBSOCKET_PATH
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,8 +19,9 @@ _REQUEST_MAP: Dict[str, str] = {
 }
 
 class ThermexHub:
-    def __init__(self, hass: HomeAssistant, host: str, api_key: str):
+    def __init__(self, hass: HomeAssistant, host: str, api_key: str, entry_id: str):
         self._hass = hass
+        self._entry_id = entry_id 
         self._host = host
         self._api_key = api_key
         self.unique_id = f"thermex_{host.replace('.', '_')}"
@@ -40,10 +39,6 @@ class ThermexHub:
         self._reconnect_lock = asyncio.Lock()
         self._reconnect_delay = 2  # seconds, backoff could be added
         self._reconnecting = False
-
-        self._filter_time = 0
-        self._json_path = Path(hass.config.path("thermex_filtertime.json"))
-        self._load_filter_time()
 
     async def _ensure_connected(self) -> None:
         """Ensure that the WebSocket connection is alive, reconnect if needed."""
@@ -222,37 +217,10 @@ class ThermexHub:
         except Exception as exc:
             _LOGGER.warning("Initial STATUS request failed: %s", exc)
 
-    def _load_filter_time(self):
-        if self._json_path.exists():
-            try:
-                with open(self._json_path, "r") as f:
-                    self._filter_time = json.load(f).get("filtertime", 0)
-            except Exception as e:
-                _LOGGER.error("Failed to load filter time: %s", e)
-                self._filter_time = 0
-        else:
-            self._filter_time = 0
-
-    def _save_filter_time(self):
-        try:
-            with open(self._json_path, "w") as f:
-                json.dump({"filtertime": self._filter_time}, f)
-        except Exception as e:
-            _LOGGER.error("Failed to save filter time: %s", e)
-
-    def reset_filter_time(self):
-        self._filter_time = 0
-        self._save_filter_time()
-
-    def update_filter_time_from_runtime(self, runtime_hours: float):
-        new_value = int(runtime_hours)
-        if new_value != self._filter_time:
-            self._filter_time = new_value
-            self._save_filter_time()
-
     def get_coordinator_data(self):
+        runtime_manager = self.runtime_manager
         return {
-            "filtertime": self._filter_time,
+            "filtertime": runtime_manager.get_filter_time(),
             "connection_state": self._connection_state,
             "last_error": self.last_error,
         }
