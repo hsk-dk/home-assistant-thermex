@@ -19,7 +19,8 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Setup Thermex main and deco lights."""
-    hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    hub: ThermexHub = entry_data["hub"]
     enable_decolight = entry.options.get("enable_decolight", False)
     entities: list[LightEntity] = [ThermexLight(hub)]
     if enable_decolight:
