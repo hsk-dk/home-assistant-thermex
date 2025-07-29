@@ -27,14 +27,9 @@ STORAGE_VERSION = 1
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up persistent runtime-tracking sensors for the Thermex fan."""
-    hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
-    store = Store(
-        hass,
-        STORAGE_VERSION,
-        f"{DOMAIN}_{entry.entry_id}_runtime.json"
-    )
-    runtime_manager = RuntimeManager(store, hub)
-    await runtime_manager.load()
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    hub = entry_data["hub"]
+    runtime_manager = entry_data["runtime_manager"]
 
     device_info = DeviceInfo(
         identifiers={(DOMAIN, hub.unique_id)},
