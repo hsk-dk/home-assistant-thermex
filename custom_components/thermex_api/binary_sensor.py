@@ -9,10 +9,10 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.storage import Store
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.core import callback
 
+from .runtime_manager import RuntimeManager
 from .const import DOMAIN, THERMEX_NOTIFY
 from .hub import ThermexHub
 
@@ -21,11 +21,9 @@ STORAGE_VERSION = 1
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Thermex filter‐alert binary sensor."""
-    hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
-    store = Store(
-        hass, STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_runtime.json"
-    )
-    data = await store.async_load() or {}
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    hub: ThermexHub = entry_data["hub"]
+    runtime_manager: RuntimeManager = entry_data["runtime_manager"]
 
     device_info = DeviceInfo(
         identifiers={(DOMAIN, hub.unique_id)},
@@ -35,7 +33,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     )
 
     async_add_entities([
-        ThermexFilterAlert(hub, store, data, entry.options, device_info)
+        ThermexFilterAlert(hub, runtime_manager, entry.options, device_info)
     ], update_before_add=True)
 
 class ThermexFilterAlert(BinarySensorEntity):
@@ -43,10 +41,9 @@ class ThermexFilterAlert(BinarySensorEntity):
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_name = "Thermex Fan Threshold Exceeded"
 
-    def __init__(self, hub, store, data, options, device_info):
+    def __init__(self, hub, runtime_manager, options, device_info):
         self._hub = hub
-        self._store = store
-        self._data = data
+        self._runtime_manager = runtime_manager
         self._options = options
         self._attr_device_info = device_info
         self._attr_unique_id = f"{hub.unique_id}_threshold_alert"
@@ -55,7 +52,7 @@ class ThermexFilterAlert(BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         return (
-            self._data.get("runtime_hours", 0.0)
+            self._runtime_manager.get_runtime_hours()
             >= self._options.get("runtime_threshold", 30)
         )
 

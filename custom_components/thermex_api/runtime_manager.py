@@ -1,7 +1,9 @@
 # custom_components/thermex_api/runtime_manager.py
-
+import logging
 from datetime import datetime
 from homeassistant.util.dt import utcnow
+
+_LOGGER = logging.getLogger(__name__)
 
 class RuntimeManager:
     def __init__(self, store, hub):
@@ -27,6 +29,7 @@ class RuntimeManager:
             self._data["last_start"] = None
 
     def reset(self):
+        _LOGGER.info("Thermex filter time counter has been reset to 0.")
         self._data["runtime_hours"] = 0.0
         self._data["last_reset"] = utcnow().isoformat()
         self._data["last_start"] = None
