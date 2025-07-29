@@ -29,14 +29,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 class ThermexLight(LightEntity):
     """Main light entity for Thermex hood."""
-
-    _attr_name = "Thermex Light"
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
     _attr_color_mode = ColorMode.BRIGHTNESS
 
     def __init__(self, hub: ThermexHub):
         self._hub = hub
         self._attr_unique_id = f"{hub.unique_id}_light"
+        self._attr_translation_key = "thermex_light"
+        self._attr_has_entity_name = True
         self._is_on: bool = False
         self._brightness: int = 25
         self._unsub = None
@@ -113,14 +113,14 @@ class ThermexLight(LightEntity):
 
 class ThermexDecoLight(LightEntity):
     """Deco light entity for Thermex hood."""
-
-    _attr_name = "Thermex Deco Light"
     _attr_supported_color_modes = {ColorMode.HS, ColorMode.BRIGHTNESS}
     _attr_color_mode = ColorMode.HS
 
     def __init__(self, hub: ThermexHub):
         self._hub = hub
         self._attr_unique_id = f"{hub.unique_id}_decolight"
+        self._attr_translation_key = "thermex_decolight"
+        self._attr_has_entity_name = True
         self._is_on: bool = False
         self._brightness: int = 0
         self._hs_color: tuple[float, float] = (0.0, 0.0)

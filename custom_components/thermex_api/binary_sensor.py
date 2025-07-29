@@ -39,7 +39,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class ThermexFilterAlert(BinarySensorEntity):
     """Binary sensor that goes ON when runtime exceeds threshold."""
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
-    _attr_name = "Thermex Fan Threshold Exceeded"
 
     def __init__(self, hub, runtime_manager, options, device_info):
         self._hub = hub
@@ -47,6 +46,8 @@ class ThermexFilterAlert(BinarySensorEntity):
         self._options = options
         self._attr_device_info = device_info
         self._attr_unique_id = f"{hub.unique_id}_threshold_alert"
+        self._attr_translation_key = "thermex_binary_sensor_threshold_alert"
+        self._attr_has_entity_name = True
         self._unsub = None
 
     @property

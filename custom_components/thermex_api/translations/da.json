@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Forbind til Thermex",
-        "description": "Indtast Thermex Emhætte ip og API-password.",
+        "title": "Forbind til Thermex-emhætten",
+        "description": "Indtast Thermex-emhættens IP-adresse og API-password.",
         "data": {
           "host": "Emhætte IP-adresse",
           "api_key": "API-password"
@@ -11,18 +11,18 @@
       }
     },
     "error": {
-      "cannot_connect": "Kunne ikke oprette forbindelse til Thermex Emhætte. Tjek IP og password."
+      "cannot_connect": "Kunne ikke oprette forbindelse. Tjek IP og password."
     },
     "abort": {
-      "already_configured": "Denne Thermex-enhed er allerede konfigureret."
+      "already_configured": "Denne Thermex-emhætte er allerede konfigureret."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Thermex indstillinger",
+        "title": "Thermex-indstillinger",
         "data": {
-          "enable_decolight": "Aktivér DecoLight",
+          "enable_decolight": "Aktivér Decolys",
           "fan_alert_hours": "Filter rengøringsadvarsel efter (timer)"
         }
       }
@@ -30,25 +30,25 @@
   },
   "entity": {
     "sensor": {
-      "thermex_fan_last_reset": {
-        "name": "Sidste filter rens"
+      "thermex_sensor_last_reset": {
+        "name": "Sidste nulstilling af filtertid"
       },
-      "thermex_fan_rumtime": {
-        "name": "Filtertid siden sidste rensning"
+      "thermex_sensor_runtime_hours": {
+        "name": "Filterdriftstid siden sidste nulstilling"
       },
-      "thermex_fan_threshold_alert": {
-        "name": "Filter rensning"
+      "thermex_sensor_filter_time": {
+        "name": "Filtertid"
       }
     },
     "button": {
-      "reset_filter_timer": {
-        "name": "Nulstil filter tid"
-      
+      "thermex_button_reset_runtime": {
+        "name": "Nulstil filtertid"
       }
     },
     "fan": {
-      "state": {
-        "thermex_api_thermex_fan": {
+      "thermex_fan": {
+        "name": "Thermex-ventilator",
+        "state": {
           "off": "Slukket",
           "low": "Lav",
           "medium": "Mellem",
@@ -56,7 +56,19 @@
           "boost": "Boost"
         }
       }
+    },
+    "binary_sensor": {
+      "thermex_binary_sensor_threshold_alert": {
+        "name": "Kræver filterrensning"
+      }
+    },
+    "light": {
+      "thermex_light": {
+        "name": "Enhættelys"
+      },
+      "thermex_decolight": {
+        "name": "Enhætte Decolys"
+      }
     }
   }
 }
-
