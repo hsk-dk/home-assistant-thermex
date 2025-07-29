@@ -150,37 +150,68 @@ class ThermexHub:
             # Optionally, trigger reconnection or notify
 
     async def send_request(self, request: str, body: Dict[str, Any]) -> Dict[str, Any]:
-        """Send a JSON-RPC request and wait for its matching response, reconnecting if necessary."""
+        """Send a JSON-RPC request and wait for its matching response, with one retry and reconnect on repeated timeout."""
         # Ensure websocket is open (and reconnect if not)
         await self._ensure_connected()
-        fut = asyncio.get_running_loop().create_future()
+
+        # Prepare future and track it by lowercase key
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
         key = request.lower()
         if key in self._pending:
             _LOGGER.warning("Overwriting pending request for key %s", key)
         self._pending[key] = fut
 
+        # Map to actual RPC request name
         req_type = _REQUEST_MAP.get(key, request)
-        try:
-            async with self._ws_lock:
-                payload = {"Request": req_type}
-                if req_type not in ("Status", "ProtocolVersion"):
-                    payload["Data"] = body
-                try:
-                    await self._ws.send_json(payload)
-                except aiohttp.ClientConnectionError as err:
-                    _LOGGER.warning("WebSocket send failed, will attempt reconnect: %s", err)
-                    self._connection_state = "disconnected"
-                    await self._ensure_connected()
-                    await self._ws.send_json(payload)
-        except Exception as err:
-            self.last_error = f"Send request error: {err}"
-            self._connection_state = "error"
-            raise
-        try:
-            return await asyncio.wait_for(fut, timeout=10)
-        finally:
-            self._pending.pop(key, None)
+        payload = {"Request": req_type}
+        if req_type not in ("Status", "ProtocolVersion"):
+            payload["Data"] = body
 
+        # Send the JSON payload once before any waits
+        async with self._ws_lock:
+            await self._ws.send_json(payload)
+            _LOGGER.debug("ThermexHub: Sent %s payload: %s", request, payload)
+
+        try:
+            # Try up to 2 attempts
+            for attempt in (1, 2):
+                try:
+                    # Wait for matching response
+                    return await asyncio.wait_for(fut, timeout=10)
+                except asyncio.TimeoutError:
+                    # Timeout: either retry or reconnect
+                    _LOGGER.debug(
+                        "ThermexHub: Timeout waiting for '%s' response (attempt %d/2)",
+                        request,
+                        attempt,
+                    )
+                    # Clean up old future
+                    self._pending.pop(key, None)
+
+                    if attempt == 1:
+                        # First timeout → retry: recreate future, re-send
+                        fut = loop.create_future()
+                        self._pending[key] = fut
+                        async with self._ws_lock:
+                            await self._ws.send_json(payload)
+                            _LOGGER.debug(
+                                "ThermexHub: Retrying %s payload: %s", request, payload
+                            )
+                        continue
+
+                    # Second timeout → reconnect once and give up
+                    _LOGGER.warning(
+                        "ThermexHub: Second timeout for '%s', reconnecting WebSocket...", request
+                    )
+                    # Tear down and re-establish connection
+                    await self.close()
+                    await self._ensure_connected()
+                    raise
+
+        finally:
+            # Always remove pending entry (in case of success or error)
+            self._pending.pop(key, None)
     async def _dispatch_initial_status(self) -> None:
         try:
             resp = await self.send_request("status", {})
