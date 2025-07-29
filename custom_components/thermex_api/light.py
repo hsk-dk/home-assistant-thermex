@@ -37,6 +37,7 @@ class ThermexLight(LightEntity):
     def __init__(self, hub: ThermexHub):
         self._hub = hub
         self._attr_unique_id = f"{hub.unique_id}_light"
+        self._attr_translation_key = "thermex_light"
         self._is_on: bool = False
         self._brightness: int = 25
         self._unsub = None
@@ -121,6 +122,7 @@ class ThermexDecoLight(LightEntity):
     def __init__(self, hub: ThermexHub):
         self._hub = hub
         self._attr_unique_id = f"{hub.unique_id}_decolight"
+        self._attr_translation_key = "thermex_decolight"
         self._is_on: bool = False
         self._brightness: int = 0
         self._hs_color: tuple[float, float] = (0.0, 0.0)
