@@ -72,7 +72,6 @@ class BaseRuntimeSensor(SensorEntity):
 
 class RuntimeHoursSensor(BaseRuntimeSensor):
     """Sensor for the cumulative runtime hours of the Thermex fan."""
-    _attr_name = "Thermex Fan Runtime"
     _attr_unit_of_measurement = "h"
     _attr_state_class = "measurement"
 
@@ -80,6 +79,7 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
         self._attr_translation_key = "thermex_sensor_runtime_hours"
+        self._attr_has_entity_name = True
     @property
     def native_value(self):
         return self._runtime_manager.get_runtime_hours()
@@ -87,13 +87,14 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
 
 class LastResetSensor(BaseRuntimeSensor):
     """Timestamp when the runtime counter was last reset."""
-    _attr_name = "Thermex Fan Last Reset"
+
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     def __init__(self, hub, runtime_manager, device_info):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_last_reset"
         self._attr_translation_key = "thermex_sensor_last_reset"
+        self._attr_has_entity_name = True
     @property
     def native_value(self):
         iso = self._runtime_manager.get_last_reset()
@@ -105,7 +106,6 @@ class LastResetSensor(BaseRuntimeSensor):
 class FilterTimeSensor(BaseRuntimeSensor):
     """Sensor to display current filter time from the runtime manager."""
 
-    _attr_name = "Thermex Filter Time"
     _attr_icon = "mdi:clock"
     _attr_native_unit_of_measurement = "h"
     _attr_state_class = "measurement"
@@ -114,6 +114,7 @@ class FilterTimeSensor(BaseRuntimeSensor):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_filter_time"
         self._attr_translation_key = "thermex_sensor_filter_time"
+        self._attr_has_entity_name = True
      
     @property
     def native_value(self):
