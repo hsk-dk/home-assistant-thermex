@@ -42,6 +42,7 @@ class ThermexFilterAlert(BinarySensorEntity):
         self._attr_device_info = device_info
         self._attr_unique_id = f"{hub.unique_id}_threshold_alert"
         self._attr_translation_key = "thermex_binary_sensor_threshold_alert"
+        self._attr_has_entity_name = True
         self._unsub = None
 
     @property

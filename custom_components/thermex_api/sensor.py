@@ -46,6 +46,7 @@ class BaseRuntimeSensor(SensorEntity):
         self._hub = hub
         self._runtime_manager = runtime_manager
         self._attr_device_info = device_info
+        self._attr_has_entity_name = True
         self._unsub = None
 
     async def async_added_to_hass(self):
