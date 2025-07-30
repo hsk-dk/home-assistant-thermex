@@ -37,7 +37,6 @@ class ThermexHub:
         self.last_status: dict | None = None
         self.last_error: str | None = None
         self.recent_messages = collections.deque(maxlen=10)
-        self._protocol_version: str | None = None
 
         self._reconnect_lock = asyncio.Lock()
         self._reconnect_delay = 2  # seconds, backoff could be added
@@ -227,22 +226,6 @@ class ThermexHub:
         return f"Thermex Hood ({self._host})"
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.unique_id)},
-            manufacturer="Thermex",
-            name=self.name,
-            model="ESP-API",
-            sw_version=self._protocol_version
-        )
-
-    @property
-    def name(self) -> str:
-        """Return the name of the device."""
-        return f"Thermex Hood ({self._host})"
-
-    @property
     def protocol_version(self) -> str | None:
         """Return the protocol version of the device."""
         return self._protocol_version
@@ -253,8 +236,7 @@ class ThermexHub:
         return DeviceInfo(
             identifiers={(DOMAIN, self.unique_id)},
             manufacturer="Thermex",
-            name=self.name,
-            model="ESP-API",
+            model=f"ESP-API ({self._host})",
             sw_version=self.protocol_version
         )
 

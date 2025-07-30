@@ -26,7 +26,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user", data_schema=STEP_USER_DATA_SCHEMA
             )
 
-        hub = ThermexHub(self.hass, user_input["host"], user_input["api_key"])
+        # Create a temporary ID for setup verification
+        temp_entry_id = self.hass.data.get(DOMAIN, {}).get("tmp_id", 0) + 1
+        self.hass.data.setdefault(DOMAIN, {})["tmp_id"] = temp_entry_id
+        
+        hub = ThermexHub(self.hass, user_input["host"], user_input["api_key"], f"tmp_{temp_entry_id}")
         try:
             await hub.connect()
         except Exception as err:
