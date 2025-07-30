@@ -54,17 +54,10 @@ class ThermexFan(FanEntity):
         self._options = options
         self._auto_off_handle = None
         self._unsub = None
-        
         self._attr_translation_key = "thermex_fan"
-        self._attr_has_entity_name = True
         self._attr_unique_id = f"{hub.unique_id}_fan"
         self._attr_icon = "mdi:fan"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, hub.unique_id)},
-            manufacturer="Thermex",
-            name=f"Thermex Hood ({hub._host})",
-            model="ESP-API",
-        )
+        self._attr_device_info = hub.device_info
 
         # State
         self._is_on = False

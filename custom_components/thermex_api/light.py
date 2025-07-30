@@ -44,12 +44,7 @@ class ThermexLight(LightEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._hub.unique_id)},
-            manufacturer="Thermex",
-            name=f"Thermex Hood ({self._hub._host})",
-            model="ESP-API",
-        )
+        return self._hub.device_info
 
     @property
     def is_on(self) -> bool:
@@ -129,12 +124,7 @@ class ThermexDecoLight(LightEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._hub.unique_id)},
-            manufacturer="Thermex",
-            name=f"Thermex Hood ({self._hub._host})",
-            model="ESP-API",
-        )
+        return self._hub.device_info
 
     @property
     def is_on(self) -> bool:

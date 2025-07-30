@@ -33,14 +33,8 @@ class ResetRuntimeButton(ButtonEntity):
 
         self._attr_unique_id = f"{hub.unique_id}_reset_runtime"
         self._attr_translation_key = "thermex_button_reset_runtime"
-        self._attr_name = "Reset Filter Timer"
         self._attr_icon = "mdi:refresh"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, hub.unique_id)},
-            manufacturer="Thermex",
-            name=f"Thermex Hood ({hub._host})",
-            model="ESP-API",
-        )
+        self._attr_device_info = hub.device_info
 
     async def async_press(self) -> None:
         """Handle the button press: reset runtime and filter time."""
