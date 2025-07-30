@@ -33,6 +33,7 @@ class ResetRuntimeButton(ButtonEntity):
 
         self._attr_unique_id = f"{hub.unique_id}_reset_runtime"
         self._attr_translation_key = "thermex_button_reset_runtime"
+        self._attr_has_entity_name = True
         self._attr_icon = "mdi:refresh"
         self._attr_device_info = hub.device_info
 
