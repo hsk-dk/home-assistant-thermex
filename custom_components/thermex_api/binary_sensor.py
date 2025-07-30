@@ -25,12 +25,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     hub: ThermexHub = entry_data["hub"]
     runtime_manager: RuntimeManager = entry_data["runtime_manager"]
 
-    device_info = DeviceInfo(
-        identifiers={(DOMAIN, hub.unique_id)},
-        manufacturer="Thermex",
-        name=f"Thermex Hood ({hub._host})",
-        model="ESP-API",
-    )
+    device_info = hub.device_info
 
     async_add_entities([
         ThermexFilterAlert(hub, runtime_manager, entry.options, device_info)
@@ -47,7 +42,6 @@ class ThermexFilterAlert(BinarySensorEntity):
         self._attr_device_info = device_info
         self._attr_unique_id = f"{hub.unique_id}_threshold_alert"
         self._attr_translation_key = "thermex_binary_sensor_threshold_alert"
-        self._attr_has_entity_name = True
         self._unsub = None
 
     @property

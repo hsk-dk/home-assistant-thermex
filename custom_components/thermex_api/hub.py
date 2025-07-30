@@ -7,6 +7,7 @@ import aiohttp
 from aiohttp import WSMsgType, ClientWebSocketResponse
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN, THERMEX_NOTIFY, DEFAULT_PORT, WEBSOCKET_PATH
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ class ThermexHub:
         self.last_status: dict | None = None
         self.last_error: str | None = None
         self.recent_messages = collections.deque(maxlen=10)
+        self._protocol_version: str | None = None
 
         self._reconnect_lock = asyncio.Lock()
         self._reconnect_delay = 2  # seconds, backoff could be added
@@ -100,6 +102,7 @@ class ThermexHub:
         try:
             proto_resp = await self.send_request("protocolversion", {})
             if proto_resp.get("Status") == 200:
+                self._protocol_version = proto_resp.get("Data", {}).get("Version")
                 _LOGGER.debug("ProtocolVersion response data: %s", proto_resp.get("Data"))
             else:
                 _LOGGER.error("ProtocolVersion returned non-200 status: %s", proto_resp)
@@ -216,6 +219,27 @@ class ThermexHub:
                 async_dispatcher_send(self._hass, THERMEX_NOTIFY, ntf_type, {ntf_type: section})
         except Exception as exc:
             _LOGGER.warning("Initial STATUS request failed: %s", exc)
+
+    @property
+    def name(self) -> str:
+        """Return the name of the device."""
+        return f"Thermex Hood ({self._host})"
+
+    @property
+    def protocol_version(self) -> str | None:
+        """Return the protocol version of the device."""
+        return self._protocol_version
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.unique_id)},
+            manufacturer="Thermex",
+            name=self.name,
+            model="ESP-API",
+            sw_version=self.protocol_version
+        )
 
     def get_coordinator_data(self):
         runtime_manager = self.runtime_manager

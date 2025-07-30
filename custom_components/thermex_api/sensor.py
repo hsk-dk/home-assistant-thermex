@@ -31,12 +31,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     hub = entry_data["hub"]
     runtime_manager = entry_data["runtime_manager"]
 
-    device_info = DeviceInfo(
-        identifiers={(DOMAIN, hub.unique_id)},
-        manufacturer="Thermex",
-        name=f"Thermex Hood ({hub._host})",
-        model="ESP-API",
-    )
+    device_info = hub.device_info
 
     async_add_entities([
         RuntimeHoursSensor(hub, runtime_manager, device_info),
@@ -79,7 +74,7 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
         self._attr_translation_key = "thermex_sensor_runtime_hours"
-        self._attr_has_entity_name = True
+ 
     @property
     def native_value(self):
         return self._runtime_manager.get_runtime_hours()
@@ -94,7 +89,7 @@ class LastResetSensor(BaseRuntimeSensor):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_last_reset"
         self._attr_translation_key = "thermex_sensor_last_reset"
-        self._attr_has_entity_name = True
+
     @property
     def native_value(self):
         iso = self._runtime_manager.get_last_reset()
@@ -114,7 +109,6 @@ class FilterTimeSensor(BaseRuntimeSensor):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_filter_time"
         self._attr_translation_key = "thermex_sensor_filter_time"
-        self._attr_has_entity_name = True
      
     @property
     def native_value(self):
