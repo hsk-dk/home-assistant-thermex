@@ -47,7 +47,7 @@
     },
     "fan": {
       "thermex_fan": {
-        "name": "Thermex-ventilator",
+        "name": "Emhætte",
         "state": {
           "off": "Slukket",
           "low": "Lav",

@@ -47,7 +47,7 @@
     },
     "fan": {
       "thermex_fan": {
-        "name": "Thermex Fan",
+        "name": "Hood",
         "state": {
           "off": "Off",
           "low": "Low",
@@ -64,10 +64,10 @@
     },
     "light": {
       "thermex_light": {
-        "name": "Thermex Light"
+        "name": "Hood Light"
       },
       "thermex_decolight": {
-        "name": "Thermex Deco Light"
+        "name": "Hood Deco Light"
       }
     }
   }
