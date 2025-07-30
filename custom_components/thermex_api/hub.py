@@ -31,6 +31,7 @@ class ThermexHub:
         self._ws: ClientWebSocketResponse | None = None
         self._recv_task: asyncio.Task | None = None
         self._session: aiohttp.ClientSession | None = None
+        self._protocol_version: str | None = None
 
         self._connection_state: str = "disconnected"
         self.last_status: dict | None = None
@@ -219,6 +220,22 @@ class ThermexHub:
                 async_dispatcher_send(self._hass, THERMEX_NOTIFY, ntf_type, {ntf_type: section})
         except Exception as exc:
             _LOGGER.warning("Initial STATUS request failed: %s", exc)
+
+    @property
+    def name(self) -> str:
+        """Return the name of the device."""
+        return f"Thermex Hood ({self._host})"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.unique_id)},
+            manufacturer="Thermex",
+            name=self.name,
+            model="ESP-API",
+            sw_version=self._protocol_version
+        )
 
     @property
     def name(self) -> str:
