@@ -254,6 +254,8 @@ class ThermexHub:
             if attempt < max_retries - 1:
                 await asyncio.sleep(retry_delay)
 
+        if protocol_ok and status_ok:
+            self._connection_state = "connected"
     @property
     def name(self) -> str:
         """Return the name of the device."""
