@@ -17,6 +17,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Update manifest.json version to ${{ github.event.release.tag_name }}
+        env:
+          COMPONENT_DIR: thermex_api
         run: |
           python3 ${{ github.workspace }}/.github/scripts/update_hacs_manifest.py --version ${{ github.event.release.tag_name }} --path custom_components/${COMPONENT_DIR}
 
