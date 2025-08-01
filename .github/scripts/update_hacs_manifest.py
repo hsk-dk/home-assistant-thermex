@@ -15,7 +15,7 @@ def update_manifest():
         if value in ["--version", "-V"]:
             version = str(sys.argv[index + 1]).replace("v", "")
         if value in ["--path", "-P"]:
-            manifest_path = str(sys.argv[index + 1])[1:-1]
+            manifest_path = str(sys.argv[index + 1]).strip('\'"')
         if value in ["--requirements", "-R"]:
             dorequirements = True
 
