@@ -33,7 +33,7 @@ jobs:
         uses: svenstaro/upload-release-action@2.11.2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./custom_components/home-assistant-thermex/home-assistant-thermex.zip
+          file: ./custom_components/${{ env.COMPONENT_DIR }}/${{ env.COMPONENT_DIR }}.zip
           asset_name: home-assistant-thermex.zip
           tag: ${{ github.ref }}
           overwrite: true
