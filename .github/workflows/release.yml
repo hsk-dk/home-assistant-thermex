@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+env:
+  COMPONENT_DIR: home-assistant-thermex
+
+jobs:
+  release_zip_file:
+    name: Prepare release asset
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Update manifest.json version to ${{ github.event.release.tag_name }}
+        run: |
+          python3 ${{ github.workspace }}/.github/scripts/update_hacs_manifest.py --version ${{ github.event.release.tag_name }} --path /custom_components/landroid_cloud/
+      - name: Commit manifest update
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add ./custom_components/home-assistant-thermex/manifest.json
+          git commit -m "Updated manifest.json"
+          git push origin HEAD:master
+      - name: Create zip
+        run: |
+          cd custom_components/home-assistant-thermex
+          zip home-assistant-thermex.zip -r ./
+      - name: Upload zip to release
+        uses: svenstaro/upload-release-action@2.11.2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./custom_components/home-assistant-thermex/home-assistant-thermex.zip
+          asset_name: home-assistant-thermex.zip
+          tag: ${{ github.ref }}
+          overwrite: true
