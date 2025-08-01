@@ -32,7 +32,8 @@ class ThermexHub:
         self._recv_task: asyncio.Task | None = None
         self._session: aiohttp.ClientSession | None = None
         self._protocol_version: str | None = None
-
+        
+        # Connection states: disconnected, connecting, authenticating, initializing, connected, error
         self._connection_state: str = "disconnected"
         self.last_status: dict | None = None
         self.last_error: str | None = None
@@ -70,49 +71,49 @@ class ThermexHub:
                     # Optionally add a backoff strategy here
 
     async def connect(self) -> None:
+        """Connect to the WebSocket, authenticate, and initialize the device."""
+        # First establish the connection
+        self._connection_state = "connecting"
         try:
             self._session = aiohttp.ClientSession()
             url = f"ws://{self._host}:{DEFAULT_PORT}{WEBSOCKET_PATH}"
             _LOGGER.debug("Connecting to Thermex at %s", url)
             self._ws = await self._session.ws_connect(url)
-            self._connection_state = "connected"
         except Exception as err:
             self._connection_state = "error"
-            self.last_error = str(err)
+            self.last_error = f"Connection failed: {str(err)}"
             raise
 
-        # Authenticate
+        # Then authenticate
+        self._connection_state = "authenticating"
         auth_payload = {"Request": "Authenticate", "Data": {"Code": self._api_key}}
-        await self._ws.send_json(auth_payload)
-        msg = await self._ws.receive()
-        if msg.type != WSMsgType.TEXT:
+        try:
+            await self._ws.send_json(auth_payload)
+            msg = await self._ws.receive()
+            if msg.type != WSMsgType.TEXT:
+                self._connection_state = "error"
+                self.last_error = "Authentication failed: no text response"
+                raise ConnectionError("Authentication failed: no text response")
+            data = json.loads(msg.data)
+            if data.get("Response") != "Authenticate" or data.get("Status") != 200:
+                _LOGGER.error("Authentication rejected: %s", data)
+                self._connection_state = "error"
+                self.last_error = f"Authentication failed: {data}"
+                raise ConnectionError(f"Authentication failed: {data}")
+            _LOGGER.debug("Authenticated successfully with Thermex (status=200)")
+            self._connection_state = "initializing"
+        except Exception as err:
             self._connection_state = "error"
-            self.last_error = "Authentication failed: no text response"
-            raise ConnectionError("Authentication failed: no text response")
-        data = json.loads(msg.data)
-        if data.get("Response") != "Authenticate" or data.get("Status") != 200:
-            _LOGGER.error("Authentication rejected: %s", data)
-            self._connection_state = "error"
-            self.last_error = f"Authentication failed: {data}"
-            raise ConnectionError(f"Authentication failed: {data}")
-        _LOGGER.debug("Authenticated successfully with Thermex (status=200)")
+            self.last_error = f"Authentication failed: {str(err)}"
+            raise
 
         self._recv_task = asyncio.create_task(self._recv_loop())
-
-        try:
-            proto_resp = await self.send_request("protocolversion", {})
-            if proto_resp.get("Status") == 200:
-                self._protocol_version = proto_resp.get("Data", {}).get("Version")
-                _LOGGER.debug("ProtocolVersion response data: %s", proto_resp.get("Data"))
-            else:
-                _LOGGER.error("ProtocolVersion returned non-200 status: %s", proto_resp)
-        except asyncio.TimeoutError:
-            _LOGGER.debug("No ProtocolVersion response within timeout, skipping negotiation")
-        except Exception as err:
-            _LOGGER.error("ProtocolVersion request failed: %s", err)
-            self.last_error = f"ProtocolVersion request failed: {err}"
-        await asyncio.sleep(0.1)
-        asyncio.create_task(self._dispatch_initial_status())
+        
+        # Allow receive loop to start
+        await asyncio.sleep(RECV_LOOP_START_DELAY)
+        
+        # Initialize device info and state
+        await self._initialize_device()
 
     async def _recv_loop(self) -> None:
         assert self._ws is not None
@@ -210,16 +211,51 @@ class ThermexHub:
         finally:
             # Always remove pending entry (in case of success or error)
             self._pending.pop(key, None)
-    async def _dispatch_initial_status(self) -> None:
-        try:
-            resp = await self.send_request("status", {})
-            data = resp.get("Data", {}) or {}
-            for ntf_type, section in data.items():
-                _LOGGER.debug("Initial STATUS notify: %s=%s", ntf_type, section)
-                async_dispatcher_send(self._hass, THERMEX_NOTIFY, ntf_type, {ntf_type: section})
-        except Exception as exc:
-            _LOGGER.warning("Initial STATUS request failed: %s", exc)
+    async def _initialize_device(self) -> None:
+        """Initialize the device by fetching protocol version and initial state."""
+        max_retries = 3
+        retry_delay = 2
 
+        # First get protocol version
+        for attempt in range(max_retries):
+            try:
+                proto_resp = await self.send_request("protocolversion", {})
+                if proto_resp.get("Status") == 200:
+                    self._protocol_version = proto_resp.get("Data", {}).get("Version")
+                    _LOGGER.debug("ProtocolVersion response data: %s", proto_resp.get("Data"))
+                    break
+                else:
+                    _LOGGER.error("ProtocolVersion returned non-200 status: %s", proto_resp)
+            except asyncio.TimeoutError:
+                _LOGGER.debug("ProtocolVersion request timeout (attempt %d/%d)", attempt + 1, max_retries)
+            except Exception as err:
+                _LOGGER.error("ProtocolVersion request failed (attempt %d/%d): %s", attempt + 1, max_retries, err)
+            
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+        
+        # Then get initial state
+        for attempt in range(max_retries):
+            try:
+                resp = await self.send_request("status", {})
+                if resp.get("Status") == 200:
+                    data = resp.get("Data", {}) or {}
+                    for ntf_type, section in data.items():
+                        _LOGGER.debug("Initial STATUS notify: %s=%s", ntf_type, section)
+                        async_dispatcher_send(self._hass, THERMEX_NOTIFY, ntf_type, {ntf_type: section})
+                    break
+                else:
+                    _LOGGER.error("Initial STATUS returned non-200 status: %s", resp)
+            except asyncio.TimeoutError:
+                _LOGGER.warning("Initial STATUS request timeout (attempt %d/%d)", attempt + 1, max_retries)
+            except Exception as exc:
+                _LOGGER.warning("Initial STATUS request failed (attempt %d/%d): %s", attempt + 1, max_retries, exc)
+            
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+
+        if protocol_ok and status_ok:
+            self._connection_state = "connected"
     @property
     def name(self) -> str:
         """Return the name of the device."""
