@@ -215,6 +215,8 @@ class ThermexHub:
         """Initialize the device by fetching protocol version and initial state."""
         max_retries = 3
         retry_delay = 2
+        protocol_ok = False
+        status_ok = False
 
         # First get protocol version
         for attempt in range(max_retries):
@@ -223,6 +225,7 @@ class ThermexHub:
                 if proto_resp.get("Status") == 200:
                     self._protocol_version = proto_resp.get("Data", {}).get("Version")
                     _LOGGER.debug("ProtocolVersion response data: %s", proto_resp.get("Data"))
+                    protocol_ok = True
                     break
                 else:
                     _LOGGER.error("ProtocolVersion returned non-200 status: %s", proto_resp)
@@ -243,6 +246,7 @@ class ThermexHub:
                     for ntf_type, section in data.items():
                         _LOGGER.debug("Initial STATUS notify: %s=%s", ntf_type, section)
                         async_dispatcher_send(self._hass, THERMEX_NOTIFY, ntf_type, {ntf_type: section})
+                    status_ok = True
                     break
                 else:
                     _LOGGER.error("Initial STATUS returned non-200 status: %s", resp)
