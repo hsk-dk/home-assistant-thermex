@@ -8,7 +8,7 @@ from aiohttp import WSMsgType, ClientWebSocketResponse
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
-from .const import DOMAIN, THERMEX_NOTIFY, DEFAULT_PORT, WEBSOCKET_PATH
+from .const import DOMAIN, THERMEX_NOTIFY, DEFAULT_PORT, WEBSOCKET_PATH, RECV_LOOP_START_DELAY
 
 _LOGGER = logging.getLogger(__name__)
 

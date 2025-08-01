@@ -1,1 +1,4 @@
 vss/thermex_api.code-workspace
+__pycache__/
+*.py[cod]
+*$py.class
