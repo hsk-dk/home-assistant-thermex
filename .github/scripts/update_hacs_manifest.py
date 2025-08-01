@@ -15,7 +15,7 @@ def update_manifest():
         if value in ["--version", "-V"]:
             version = str(sys.argv[index + 1]).replace("v", "")
         if value in ["--path", "-P"]:
-            manifest_path = str(sys.argv[index + 1]).strip('\'"')
+            manifest_path = str(sys.argv[index + 1])[1:-1]
         if value in ["--requirements", "-R"]:
             dorequirements = True
 
@@ -39,16 +39,18 @@ def update_manifest():
             for line in file:
                 requirements.append(line.rstrip())
 
-        new_requirements = manifest["requirements"].copy()
+        new_requirements = []
         for requirement in requirements:
             req = requirement.split("==")[0].lower()
-            # Remove any existing requirement with the same name (case-insensitive, ignoring version)
             new_requirements = [
-                x for x in new_requirements if not x.lower().startswith(req)
+                requirement
+                for x in manifest["requirements"]
+                if x.lower().startswith(req)
             ]
-            # Add the new requirement
-            new_requirements.append(requirement)
-        manifest["requirements"] = new_requirements
+            new_requirements += [
+                x for x in manifest["requirements"] if not x.lower().startswith(req)
+            ]
+            manifest["requirements"] = new_requirements
 
     with open(
         f"{os.getcwd()}/{manifest_path}/manifest.json",
