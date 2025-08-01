@@ -15,20 +15,24 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
       - name: Update manifest.json version to ${{ github.event.release.tag_name }}
         run: |
-          python3 ${{ github.workspace }}/.github/scripts/update_hacs_manifest.py --version ${{ github.event.release.tag_name }} --path custom_components/home-assistant-thermex/
+          python3 ${{ github.workspace }}/.github/scripts/update_hacs_manifest.py --version ${{ github.event.release.tag_name }} --path custom_components/${COMPONENT_DIR}
+
       - name: Commit manifest update
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add ./custom_components/$COMPONENT_DIR/manifest.json
+          git add ./custom_components/${COMPONENT_DIR}/manifest.json
           git commit -m "Updated manifest.json"
           git push origin HEAD:master
+
       - name: Create zip
         run: |
-          cd custom_components/home-assistant-thermex
-          zip home-assistant-thermex.zip -r ./
+          cd custom_components/${COMPONENT_DIR}
+          zip ${COMPONENT_DIR}.zip -r ./
+
       - name: Upload zip to release
         uses: svenstaro/upload-release-action@2.11.2
         with:
