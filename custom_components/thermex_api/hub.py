@@ -110,7 +110,7 @@ class ThermexHub:
         self._recv_task = asyncio.create_task(self._recv_loop())
         
         # Allow receive loop to start
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(RECV_LOOP_START_DELAY)
         
         # Initialize device info and state
         await self._initialize_device()
