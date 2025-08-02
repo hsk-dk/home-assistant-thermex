@@ -23,7 +23,8 @@
         "title": "Thermex-indstillinger",
         "data": {
           "enable_decolight": "Aktivér Decolys",
-          "fan_alert_hours": "Filter rengøringsadvarsel efter (timer)"
+          "fan_alert_hours": "Filter rengøringsadvarsel efter (timer)",
+          "fan_alert_days": "Filter rengøringsadvarsel efter (dage)"
         }
       }
     }
@@ -64,10 +65,10 @@
     },
     "light": {
       "thermex_light": {
-        "name": "Enhættelys"
+        "name": "Emhættebelysning"
       },
       "thermex_decolight": {
-        "name": "Enhætte Decolys"
+        "name": "Emhætte stemningsbelysning"
       }
     }
   }

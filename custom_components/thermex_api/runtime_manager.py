@@ -40,6 +40,24 @@ class RuntimeManager:
     def get_last_reset(self):
         return self._data.get("last_reset")
 
+    def get_days_since_reset(self):
+        """Get the number of days since the last filter reset."""
+        last_reset = self._data.get("last_reset")
+        if not last_reset:
+            return None
+        
+        try:
+            from homeassistant.util.dt import parse_datetime
+            reset_datetime = parse_datetime(last_reset)
+            if reset_datetime:
+                now = utcnow()
+                delta = now - reset_datetime
+                return delta.days
+        except Exception as e:
+            _LOGGER.warning("Error calculating days since reset: %s", e)
+        
+        return None
+
     def get_filter_time(self):
         # For clarity: filter time is always runtime hours
         return self.get_runtime_hours()

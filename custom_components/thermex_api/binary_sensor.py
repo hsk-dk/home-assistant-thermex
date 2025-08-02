@@ -47,10 +47,22 @@ class ThermexFilterAlert(BinarySensorEntity):
 
     @property
     def is_on(self) -> bool:
-        return (
-            self._runtime_manager.get_runtime_hours()
-            >= self._options.get("runtime_threshold", 30)
-        )
+        """Return True if filter alert should be triggered."""
+        # Check runtime hours threshold
+        runtime_hours = self._runtime_manager.get_runtime_hours()
+        hours_threshold = self._options.get("fan_alert_hours", 30)
+        hours_exceeded = runtime_hours >= hours_threshold
+        
+        # Check days since reset threshold
+        days_since_reset = self._runtime_manager.get_days_since_reset()
+        days_threshold = self._options.get("fan_alert_days", 90)
+        days_exceeded = False
+        
+        if days_since_reset is not None:
+            days_exceeded = days_since_reset >= days_threshold
+        
+        # Trigger alert if either condition is met
+        return hours_exceeded or days_exceeded
 
     async def async_added_to_hass(self):
         self._unsub = async_dispatcher_connect(

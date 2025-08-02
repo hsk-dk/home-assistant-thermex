@@ -75,13 +75,29 @@ class ThermexFan(FanEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
+        days_since_reset = self._runtime_manager.get_days_since_reset()
+        hours_threshold = self._options.get("fan_alert_hours", 30)
+        days_threshold = self._options.get("fan_alert_days", 90)
+        runtime_hours = self._runtime_manager.get_runtime_hours()
+        
+        # Calculate alert status based on both conditions
+        hours_exceeded = runtime_hours >= hours_threshold
+        days_exceeded = False
+        if days_since_reset is not None:
+            days_exceeded = days_since_reset >= days_threshold
+        alert_triggered = hours_exceeded or days_exceeded
+        
         return {
-            "runtime_hours": self._runtime_manager.get_runtime_hours(),
+            "runtime_hours": runtime_hours,
             "filter_time": self._runtime_manager.get_filter_time(),
             "last_reset": self._runtime_manager.get_last_reset() or "never",
+            "days_since_reset": days_since_reset,
             "last_preset": self._runtime_manager.get_last_preset(),
-            "threshold": self._options.get("runtime_threshold", 30),
-            "alert": self._runtime_manager.get_runtime_hours() >= self._options.get("runtime_threshold", 30),
+            "hours_threshold": hours_threshold,
+            "days_threshold": days_threshold,
+            "alert": alert_triggered,
+            "hours_exceeded": hours_exceeded,
+            "days_exceeded": days_exceeded,
             "is_on": self._is_on,
         }
 

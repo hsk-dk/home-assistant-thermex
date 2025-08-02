@@ -22,8 +22,9 @@
       "init": {
         "title": "Thermex options",
         "data": {
-          "enable_decolight": "Activate DecoLight",
-          "fan_alert_hours": "Filter cleaning notice after (hours)"
+          "enable_decolight": "Activate Ambient light",
+          "fan_alert_hours": "Grease filter cleaning notice after (hours)",
+          "fan_alert_days": "Grease filter cleaning notice after (days)"
         }
       }
     }
@@ -31,18 +32,18 @@
   "entity": {
     "sensor": {
       "thermex_sensor_last_reset": {
-        "name": "Last filter time reset"
+        "name": "Last grease filter time reset"
       },
       "thermex_sensor_runtime_hours": {
-        "name": "Filter runtime since last reset"
+        "name": "Grease filter runtime since last reset"
       },
       "thermex_sensor_filter_time": {
-        "name": "Filter time"
+        "name": "Grease filter time"
       }
     },
     "button": {
       "thermex_button_reset_runtime": {
-        "name": "Reset filter time"
+        "name": "Reset grease filter time"
       }
     },
     "fan": {
@@ -59,15 +60,15 @@
     },
     "binary_sensor": {
       "thermex_binary_sensor_threshold_alert": {
-        "name": "Filter cleaning needed"
+        "name": "Grease filter must be cleaned"
       }
     },
     "light": {
       "thermex_light": {
-        "name": "Hood Light"
+        "name": "Hood Functional light"
       },
       "thermex_decolight": {
-        "name": "Hood Deco Light"
+        "name": "Hood Ambient light"
       }
     }
   }

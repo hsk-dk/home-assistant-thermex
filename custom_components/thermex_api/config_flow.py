@@ -66,6 +66,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     "fan_alert_hours",
                     default=self.entry.options.get("fan_alert_hours", 30)
                 ): int,
+                vol.Optional(
+                    "fan_alert_days",
+                    default=self.entry.options.get("fan_alert_days", 90)
+                ): int,
             })
             return self.async_show_form(
                 step_id="init", data_schema=data_schema
