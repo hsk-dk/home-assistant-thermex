@@ -26,4 +26,3 @@ def update_manifest():
 
 
 update_manifest()
-update_manifest()
