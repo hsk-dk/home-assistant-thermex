@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: write
+  actions: read
+  pull-requests: write
 
 jobs:
   update_hacs_manifest:
@@ -44,11 +46,13 @@ jobs:
           files: custom_components/thermex_api
           dest: thermex_api.zip
 
+      - name: "Verify zip file"
+        run: |
+          ls -la thermex_api.zip
+          file thermex_api.zip
+
       - name: Upload files to a GitHub release
-        uses: svenstaro/upload-release-action@2.11.2
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          file: "thermex_api.zip"
-          asset_name: "thermex_api.zip"
-          tag: "${{ github.ref }}"
-          overwrite: true
+        run: |
+          gh release upload ${{ steps.version.outputs.version }} thermex_api.zip --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
