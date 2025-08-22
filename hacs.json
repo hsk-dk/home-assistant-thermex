@@ -1,6 +1,5 @@
 {
   "name": "Thermex Hood Integration",
   "content_in_root": false,
-  "zip_release": true,
-  "filename": "thermex_api.zip"
+  "zip_release": false
 }
