@@ -1,0 +1,51 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create temporary directory
+        run: mkdir temp_dir
+
+      - name: Copy all files except excluded ones
+        run: |
+          rsync -av --progress ./ temp_dir/ \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'node_modules' \
+            --exclude '.DS_Store' \
+            --exclude '*.log' \
+            --exclude '.gitignore' \
+            --exclude 'README.md' \
+            --exclude '.env' \
+            --exclude 'package.json' \
+            --exclude 'package-lock.json' \
+            --exclude 'src' 
+
+      - name: Rename directory
+        run: mv temp_dir [your-plugin-name]
+
+      - name: Create zip archive
+        run: |
+          zip -r home-assistant-thermex-${{ github.event.inputs.tag }}.zip home-assistant-thermex
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: home-assistant-thermex-${{ github.event.inputs.tag }}.zip
+          tag_name: ${{ github.event.inputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+permissions:
+  contents: write
