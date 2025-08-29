@@ -33,16 +33,16 @@ jobs:
             --exclude 'src' 
 
       - name: Rename directory
-        run: mv temp_dir [your-plugin-name]
+        run: mv temp_dir thermex_api
 
       - name: Create zip archive
         run: |
-          zip -r home-assistant-thermex-${{ github.event.inputs.tag }}.zip home-assistant-thermex
+          zip -r thermex_api.zip custom_components/thermex_api
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: home-assistant-thermex-${{ github.event.inputs.tag }}.zip
+          files: thermex_api.zip
           tag_name: ${{ github.event.inputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
