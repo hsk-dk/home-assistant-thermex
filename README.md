@@ -5,6 +5,7 @@ This custom component integrates Thermex extractor hoods into Home Assistant, pr
 ---
 
 ## Installation
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=hsk-dk&repository=home-assistant-thermex)
 
 Install through [HACS](https://hacs.xyz/) by seaching for "Thermex Hood Integration".
 
@@ -39,8 +40,8 @@ Install through [HACS](https://hacs.xyz/) by seaching for "Thermex Hood Integrat
 
 - Set up the integration through the Home Assistant UI.
 - Enter your extractor hood IP and password.
-- Configure filter cleaning intervals.
-- Enable Decolight via integration options (if needed).
+- Configure filter cleaning intervals (filter max run hours and max days between cleaning).
+- Enable Ambient light via integration options (if needed).
 
 ---
 

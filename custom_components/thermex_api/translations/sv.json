@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermex köksfläktsanslutning",
+        "description": "Fyll i Thermex köksfläkt IP och API lösenord.",
+        "data": {
+          "host": "Köksfläktens IP address",
+          "api_key": "API lösenord"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kan inte ansluta. Kolla IP och lösenord."
+    },
+    "abort": {
+      "already_configured": "Den här köksfläkten är redan konfigurerad."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Thermex-inställningar",
+        "data": {
+          "enable_decolight": "Aktivera DecoLight",
+          "fan_alert_hours": "Notis för filterbyte efter (timmar)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "thermex_sensor_last_reset": {
+        "name": "Senaste nollställning av filtertiden"
+      },
+      "thermex_sensor_runtime_hours": {
+        "name": "Filtertid efter senaste nollställning"
+      },
+      "thermex_sensor_filter_time": {
+        "name": "Filtertid"
+      }
+    },
+    "button": {
+      "thermex_button_reset_runtime": {
+        "name": "Nollställ filtertid"
+      }
+    },
+    "fan": {
+      "thermex_fan": {
+        "name": "Köksfläkt",
+        "state": {
+          "off": "Av",
+          "low": "Låg",
+          "medium": "Medel",
+          "high": "Hög",
+          "boost": "Boost"
+        }
+      }
+    },
+    "binary_sensor": {
+      "thermex_binary_sensor_threshold_alert": {
+        "name": "Filtret behöver göras rent"
+      }
+    },
+    "light": {
+      "thermex_light": {
+        "name": "Köksfläktssljus"
+      },
+      "thermex_decolight": {
+        "name": "Thermex Deco Light"
+      }
+    }
+  }
+}
