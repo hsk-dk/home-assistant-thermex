@@ -51,6 +51,21 @@ class ThermexFilterAlert(BinarySensorEntity):
             self._runtime_manager.get_runtime_hours()
             >= self._options.get("runtime_threshold", 30)
         )
+    
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return additional state attributes including connection status."""
+        hub_data = self._hub.get_coordinator_data()
+        
+        return {
+            "runtime_hours": self._runtime_manager.get_runtime_hours(),
+            "threshold": self._options.get("runtime_threshold", 30),
+            "last_reset": self._runtime_manager.get_last_reset() or "never",
+            # Connection status attributes
+            "connection_state": hub_data.get("connection_state", "unknown"),
+            "watchdog_active": hub_data.get("watchdog_active", False),
+            "time_since_activity": hub_data.get("time_since_activity", 0),
+        }
 
     async def async_added_to_hass(self):
         self._unsub = async_dispatcher_connect(
