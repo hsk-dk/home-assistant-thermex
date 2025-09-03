@@ -23,7 +23,8 @@
         "title": "Thermex-inställningar",
         "data": {
           "enable_decolight": "Aktivera DecoLight",
-          "fan_alert_hours": "Notis för filterbyte efter (timmar)"
+          "fan_alert_hours": "Notis för filterbyte efter (timmar)",
+          "fan_alert_days": "Notis för filterbyte efter (dagar)"
         }
       }
     }

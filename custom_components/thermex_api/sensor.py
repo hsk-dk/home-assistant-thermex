@@ -7,6 +7,7 @@ Creates persistent sensors for:
  - filter_time
 """
 import logging
+import asyncio
 from datetime import datetime
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
@@ -16,6 +17,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.core import callback
 from homeassistant.util.dt import parse_datetime
+from homeassistant.helpers.event import async_call_later
 
 from .const import DOMAIN, THERMEX_NOTIFY
 from .hub import ThermexHub
@@ -66,7 +68,73 @@ class BaseRuntimeSensor(SensorEntity):
             self.async_write_ha_state()
 
 
-class RuntimeHoursSensor(BaseRuntimeSensor):
+class PeriodicRuntimeSensor(BaseRuntimeSensor):
+    """Enhanced runtime sensor that updates every minute when fan is running."""
+    
+    def __init__(self, hub, runtime_manager, device_info):
+        super().__init__(hub, runtime_manager, device_info)
+        self._update_timer = None
+        self._update_interval = 60  # Update every 60 seconds
+        self._fan_is_running = False
+    
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        # Start the periodic update timer
+        self._schedule_update()
+    
+    async def async_will_remove_from_hass(self):
+        await super().async_will_remove_from_hass()
+        # Cancel the periodic update timer
+        if self._update_timer:
+            self._update_timer()
+            self._update_timer = None
+    
+    def _schedule_update(self):
+        """Schedule the next update."""
+        if self._update_timer:
+            self._update_timer()
+        
+        self._update_timer = async_call_later(
+            self.hass, 
+            self._update_interval, 
+            self._periodic_update
+        )
+    
+    @callback
+    def _periodic_update(self, _):
+        """Periodic update callback - updates when fan is running."""
+        if self._fan_is_running:
+            # Fan is running, update the sensor
+            self.async_write_ha_state()
+        
+        # Schedule next update
+        self._schedule_update()
+    
+    @callback
+    def _handle_notify(self, ntf_type, data):
+        """Handle notifications and track fan state."""
+        if ntf_type.lower() == "fan":
+            # Update sensor state
+            self.async_write_ha_state()
+            
+            # Track if fan is running based on the notification data
+            if isinstance(data, dict) and "fan" in data:
+                fan_data = data["fan"]
+                # Check if fan mode indicates it's running (not "off")
+                if isinstance(fan_data, dict):
+                    mode = fan_data.get("mode", "off")
+                    self._fan_is_running = mode != "off" and mode != 0
+                elif isinstance(fan_data, str):
+                    self._fan_is_running = fan_data != "off"
+                else:
+                    # Fallback: assume running if we got a fan notification
+                    self._fan_is_running = True
+            
+            # Reset the timer to ensure regular updates start/stop appropriately
+            self._schedule_update()
+
+
+class RuntimeHoursSensor(PeriodicRuntimeSensor):
     """Sensor for the cumulative runtime hours of the Thermex fan."""
     _attr_unit_of_measurement = "h"
     _attr_state_class = "measurement"
@@ -99,7 +167,7 @@ class LastResetSensor(BaseRuntimeSensor):
         return None
 
 
-class FilterTimeSensor(BaseRuntimeSensor):
+class FilterTimeSensor(PeriodicRuntimeSensor):
     """Sensor to display current filter time from the runtime manager."""
 
     _attr_icon = "mdi:clock"

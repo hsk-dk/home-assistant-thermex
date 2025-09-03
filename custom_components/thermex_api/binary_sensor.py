@@ -63,6 +63,29 @@ class ThermexFilterAlert(BinarySensorEntity):
         
         # Trigger alert if either condition is met
         return hours_exceeded or days_exceeded
+    
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return additional state attributes including dual threshold information."""
+        runtime_hours = self._runtime_manager.get_runtime_hours()
+        days_since_reset = self._runtime_manager.get_days_since_reset()
+        hours_threshold = self._options.get("fan_alert_hours", 30)
+        days_threshold = self._options.get("fan_alert_days", 90)
+        
+        hours_exceeded = runtime_hours >= hours_threshold
+        days_exceeded = False
+        if days_since_reset is not None:
+            days_exceeded = days_since_reset >= days_threshold
+        
+        return {
+            "runtime_hours": runtime_hours,
+            "days_since_reset": days_since_reset,
+            "hours_threshold": hours_threshold,
+            "days_threshold": days_threshold,
+            "hours_exceeded": hours_exceeded,
+            "days_exceeded": days_exceeded,
+            "last_reset": self._runtime_manager.get_last_reset() or "never",
+        }
 
     async def async_added_to_hass(self):
         self._unsub = async_dispatcher_connect(
