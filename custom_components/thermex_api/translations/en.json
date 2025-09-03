@@ -23,7 +23,8 @@
         "title": "Thermex options",
         "data": {
           "enable_decolight": "Activate DecoLight",
-          "fan_alert_hours": "Filter cleaning notice after (hours)"
+          "fan_alert_hours": "Filter cleaning notice after (hours)",
+          "fan_alert_days": "Filter cleaning notice after (days)"
         }
       }
     }
@@ -38,6 +39,9 @@
       },
       "thermex_sensor_filter_time": {
         "name": "Filter time"
+      },
+      "thermex_sensor_connection_status": {
+        "name": "Connection Status"
       }
     },
     "button": {

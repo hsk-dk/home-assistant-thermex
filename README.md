@@ -1,3 +1,5 @@
+[![home-assistant-thermex](https://img.shields.io/github/release/hsk-dk/home-assistant-thermex/all.svg?style=plastic&label=Current%20release)](https://github.com/hsk-dk/home-assistant-thermex) [![downloads](https://img.shields.io/github/downloads/hsk-dk/home-assistant-thermex/total?style=plastic&label=Total%20downloads)](https://github.com/hsk-dk/home-assistant-thermex) [![Buy me a coffee](https://img.shields.io/static/v1?label=Buy%20me%20a%20coffee&message=and%20say%20thanks&color=orange&logo=buymeacoffee&logoColor=white&style=plastic)](https://www.buymeacoffee.com/hskdk)
+
 # Thermex Hood Integration Custom Component
 
 This custom component integrates Thermex extractor hoods into Home Assistant, providing control over lighting, fan speed, and monitoring filter usage.
@@ -56,5 +58,6 @@ Install through [HACS](https://hacs.xyz/) by seaching for "Thermex Hood Integrat
 
 - English
 - Danish
+- Swedish
 
 ---

@@ -75,6 +75,9 @@ class ThermexFan(FanEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
+        # Get connection status from hub
+        hub_data = self._hub.get_coordinator_data()
+        
         return {
             "runtime_hours": self._runtime_manager.get_runtime_hours(),
             "filter_time": self._runtime_manager.get_filter_time(),
@@ -83,6 +86,13 @@ class ThermexFan(FanEntity):
             "threshold": self._options.get("runtime_threshold", 30),
             "alert": self._runtime_manager.get_runtime_hours() >= self._options.get("runtime_threshold", 30),
             "is_on": self._is_on,
+            # Connection status attributes
+            "connection_state": hub_data.get("connection_state", "unknown"),
+            "last_error": hub_data.get("last_error"),
+            "watchdog_active": hub_data.get("watchdog_active", False),
+            "time_since_activity": hub_data.get("time_since_activity", 0),
+            "heartbeat_interval": hub_data.get("heartbeat_interval", 30),
+            "connection_timeout": hub_data.get("connection_timeout", 120),
         }
 
     async def async_added_to_hass(self):

@@ -37,6 +37,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         RuntimeHoursSensor(hub, runtime_manager, device_info),
         LastResetSensor(hub, runtime_manager, device_info),
         FilterTimeSensor(hub, runtime_manager, device_info),
+        ConnectionStatusSensor(hub, runtime_manager, device_info),
     ], update_before_add=True)
 
 
@@ -117,3 +118,40 @@ class FilterTimeSensor(BaseRuntimeSensor):
         return self._runtime_manager.get_filter_time()
         # If you want to display runtime_hours as filter time, use:
         # return self._runtime_manager.get_runtime_hours()
+
+
+class ConnectionStatusSensor(BaseRuntimeSensor):
+    """Sensor to display connection status and diagnostic information."""
+
+    _attr_icon = "mdi:connection"
+
+    def __init__(self, hub, runtime_manager, device_info):
+        super().__init__(hub, runtime_manager, device_info)
+        self._attr_unique_id = f"{hub.unique_id}_connection_status"
+        self._attr_translation_key = "thermex_sensor_connection_status"
+     
+    @property
+    def native_value(self):
+        """Return the connection state as the sensor value."""
+        hub_data = self._hub.get_coordinator_data()
+        return hub_data.get("connection_state", "unknown")
+    
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return connection diagnostic information as attributes."""
+        hub_data = self._hub.get_coordinator_data()
+        
+        return {
+            "last_error": hub_data.get("last_error"),
+            "watchdog_active": hub_data.get("watchdog_active", False),
+            "time_since_activity": hub_data.get("time_since_activity", 0),
+            "heartbeat_interval": hub_data.get("heartbeat_interval", 30),
+            "connection_timeout": hub_data.get("connection_timeout", 120),
+            "protocol_version": self._hub.protocol_version,
+        }
+    
+    @callback
+    def _handle_notify(self, ntf_type, data):
+        """Update on any notification to refresh connection status."""
+        # Update connection status on any activity
+        self.async_write_ha_state()

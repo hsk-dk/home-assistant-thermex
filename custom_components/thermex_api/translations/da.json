@@ -23,7 +23,8 @@
         "title": "Thermex-indstillinger",
         "data": {
           "enable_decolight": "Aktivér Decolys",
-          "fan_alert_hours": "Filter rengøringsadvarsel efter (timer)"
+          "fan_alert_hours": "Filter rengøringsadvarsel efter (timer)",
+          "fan_alert_days": "Filter rengøringsadvarsel efter (dage)"
         }
       }
     }
@@ -38,6 +39,9 @@
       },
       "thermex_sensor_filter_time": {
         "name": "Filtertid"
+      },
+      "thermex_sensor_connection_status": {
+        "name": "Forbindelsesstatus"
       }
     },
     "button": {
