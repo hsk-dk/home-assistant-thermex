@@ -56,5 +56,6 @@ Install through [HACS](https://hacs.xyz/) by seaching for "Thermex Hood Integrat
 
 - English
 - Danish
+- Swedish
 
 ---
