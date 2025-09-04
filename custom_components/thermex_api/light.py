@@ -38,7 +38,8 @@ class ThermexLight(LightEntity):
         self._attr_translation_key = "thermex_light"
         self._attr_has_entity_name = True
         self._is_on: bool = False
-        self._brightness: int = 25
+        self._brightness: int = 204  # Default to 80% (204/255)
+        self._last_brightness: int = 204  # Remember last brightness when on
         self._unsub = None
         self._got_initial_state: bool = False
 
@@ -73,17 +74,27 @@ class ThermexLight(LightEntity):
             _LOGGER.warning("ThermexLight notify missing 'Light' key: %s", data)
             return
         self._is_on = bool(light.get("lightonoff", 0))
-        self._brightness = max(0, min(255, light.get("lightbrightness", 0)))
+        brightness = max(0, min(255, light.get("lightbrightness", 0)))
+        self._brightness = brightness
+        # Store last brightness when light is on and brightness > 0
+        if self._is_on and brightness > 0:
+            self._last_brightness = brightness
         self._got_initial_state = True
         self.schedule_update_ha_state()
 
     async def async_turn_on(self, **kwargs):
-        brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        if brightness is None:
+            # No brightness specified, use last known brightness
+            brightness = self._last_brightness
         brightness = max(0, min(255, brightness))  # Clamp to valid range
         _LOGGER.debug("ThermexLight: Turn on - Brightness: %s", brightness)
         await self._hub.send_request("Update", {"Light": {"lightonoff": 1, "lightbrightness": brightness}})
         self._is_on = True
         self._brightness = brightness
+        # Store as last brightness when turning on
+        if brightness > 0:
+            self._last_brightness = brightness
         self.schedule_update_ha_state()
 
     async def async_turn_off(self, **kwargs):
@@ -100,7 +111,11 @@ class ThermexLight(LightEntity):
             resp = await self._hub.send_request("status", {})
             light = resp.get("Data", {}).get("Light", {})
             self._is_on = bool(light.get("lightonoff", 0))
-            self._brightness = max(0, min(255, light.get("lightbrightness", 0)))
+            brightness = max(0, min(255, light.get("lightbrightness", 0)))
+            self._brightness = brightness
+            # Store last brightness when light is on and brightness > 0
+            if self._is_on and brightness > 0:
+                self._last_brightness = brightness
             self._got_initial_state = True
             self.schedule_update_ha_state()
         except Exception as err:
@@ -117,7 +132,8 @@ class ThermexDecoLight(LightEntity):
         self._attr_translation_key = "thermex_decolight"
         self._attr_has_entity_name = True
         self._is_on: bool = False
-        self._brightness: int = 0
+        self._brightness: int = 204  # Default to 80% (204/255)
+        self._last_brightness: int = 204  # Remember last brightness when on
         self._hs_color: tuple[float, float] = (0.0, 0.0)
         self._unsub = None
         self._got_initial_state: bool = False
@@ -157,7 +173,11 @@ class ThermexDecoLight(LightEntity):
             _LOGGER.warning("ThermexDecoLight notify missing 'Decolight' key: %s", data)
             return
         self._is_on = bool(deco.get("decolightonoff", 0))
-        self._brightness = max(0, min(255, deco.get("decolightbrightness", 0)))
+        brightness = max(0, min(255, deco.get("decolightbrightness", 0)))
+        self._brightness = brightness
+        # Store last brightness when light is on and brightness > 0
+        if self._is_on and brightness > 0:
+            self._last_brightness = brightness
         r = deco.get("decolightr", 0)
         g = deco.get("decolightg", 0)
         b = deco.get("decolightb", 0)
@@ -166,7 +186,10 @@ class ThermexDecoLight(LightEntity):
         self.schedule_update_ha_state()
 
     async def async_turn_on(self, **kwargs):
-        brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        if brightness is None:
+            # No brightness specified, use last known brightness
+            brightness = self._last_brightness
         brightness = max(0, min(255, brightness))  # Clamp to valid range
         rgb = kwargs.get(ATTR_RGB_COLOR)
         if rgb:
@@ -183,6 +206,9 @@ class ThermexDecoLight(LightEntity):
         await self._hub.send_request("Update", {"Decolight": payload})
         self._is_on = True
         self._brightness = brightness
+        # Store as last brightness when turning on
+        if brightness > 0:
+            self._last_brightness = brightness
         self._hs_color = color_RGB_to_hs(r, g, b)
         self.schedule_update_ha_state()
 
@@ -200,7 +226,11 @@ class ThermexDecoLight(LightEntity):
             resp = await self._hub.send_request("status", {})
             deco = resp.get("Data", {}).get("Decolight", {})
             self._is_on = bool(deco.get("decolightonoff", 0))
-            self._brightness = max(0, min(255, deco.get("decolightbrightness", 0)))
+            brightness = max(0, min(255, deco.get("decolightbrightness", 0)))
+            self._brightness = brightness
+            # Store last brightness when light is on and brightness > 0
+            if self._is_on and brightness > 0:
+                self._last_brightness = brightness
             r = deco.get("decolightr", 0)
             g = deco.get("decolightg", 0)
             b = deco.get("decolightb", 0)
