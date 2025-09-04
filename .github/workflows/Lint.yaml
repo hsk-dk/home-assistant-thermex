@@ -1,0 +1,74 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black isort flake8 pylint mypy
+          # Install only the types we need, not full HA
+          pip install aiohttp types-aiofiles
+          
+      - name: Run Black (Code Formatting)
+        continue-on-error: true
+        run: |
+          echo "::group::Black Results"
+          black --check --diff custom_components/ || echo "Black formatting issues found"
+          echo "::endgroup::"
+        
+      - name: Run isort (Import Sorting)
+        continue-on-error: true
+        run: |
+          echo "::group::isort Results"
+          isort --check-only --diff custom_components/ || echo "Import sorting issues found"
+          echo "::endgroup::"
+        
+      - name: Run Flake8 (Style Guide)
+        continue-on-error: true
+        run: |
+          echo "::group::Flake8 Results"
+          flake8 custom_components/ --count --select=E9,F63,F7,F82 --show-source --statistics || echo "Flake8 critical issues found"
+          echo "::endgroup::"
+        
+      - name: Run Pylint (Code Analysis)
+        continue-on-error: true
+        run: |
+          echo "::group::Pylint Results"
+          pylint custom_components/thermex_api/ --disable=C,R,W --errors-only || echo "Pylint errors found"
+          echo "::endgroup::"
+        
+      - name: Run MyPy (Type Checking)
+        continue-on-error: true
+        run: |
+          echo "::group::MyPy Results"
+          mypy custom_components/thermex_api/ --ignore-missing-imports --no-strict-optional || echo "MyPy type issues found"
+          echo "::endgroup::"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Linting completed. Check individual sections above for details."
+          echo "Note: This workflow shows issues but doesn't fail the build."

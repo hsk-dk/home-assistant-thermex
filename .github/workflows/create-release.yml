@@ -4,48 +4,187 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release Tag'
+        description: 'Release Tag (e.g., v2.10.3)'
         required: true
+      release_notes:
+        description: 'Release Notes (optional - will use draft release if available)'
+        required: false
+        type: string
+      use_draft:
+        description: 'Use existing draft release created by Release Drafter'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
-  build:
+  create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - name: Create temporary directory
-        run: mkdir temp_dir
-
-      - name: Copy all files except excluded ones
+      - name: Validate tag format
         run: |
-          rsync -av --progress ./ temp_dir/ \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude 'node_modules' \
-            --exclude '.DS_Store' \
-            --exclude '*.log' \
-            --exclude '.gitignore' \
-            --exclude 'README.md' \
-            --exclude '.env' \
-            --exclude 'package.json' \
-            --exclude 'package-lock.json' \
-            --exclude 'src' 
+          TAG=${{ github.event.inputs.tag }}
+          if [[ ! $TAG =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Tag must be in format v1.2.3 or 1.2.3"
+            exit 1
+          fi
+          echo "TAG_NAME=$TAG" >> $GITHUB_ENV
+          echo "VERSION=${TAG#v}" >> $GITHUB_ENV
 
-      - name: Rename directory
-        run: mv temp_dir thermex_api
-
-      - name: Create zip archive
+      - name: Check if tag already exists
         run: |
-          zip -r thermex_api.zip custom_components/thermex_api
+          if git rev-parse --verify "refs/tags/${{ env.TAG_NAME }}" >/dev/null 2>&1; then
+            echo "Error: Tag ${{ env.TAG_NAME }} already exists"
+            exit 1
+          fi
 
-      - name: Create Release
+      - name: Update manifest.json version
+        run: |
+          echo "Updating manifest.json version to ${{ env.VERSION }}"
+          
+          # Backup original file
+          cp custom_components/thermex_api/manifest.json custom_components/thermex_api/manifest.json.bak
+          
+          # Update version using jq for proper JSON handling
+          sudo apt-get update && sudo apt-get install -y jq
+          jq --arg version "${{ env.VERSION }}" '.version = $version' custom_components/thermex_api/manifest.json > temp.json
+          mv temp.json custom_components/thermex_api/manifest.json
+          
+          # Verify the change
+          echo "Updated manifest.json:"
+          cat custom_components/thermex_api/manifest.json
+          
+          # Check if version was actually updated
+          CURRENT_VERSION=$(jq -r '.version' custom_components/thermex_api/manifest.json)
+          if [ "$CURRENT_VERSION" != "${{ env.VERSION }}" ]; then
+            echo "Error: Failed to update version in manifest.json"
+            exit 1
+          fi
+
+      - name: Commit and push version update
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Check if there are changes to commit
+          if git diff --quiet custom_components/thermex_api/manifest.json; then
+            echo "No changes to manifest.json"
+          else
+            git add custom_components/thermex_api/manifest.json
+            git commit -m "chore: update version to ${{ env.VERSION }}"
+            git push origin ${{ github.ref_name }}
+            echo "Version update committed and pushed"
+          fi
+
+      - name: Create Git Tag
+        run: |
+          git tag ${{ env.TAG_NAME }}
+          git push origin ${{ env.TAG_NAME }}
+          echo "Tag ${{ env.TAG_NAME }} created and pushed"
+
+      - name: Create ZIP archive
+        run: |
+          echo "Creating ZIP archive..."
+          cd custom_components/thermex_api
+          
+          # Create zip with only the necessary files
+          zip -r ../../thermex_api.zip . \
+            -x "*.pyc" \
+            -x "__pycache__/*" \
+            -x "*.log" \
+            -x ".DS_Store" \
+            -x "*.bak"
+          
+          cd ../..
+          
+          # Verify ZIP contents
+          echo "ZIP file contents:"
+          unzip -l thermex_api.zip
+
+      - name: Get draft release body (if using draft)
+        if: ${{ github.event.inputs.use_draft == 'true' && github.event.inputs.release_notes == '' }}
+        id: get_draft
+        run: |
+          echo "Looking for existing draft release..."
+          
+          # Get the latest draft release
+          DRAFT_BODY=$(gh release list --json tagName,body,isDraft --jq '.[] | select(.isDraft == true) | .body' | head -1)
+          
+          if [ -n "$DRAFT_BODY" ]; then
+            echo "Found draft release body"
+            # Save to file to handle multiline content
+            echo "$DRAFT_BODY" > draft_body.txt
+            echo "has_draft=true" >> $GITHUB_OUTPUT
+          else
+            echo "No draft release found"
+            echo "has_draft=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine release notes
+        id: release_notes
+        run: |
+          if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+            echo "Using provided release notes"
+            echo "${{ github.event.inputs.release_notes }}" > final_notes.txt
+            echo "generate_notes=false" >> $GITHUB_OUTPUT
+          elif [ "${{ steps.get_draft.outputs.has_draft }}" == "true" ]; then
+            echo "Using draft release notes"
+            cp draft_body.txt final_notes.txt
+            echo "generate_notes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Will generate release notes automatically"
+            echo "generate_notes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: thermex_api.zip
-          tag_name: ${{ github.event.inputs.tag }}
+          tag_name: ${{ env.TAG_NAME }}
+          name: "Release ${{ env.TAG_NAME }}"
+          body_path: ${{ steps.release_notes.outputs.generate_notes == 'false' && 'final_notes.txt' || '' }}
+          generate_release_notes: ${{ steps.release_notes.outputs.generate_notes == 'true' }}
+          draft: false
+          prerelease: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-permissions:
-  contents: write
+      - name: Clean up draft releases
+        if: ${{ github.event.inputs.use_draft == 'true' && steps.get_draft.outputs.has_draft == 'true' }}
+        run: |
+          echo "Cleaning up draft releases..."
+          gh release list --json tagName,isDraft --jq '.[] | select(.isDraft == true) | .tagName' | while read tag; do
+            if [ "$tag" != "${{ env.TAG_NAME }}" ]; then
+              echo "Deleting draft release: $tag"
+              gh release delete "$tag" --yes || echo "Failed to delete $tag"
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update HACS validation (optional)
+        run: |
+          echo "Release created successfully!"
+          echo "ZIP file: thermex_api.zip"
+          echo "Tag: ${{ env.TAG_NAME }}"
+          echo "Version: ${{ env.VERSION }}"
+          echo ""
+          echo "Next steps:"
+
+
+
+          echo "3. Update any documentation if needed"          echo "2. Test the ZIP file download"          echo "1. Verify the release in GitHub"          echo "1. Verify the release in GitHub"
+          echo "2. Test the ZIP file download"
+          echo "3. Update any documentation if needed"
