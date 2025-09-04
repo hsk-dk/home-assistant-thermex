@@ -1,0 +1,108 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+change-template: '- #$NUMBER $TITLE @$AUTHOR'
+sort-direction: ascending
+exclude-labels:
+  - 'skip-changelog'
+  - 'duplicate'
+  - 'invalid'
+  - 'wontfix'
+
+categories:
+  - title: '🛠 Breaking Changes'
+    labels:
+      - 'breaking-change'
+      - 'major'
+  - title: '🚀 Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+      - 'feature request'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'bug'
+      - 'fix'
+      - 'bugfix'
+  - title: '🧰 Maintenance'
+    labels:
+      - 'chore'
+      - 'maintenance'
+      - 'refactor'
+  - title: '📚 Documentation'
+    labels:
+      - 'documentation'
+      - 'docs'
+  - title: '📦 Dependencies'
+    labels:
+      - 'dependencies'
+      - 'dependency'
+
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking-change'
+  minor:
+    labels:
+      - 'minor'
+      - 'feature'
+      - 'enhancement'
+  patch:
+    labels:
+      - 'patch'
+      - 'bug'
+      - 'fix'
+      - 'bugfix'
+      - 'chore'
+      - 'maintenance'
+      - 'dependencies'
+  default: patch
+
+template: |
+  ## Changes
+
+  $CHANGES
+
+  ## Installation
+
+  1. Download the `thermex_api.zip` file from the assets below
+  2. Extract the contents into your `custom_components/thermex_api` directory
+  3. Restart Home Assistant
+  4. Add the integration through the UI (Configuration > Integrations > Add Integration > Thermex Hood)
+
+  ## What's Changed
+
+  See the full list of changes above.
+
+  **Full Changelog**: https://github.com/hsk-dk/home-assistant-thermex/compare/$PREVIOUS_TAG...$TAG
+
+autolabeler:
+  - label: 'bug'
+    branch:
+      - '/fix\/.+/'
+    title:
+      - '/fix/i'
+      - '/bug/i'
+  - label: 'feature'
+    branch:
+      - '/feature\/.+/'
+    title:
+      - '/feature/i'
+      - '/feat/i'
+  - label: 'chore'
+    branch:
+      - '/chore\/.+/'
+    title:
+      - '/chore/i'
+  - label: 'documentation'
+    branch:
+      - '/docs?\/.+/'
+    title:
+      - '/docs?/i'
+  - label: 'dependencies'
+    files:
+      - 'requirements.txt'
+      - 'custom_components/thermex_api/manifest.json'
+    title:
+      - '/bump/i'
+      - '/update.*dependency/i'
