@@ -1,3 +1,13 @@
 reset_runtime:
+  description: "Reset the Thermex fan's runtime counter to zero"
+  fields: {}
+
+start_delayed_off:
+  description: "Start delayed turn-off timer for the Thermex fan"
+  fields: {}
+
+cancel_delayed_off:
+  description: "Cancel delayed turn-off timer for the Thermex fan"
+  fields: {}et_runtime:
   description: "Reset the Thermex fan’s runtime counter to zero"
   fields: {}

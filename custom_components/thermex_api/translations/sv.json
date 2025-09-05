@@ -24,7 +24,8 @@
         "data": {
           "enable_decolight": "Aktivera DecoLight",
           "fan_alert_hours": "Notis för filterbyte efter (timmar)",
-          "fan_alert_days": "Notis för filterbyte efter (dagar)"
+          "fan_alert_days": "Notis för filterbyte efter (dagar)",
+          "fan_auto_off_delay": "Fördröjd avstängning timer (minuter)"
         }
       }
     }
@@ -47,6 +48,9 @@
     "button": {
       "thermex_button_reset_runtime": {
         "name": "Nollställ filtertid"
+      },
+      "thermex_button_delayed_turn_off": {
+        "name": "Starta fördröjd avstängning"
       }
     },
     "fan": {

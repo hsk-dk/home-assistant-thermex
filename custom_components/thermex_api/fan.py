@@ -36,6 +36,16 @@ async def async_setup_entry(hass, entry, async_add_entities):
         {},
         "async_reset"
     )
+    platform.async_register_entity_service(
+        "start_delayed_off",
+        {},
+        "start_delayed_off"
+    )
+    platform.async_register_entity_service(
+        "cancel_delayed_off",
+        {},
+        "cancel_delayed_off"
+    )
 
 
 class ThermexFan(FanEntity):
@@ -53,6 +63,9 @@ class ThermexFan(FanEntity):
         self._runtime_manager = runtime_manager
         self._options = options
         self._auto_off_handle = None
+        self._delayed_off_handle = None
+        self._delayed_off_active = False
+        self._delayed_off_remaining = 0
         self._unsub = None
         self._attr_translation_key = "thermex_fan"
         self._attr_has_entity_name = True
@@ -93,6 +106,10 @@ class ThermexFan(FanEntity):
             "time_since_activity": hub_data.get("time_since_activity", 0),
             "heartbeat_interval": hub_data.get("heartbeat_interval", 30),
             "connection_timeout": hub_data.get("connection_timeout", 120),
+            # Delayed turn-off attributes
+            "delayed_off_active": self._delayed_off_active,
+            "delayed_off_remaining": self._delayed_off_remaining,
+            "delayed_off_delay": self._options.get("fan_auto_off_delay", 10),
         }
 
     async def async_added_to_hass(self):
@@ -100,10 +117,6 @@ class ThermexFan(FanEntity):
         _LOGGER.debug("ThermexFan: awaiting initial notify for state")
         # Use a longer timeout and check if startup is complete
         async_call_later(self.hass, 15, self._fallback_status)
-
-    async def async_will_remove_from_hass(self):
-        if self._unsub:
-            self._unsub()
 
     @callback
     def _handle_notify(self, ntf_type: str, data: dict) -> None:
@@ -162,6 +175,7 @@ class ThermexFan(FanEntity):
         self.schedule_update_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
+        await self.cancel_delayed_off()  # Cancel any delayed turn-off
         await self.async_set_preset_mode("off")
         self._runtime_manager.stop()
         self._runtime_manager.set_last_preset("off")
@@ -174,6 +188,71 @@ class ThermexFan(FanEntity):
         self._runtime_manager.reset()
         await self._runtime_manager.save()
         self.schedule_update_ha_state()
+
+    async def start_delayed_off(self) -> None:
+        """Start the delayed turn-off timer."""
+        if not self._is_on:
+            _LOGGER.warning("Cannot start delayed turn-off: fan is not running")
+            return
+
+        # Cancel any existing delayed turn-off
+        await self.cancel_delayed_off()
+
+        delay_minutes = self._options.get("fan_auto_off_delay", 10)
+        self._delayed_off_active = True
+        self._delayed_off_remaining = delay_minutes
+
+        _LOGGER.info("Starting delayed turn-off: %d minutes", delay_minutes)
+        
+        # Schedule the turn-off
+        self._delayed_off_handle = async_call_later(
+            self.hass, delay_minutes * 60, self._handle_delayed_off
+        )
+        
+        # Start countdown timer (update every minute)
+        self._update_countdown()
+        
+        self.schedule_update_ha_state()
+
+    async def cancel_delayed_off(self) -> None:
+        """Cancel the delayed turn-off timer."""
+        if self._delayed_off_handle:
+            self._delayed_off_handle()
+            self._delayed_off_handle = None
+
+        self._delayed_off_active = False
+        self._delayed_off_remaining = 0
+        self.schedule_update_ha_state()
+        _LOGGER.info("Delayed turn-off cancelled")
+
+    def _update_countdown(self) -> None:
+        """Update the countdown timer display."""
+        if not self._delayed_off_active:
+            return
+
+        self._delayed_off_remaining = max(0, self._delayed_off_remaining - 1)
+        
+        if self._delayed_off_remaining > 0:
+            # Schedule next update in 1 minute
+            async_call_later(self.hass, 60, lambda _: self._update_countdown())
+        
+        self.schedule_update_ha_state()
+
+    async def _handle_delayed_off(self, _now) -> None:
+        """Handle the delayed turn-off event."""
+        self._delayed_off_handle = None
+        self._delayed_off_active = False
+        self._delayed_off_remaining = 0
+        
+        _LOGGER.info("Delayed turn-off triggered: turning off fan")
+        await self.async_turn_off()
+        self.schedule_update_ha_state()
+
+    async def async_will_remove_from_hass(self):
+        """Cancel any pending timers when entity is removed."""
+        if self._unsub:
+            self._unsub()
+        await self.cancel_delayed_off()
 
     async def _handle_auto_off(self, _now):
         self._auto_off_handle = None
