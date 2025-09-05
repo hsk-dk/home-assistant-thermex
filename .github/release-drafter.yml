@@ -63,18 +63,9 @@ template: |
 
   $CHANGES
 
-  ## Installation
+  ## Say thanks
 
-  1. Download the `thermex_api.zip` file from the assets below
-  2. Extract the contents into your `custom_components/thermex_api` directory
-  3. Restart Home Assistant
-  4. Add the integration through the UI (Configuration > Integrations > Add Integration > Thermex Hood)
-
-  ## What's Changed
-
-  See the full list of changes above.
-
-  **Full Changelog**: https://github.com/hsk-dk/home-assistant-thermex/compare/$PREVIOUS_TAG...$TAG
+  <a href="https://www.buymeacoffee.com/hskdk" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 
 autolabeler:
   - label: 'bug'
