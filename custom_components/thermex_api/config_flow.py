@@ -68,11 +68,22 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ): int,
                 vol.Optional(
                     "fan_auto_off_delay",
-                    default=self.entry.options.get("fan_auto_off_delay", 10)
+                    default=self.entry.options.get("fan_auto_off_delay", 10),
+                    description="Time in minutes before automatic fan turn-off"
                 ): vol.All(vol.Coerce(int), vol.Range(min=1, max=120)),
             })
             return self.async_show_form(
                 step_id="init", data_schema=data_schema
             )
+
+        # In the validation section
+        if user_input:
+            delay = user_input.get("fan_auto_off_delay", 10)
+            if not (1 <= delay <= 120):
+                return self.async_show_form(
+                    step_id="init", 
+                    data_schema=data_schema,
+                    errors={"fan_auto_off_delay": "invalid_delay_range"}
+                )
 
         return self.async_create_entry(title="Options", data=user_input)

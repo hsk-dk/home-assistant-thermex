@@ -198,7 +198,7 @@ class ThermexFan(FanEntity):
         # Cancel any existing delayed turn-off
         await self.cancel_delayed_off()
 
-        delay_minutes = self._options.get("fan_auto_off_delay", 10)
+        delay_minutes = max(1, min(120, self._options.get("fan_auto_off_delay", 10)))
         self._delayed_off_active = True
         self._delayed_off_remaining = delay_minutes
 
@@ -230,13 +230,19 @@ class ThermexFan(FanEntity):
         if not self._delayed_off_active:
             return
 
-        self._delayed_off_remaining = max(0, self._delayed_off_remaining - 1)
-        
         if self._delayed_off_remaining > 0:
-            # Schedule next update in 1 minute
-            async_call_later(self.hass, 60, lambda _: self._update_countdown())
+            # Schedule next update in 1 minute, then decrement
+            async_call_later(self.hass, 60, self._decrement_and_schedule)
         
         self.schedule_update_ha_state()
+
+    def _decrement_and_schedule(self, _now) -> None:
+        """Decrement countdown and schedule next update."""
+        if self._delayed_off_active:
+            self._delayed_off_remaining = max(0, self._delayed_off_remaining - 1)
+            self.schedule_update_ha_state()
+            if self._delayed_off_remaining > 0:
+                async_call_later(self.hass, 60, self._decrement_and_schedule)
 
     async def _handle_delayed_off(self, _now) -> None:
         """Handle the delayed turn-off event."""
