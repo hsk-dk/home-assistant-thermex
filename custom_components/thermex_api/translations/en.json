@@ -24,7 +24,8 @@
         "data": {
           "enable_decolight": "Activate DecoLight",
           "fan_alert_hours": "Filter cleaning notice after (hours)",
-          "fan_alert_days": "Filter cleaning notice after (days)"
+          "fan_alert_days": "Filter cleaning notice after (days)",
+          "fan_auto_off_delay": "Delayed turn-off timer (minutes)"
         }
       }
     }
@@ -47,6 +48,9 @@
     "button": {
       "thermex_button_reset_runtime": {
         "name": "Reset filter time"
+      },
+      "thermex_button_delayed_turn_off": {
+        "name": "Start delayed turn-off"
       }
     },
     "fan": {
