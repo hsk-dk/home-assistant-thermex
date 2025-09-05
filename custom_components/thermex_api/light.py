@@ -59,7 +59,8 @@ class ThermexLight(LightEntity):
         self._got_initial_state = False
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("ThermexLight: awaiting initial notify for state")
-        async_call_later(self.hass, 10, self._fallback_status)
+        # Use a longer timeout and check if startup is complete
+        async_call_later(self.hass, 15, self._fallback_status)
 
     async def async_will_remove_from_hass(self):
         if self._unsub:
@@ -73,13 +74,18 @@ class ThermexLight(LightEntity):
         if light is None:
             _LOGGER.warning("ThermexLight notify missing 'Light' key: %s", data)
             return
+        
+        # Mark as having received initial state regardless of timing
+        if not self._got_initial_state:
+            _LOGGER.debug("ThermexLight: Received initial state via notify")
+            self._got_initial_state = True
+            
         self._is_on = bool(light.get("lightonoff", 0))
         brightness = max(0, min(255, light.get("lightbrightness", 0)))
         self._brightness = brightness
         # Store last brightness when light is on and brightness > 0
         if self._is_on and brightness > 0:
             self._last_brightness = brightness
-        self._got_initial_state = True
         self.schedule_update_ha_state()
 
     async def async_turn_on(self, **kwargs):
@@ -106,20 +112,33 @@ class ThermexLight(LightEntity):
     async def _fallback_status(self, _now):
         if self._got_initial_state:
             return
-        _LOGGER.warning("ThermexLight: no notify in 10s, fetching fallback status")
-        try:
-            resp = await self._hub.send_request("status", {})
-            light = resp.get("Data", {}).get("Light", {})
-            self._is_on = bool(light.get("lightonoff", 0))
-            brightness = max(0, min(255, light.get("lightbrightness", 0)))
-            self._brightness = brightness
-            # Store last brightness when light is on and brightness > 0
-            if self._is_on and brightness > 0:
-                self._last_brightness = brightness
+        
+        # Check if hub startup is complete - if so, we should have received initial status
+        if self._hub.startup_complete:
+            _LOGGER.debug("ThermexLight: Hub startup complete but no notify received, using default state")
             self._got_initial_state = True
-            self.schedule_update_ha_state()
+            return
+            
+        _LOGGER.warning("ThermexLight: no notify in 15s, fetching fallback status")
+        try:
+            data = await self._hub.request_fallback_status("ThermexLight")
+            light = data.get("Light", {})
+            if light:
+                self._is_on = bool(light.get("lightonoff", 0))
+                brightness = max(0, min(255, light.get("lightbrightness", 0)))
+                self._brightness = brightness
+                # Store last brightness when light is on and brightness > 0
+                if self._is_on and brightness > 0:
+                    self._last_brightness = brightness
+                self._got_initial_state = True
+                self.schedule_update_ha_state()
+            else:
+                _LOGGER.debug("ThermexLight: No light data in fallback response, using defaults")
+                self._got_initial_state = True
         except Exception as err:
             _LOGGER.error("ThermexLight: fallback status failed: %s", err)
+            # Set initial state anyway to avoid repeated warnings
+            self._got_initial_state = True
 
 class ThermexDecoLight(LightEntity):
     """Deco light entity for Thermex hood."""
@@ -158,7 +177,8 @@ class ThermexDecoLight(LightEntity):
         self._got_initial_state = False
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("ThermexDecoLight: awaiting initial notify for state")
-        async_call_later(self.hass, 10, self._fallback_status)
+        # Use a longer timeout and check if startup is complete
+        async_call_later(self.hass, 15, self._fallback_status)
 
     async def async_will_remove_from_hass(self):
         if self._unsub:
@@ -221,21 +241,34 @@ class ThermexDecoLight(LightEntity):
     async def _fallback_status(self, _now):
         if self._got_initial_state:
             return
-        _LOGGER.warning("ThermexDecoLight: no notify in 10s, fetching fallback status")
-        try:
-            resp = await self._hub.send_request("status", {})
-            deco = resp.get("Data", {}).get("Decolight", {})
-            self._is_on = bool(deco.get("decolightonoff", 0))
-            brightness = max(0, min(255, deco.get("decolightbrightness", 0)))
-            self._brightness = brightness
-            # Store last brightness when light is on and brightness > 0
-            if self._is_on and brightness > 0:
-                self._last_brightness = brightness
-            r = deco.get("decolightr", 0)
-            g = deco.get("decolightg", 0)
-            b = deco.get("decolightb", 0)
-            self._hs_color = color_RGB_to_hs(r, g, b)
+        
+        # Check if hub startup is complete - if so, we should have received initial status
+        if self._hub.startup_complete:
+            _LOGGER.debug("ThermexDecoLight: Hub startup complete but no notify received, using default state")
             self._got_initial_state = True
-            self.schedule_update_ha_state()
+            return
+            
+        _LOGGER.warning("ThermexDecoLight: no notify in 15s, fetching fallback status")
+        try:
+            data = await self._hub.request_fallback_status("ThermexDecoLight")
+            deco = data.get("Decolight", {})
+            if deco:
+                self._is_on = bool(deco.get("decolightonoff", 0))
+                brightness = max(0, min(255, deco.get("decolightbrightness", 0)))
+                self._brightness = brightness
+                # Store last brightness when light is on and brightness > 0
+                if self._is_on and brightness > 0:
+                    self._last_brightness = brightness
+                r = deco.get("decolightr", 0)
+                g = deco.get("decolightg", 0)
+                b = deco.get("decolightb", 0)
+                self._hs_color = color_RGB_to_hs(r, g, b)
+                self._got_initial_state = True
+                self.schedule_update_ha_state()
+            else:
+                _LOGGER.debug("ThermexDecoLight: No decolight data in fallback response, using defaults")
+                self._got_initial_state = True
         except Exception as err:
             _LOGGER.error("ThermexDecoLight: fallback status failed: %s", err)
+            # Set initial state anyway to avoid repeated warnings
+            self._got_initial_state = True

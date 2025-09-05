@@ -37,6 +37,7 @@ class ThermexHub:
         self.last_status: dict | None = None
         self.last_error: str | None = None
         self.recent_messages = collections.deque(maxlen=10)
+        self._startup_complete: bool = False
 
         self._reconnect_lock = asyncio.Lock()
         self._reconnect_delay = 2  # seconds, backoff could be added
@@ -91,8 +92,9 @@ class ThermexHub:
                     # Optionally add a backoff strategy here
 
     async def connect(self) -> None:
-        # Initialize activity timer
+        # Initialize activity timer and reset startup flag
         self._last_activity = asyncio.get_event_loop().time()
+        self._startup_complete = False
         
         try:
             self._session = aiohttp.ClientSession()
@@ -127,8 +129,18 @@ class ThermexHub:
         try:
             proto_resp = await self.send_request("protocolversion", {})
             if proto_resp.get("Status") == 200:
-                self._protocol_version = proto_resp.get("Data", {}).get("Version")
-                _LOGGER.debug("ProtocolVersion response data: %s", proto_resp.get("Data"))
+                data = proto_resp.get("Data", {})
+                # Handle both formats: {"Version": "1.1"} or {"MajorVersion": 1, "MinorVersion": 1}
+                if "Version" in data:
+                    self._protocol_version = data["Version"]
+                elif "MajorVersion" in data and "MinorVersion" in data:
+                    major = data["MajorVersion"]
+                    minor = data["MinorVersion"]
+                    self._protocol_version = f"{major}.{minor}"
+                else:
+                    self._protocol_version = "unknown"
+                _LOGGER.debug("ProtocolVersion response data: %s", data)
+                _LOGGER.debug("Parsed protocol version: %s", self._protocol_version)
             else:
                 _LOGGER.error("ProtocolVersion returned non-200 status: %s", proto_resp)
         except asyncio.TimeoutError:
@@ -289,6 +301,9 @@ class ThermexHub:
             for ntf_type, section in data.items():
                 _LOGGER.debug("Initial STATUS notify: %s=%s", ntf_type, section)
                 async_dispatcher_send(self._hass, THERMEX_NOTIFY, ntf_type, {ntf_type: section})
+            # Mark startup as complete after dispatching initial status
+            self._startup_complete = True
+            _LOGGER.debug("ThermexHub: Initial status dispatch complete")
         except Exception as exc:
             _LOGGER.warning("Initial STATUS request failed: %s", exc)
 
@@ -296,6 +311,21 @@ class ThermexHub:
     def name(self) -> str:
         """Return the name of the device."""
         return f"Thermex Hood ({self._host})"
+
+    @property
+    def startup_complete(self) -> bool:
+        """Return whether initial startup is complete."""
+        return self._startup_complete
+
+    async def request_fallback_status(self, entity_name: str) -> dict:
+        """Request fallback status in a coordinated way to avoid duplicate requests."""
+        _LOGGER.debug("ThermexHub: %s requesting fallback status", entity_name)
+        try:
+            resp = await self.send_request("status", {})
+            return resp.get("Data", {}) or {}
+        except Exception as exc:
+            _LOGGER.error("ThermexHub: Fallback status request failed: %s", exc)
+            return {}
 
     @property
     def protocol_version(self) -> str | None:
@@ -325,6 +355,7 @@ class ThermexHub:
             "time_since_activity": round(time_since_activity, 1),
             "heartbeat_interval": self._heartbeat_interval,
             "connection_timeout": self._connection_timeout,
+            "protocol_version": self.protocol_version,
         }
     
     async def close(self) -> None:

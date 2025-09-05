@@ -98,7 +98,8 @@ class ThermexFan(FanEntity):
     async def async_added_to_hass(self):
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("ThermexFan: awaiting initial notify for state")
-        async_call_later(self.hass, 10, self._fallback_status)
+        # Use a longer timeout and check if startup is complete
+        async_call_later(self.hass, 15, self._fallback_status)
 
     async def async_will_remove_from_hass(self):
         if self._unsub:
@@ -183,14 +184,27 @@ class ThermexFan(FanEntity):
     async def _fallback_status(self, _now):
         if self._got_initial_state:
             return
-        _LOGGER.warning("ThermexFan: no notify received in 10s, fetching fallback status")
-        try:
-            resp = await self._hub.send_request("status", {})
-            fan = resp.get("Data", {}).get("Fan", {})
-            self._is_on = bool(fan.get("fanonoff", 0)) and fan.get("fanspeed", 0) != 0
-            self._preset_mode = _VALUE_TO_MODE.get(fan.get("fanspeed", 0), "off")
-            self._runtime_manager.set_last_preset(self._preset_mode)
+        
+        # Check if hub startup is complete - if so, we should have received initial status
+        if self._hub.startup_complete:
+            _LOGGER.debug("ThermexFan: Hub startup complete but no notify received, using default state")
             self._got_initial_state = True
-            self.schedule_update_ha_state()
+            return
+            
+        _LOGGER.warning("ThermexFan: no notify received in 15s, fetching fallback status")
+        try:
+            data = await self._hub.request_fallback_status("ThermexFan")
+            fan = data.get("Fan", {})
+            if fan:
+                self._is_on = bool(fan.get("fanonoff", 0)) and fan.get("fanspeed", 0) != 0
+                self._preset_mode = _VALUE_TO_MODE.get(fan.get("fanspeed", 0), "off")
+                self._runtime_manager.set_last_preset(self._preset_mode)
+                self._got_initial_state = True
+                self.schedule_update_ha_state()
+            else:
+                _LOGGER.debug("ThermexFan: No fan data in fallback response, using defaults")
+                self._got_initial_state = True
         except Exception as err:
             _LOGGER.error("ThermexFan: fallback status failed: %s", err)
+            # Set initial state anyway to avoid repeated warnings
+            self._got_initial_state = True
