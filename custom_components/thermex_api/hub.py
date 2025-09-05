@@ -129,8 +129,18 @@ class ThermexHub:
         try:
             proto_resp = await self.send_request("protocolversion", {})
             if proto_resp.get("Status") == 200:
-                self._protocol_version = proto_resp.get("Data", {}).get("Version")
-                _LOGGER.debug("ProtocolVersion response data: %s", proto_resp.get("Data"))
+                data = proto_resp.get("Data", {})
+                # Handle both formats: {"Version": "1.1"} or {"MajorVersion": 1, "MinorVersion": 1}
+                if "Version" in data:
+                    self._protocol_version = data["Version"]
+                elif "MajorVersion" in data and "MinorVersion" in data:
+                    major = data["MajorVersion"]
+                    minor = data["MinorVersion"]
+                    self._protocol_version = f"{major}.{minor}"
+                else:
+                    self._protocol_version = "unknown"
+                _LOGGER.debug("ProtocolVersion response data: %s", data)
+                _LOGGER.debug("Parsed protocol version: %s", self._protocol_version)
             else:
                 _LOGGER.error("ProtocolVersion returned non-200 status: %s", proto_resp)
         except asyncio.TimeoutError:
@@ -345,6 +355,7 @@ class ThermexHub:
             "time_since_activity": round(time_since_activity, 1),
             "heartbeat_interval": self._heartbeat_interval,
             "connection_timeout": self._connection_timeout,
+            "protocol_version": self.protocol_version,
         }
     
     async def close(self) -> None:

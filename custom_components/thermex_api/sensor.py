@@ -132,9 +132,15 @@ class ConnectionStatusSensor(BaseRuntimeSensor):
      
     @property
     def native_value(self):
-        """Return the connection state as the sensor value."""
+        """Return the connection state with protocol version as the sensor value."""
         hub_data = self._hub.get_coordinator_data()
-        return hub_data.get("connection_state", "unknown")
+        connection_state = hub_data.get("connection_state", "unknown")
+        protocol_version = self._hub.protocol_version
+        
+        if connection_state == "connected" and protocol_version:
+            return f"connected (v{protocol_version})"
+        else:
+            return connection_state
     
     @property
     def extra_state_attributes(self) -> dict:
