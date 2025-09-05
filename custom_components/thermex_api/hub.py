@@ -37,6 +37,7 @@ class ThermexHub:
         self.last_status: dict | None = None
         self.last_error: str | None = None
         self.recent_messages = collections.deque(maxlen=10)
+        self._startup_complete: bool = False
 
         self._reconnect_lock = asyncio.Lock()
         self._reconnect_delay = 2  # seconds, backoff could be added
@@ -91,8 +92,9 @@ class ThermexHub:
                     # Optionally add a backoff strategy here
 
     async def connect(self) -> None:
-        # Initialize activity timer
+        # Initialize activity timer and reset startup flag
         self._last_activity = asyncio.get_event_loop().time()
+        self._startup_complete = False
         
         try:
             self._session = aiohttp.ClientSession()
@@ -289,6 +291,9 @@ class ThermexHub:
             for ntf_type, section in data.items():
                 _LOGGER.debug("Initial STATUS notify: %s=%s", ntf_type, section)
                 async_dispatcher_send(self._hass, THERMEX_NOTIFY, ntf_type, {ntf_type: section})
+            # Mark startup as complete after dispatching initial status
+            self._startup_complete = True
+            _LOGGER.debug("ThermexHub: Initial status dispatch complete")
         except Exception as exc:
             _LOGGER.warning("Initial STATUS request failed: %s", exc)
 
@@ -296,6 +301,21 @@ class ThermexHub:
     def name(self) -> str:
         """Return the name of the device."""
         return f"Thermex Hood ({self._host})"
+
+    @property
+    def startup_complete(self) -> bool:
+        """Return whether initial startup is complete."""
+        return self._startup_complete
+
+    async def request_fallback_status(self, entity_name: str) -> dict:
+        """Request fallback status in a coordinated way to avoid duplicate requests."""
+        _LOGGER.debug("ThermexHub: %s requesting fallback status", entity_name)
+        try:
+            resp = await self.send_request("status", {})
+            return resp.get("Data", {}) or {}
+        except Exception as exc:
+            _LOGGER.error("ThermexHub: Fallback status request failed: %s", exc)
+            return {}
 
     @property
     def protocol_version(self) -> str | None:
