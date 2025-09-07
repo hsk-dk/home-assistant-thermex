@@ -38,6 +38,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         LastResetSensor(hub, runtime_manager, device_info),
         FilterTimeSensor(hub, runtime_manager, device_info),
         ConnectionStatusSensor(hub, runtime_manager, device_info),
+        DelayedTurnOffSensor(hub, runtime_manager, device_info, entry.entry_id),
     ], update_before_add=True)
 
 
@@ -161,3 +162,106 @@ class ConnectionStatusSensor(BaseRuntimeSensor):
         """Update on any notification to refresh connection status."""
         # Update connection status on any activity
         self.async_write_ha_state()
+
+
+class DelayedTurnOffSensor(BaseRuntimeSensor):
+    """Sensor that shows the scheduled turn-off time for the fan."""
+    
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    
+    def __init__(self, hub, runtime_manager, device_info, entry_id):
+        super().__init__(hub, runtime_manager, device_info)
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{hub.unique_id}_delayed_turn_off_time"
+        self._attr_translation_key = "thermex_sensor_delayed_turn_off"
+        
+    async def async_added_to_hass(self):
+        """Listen for delayed turn-off notifications."""
+        await super().async_added_to_hass()
+        # Listen specifically for delayed turn-off notifications
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, THERMEX_NOTIFY, self._handle_delayed_off_notify
+            )
+        )
+        
+    @callback
+    def _handle_delayed_off_notify(self, ntf_type, data):
+        """Handle delayed turn-off notification."""
+        if ntf_type == "delayed_turn_off":
+            _LOGGER.debug("DelayedTurnOffSensor received notification: %s", data)
+            # Force update immediately when we get a delayed turn-off notification
+            self.async_write_ha_state()
+        elif ntf_type == "fan":
+            # Also update when fan state changes, as this might affect our display
+            _LOGGER.debug("DelayedTurnOffSensor received fan notification, updating state")
+            self.async_write_ha_state()
+        
+    @property
+    def native_value(self):
+        """Return the scheduled turn-off time."""
+        # Get the fan entity to check its delayed turn-off status
+        if hasattr(self.hass, 'data') and DOMAIN in self.hass.data:
+            entry_data = self.hass.data[DOMAIN].get(self._entry_id)
+            if entry_data and 'hub' in entry_data:
+                # Find the fan entity by checking entity registry
+                fan_entity_id = f"fan.{self._hub.unique_id}_fan"
+                
+                # Also try alternative naming schemes that HA might use
+                possible_entity_ids = [
+                    fan_entity_id,
+                    f"fan.{self._hub.unique_id.replace('_', '')}_fan",
+                    f"fan.thermex_hood_thermex_ventilator",  # From the logs
+                ]
+                
+                _LOGGER.debug("DelayedTurnOffSensor: trying entity IDs: %s", possible_entity_ids)
+                
+                fan_state = None
+                actual_entity_id = None
+                
+                for entity_id in possible_entity_ids:
+                    fan_state = self.hass.states.get(entity_id)
+                    if fan_state:
+                        actual_entity_id = entity_id
+                        break
+                
+                _LOGGER.debug("DelayedTurnOffSensor: found fan at %s, fan_state=%s", actual_entity_id, fan_state is not None)
+                
+                if fan_state and fan_state.attributes:
+                    scheduled_time = fan_state.attributes.get("delayed_off_scheduled_time")
+                    _LOGGER.debug("DelayedTurnOffSensor: scheduled_time=%s", scheduled_time)
+                    if scheduled_time:
+                        parsed_dt = parse_datetime(scheduled_time)
+                        if parsed_dt:
+                            # Ensure timezone is set (assume local timezone if none)
+                            if parsed_dt.tzinfo is None:
+                                from homeassistant.util import dt as dt_util
+                                parsed_dt = parsed_dt.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+                            return parsed_dt
+        return None
+        
+    @property 
+    def extra_state_attributes(self) -> dict:
+        """Return additional delayed turn-off information."""
+        if hasattr(self.hass, 'data') and DOMAIN in self.hass.data:
+            entry_data = self.hass.data[DOMAIN].get(self._entry_id)
+            if entry_data and 'hub' in entry_data:
+                # Try multiple possible entity IDs
+                possible_entity_ids = [
+                    f"fan.{self._hub.unique_id}_fan",
+                    f"fan.thermex_hood_thermex_ventilator",  # From the logs
+                ]
+                
+                for entity_id in possible_entity_ids:
+                    fan_state = self.hass.states.get(entity_id)
+                    if fan_state and fan_state.attributes:
+                        return {
+                            "delayed_off_active": fan_state.attributes.get("delayed_off_active", False),
+                            "delayed_off_remaining": fan_state.attributes.get("delayed_off_remaining", 0),
+                            "delayed_off_delay": fan_state.attributes.get("delayed_off_delay", 10),
+                        }
+        return {
+            "delayed_off_active": False,
+            "delayed_off_remaining": 0,
+            "delayed_off_delay": 10,
+        }

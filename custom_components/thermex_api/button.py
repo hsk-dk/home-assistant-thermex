@@ -77,30 +77,37 @@ class DelayedTurnOffButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press: start delayed turn-off for the fan."""
-        # Find the fan entity and start delayed turn-off
-        entry_data = self.hass.data[DOMAIN].get(self._entry_id)
-        if not entry_data:
-            _LOGGER.error("Entry data not found for delayed turn-off")
-            return
-
-        # Get the fan entity
-        fan_entity_id = f"fan.{self._hub.unique_id}_fan"
-        fan_entity = None
+        _LOGGER.info("DelayedTurnOffButton pressed")
         
-        # Look for the fan entity in the entity registry
-        for entity in self.hass.states.async_all():
-            if entity.entity_id == fan_entity_id:
-                # Get the actual entity object via entity registry
-                entity_registry = self.hass.helpers.entity_registry.async_get(self.hass)
-                entity_entry = entity_registry.async_get(entity.entity_id)
-                if entity_entry and entity_entry.platform == DOMAIN:
-                    # Call the fan service
-                    await self.hass.services.async_call(
-                        "fan",
-                        "start_delayed_off",
-                        {"entity_id": fan_entity_id},
-                        blocking=True
-                    )
-                    return
-
-        _LOGGER.error("Fan entity not found for delayed turn-off")
+        try:
+            # Try the new domain service first
+            _LOGGER.info("Calling start_delayed_off_domain service")
+            
+            await self.hass.services.async_call(
+                DOMAIN,
+                "start_delayed_off_domain",
+                {},  # No entity_id needed for domain service
+                blocking=False
+            )
+            _LOGGER.info("Domain service call completed")
+            
+        except Exception as err:
+            _LOGGER.error("Domain service failed, trying entity service: %s", err)
+            
+            try:
+                # Fallback to entity service
+                entity_id = f"fan.{self._hub.unique_id}_fan"
+                _LOGGER.info("Calling start_delayed_off entity service for: %s", entity_id)
+                
+                await self.hass.services.async_call(
+                    DOMAIN,
+                    "start_delayed_off",
+                    {"entity_id": entity_id},
+                    blocking=False
+                )
+                _LOGGER.info("Entity service call completed")
+                
+            except Exception as err2:
+                _LOGGER.error("Both service calls failed: %s", err2)
+                import traceback
+                _LOGGER.error("Traceback: %s", traceback.format_exc())

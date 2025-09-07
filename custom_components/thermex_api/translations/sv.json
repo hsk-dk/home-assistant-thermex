@@ -43,6 +43,9 @@
       },
       "thermex_sensor_connection_status": {
         "name": "Anslutningsstatus"
+      },
+      "thermex_sensor_delayed_turn_off": {
+        "name": "Fördröjd avstängning tid"
       }
     },
     "button": {
