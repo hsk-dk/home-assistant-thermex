@@ -1,11 +1,15 @@
 {
-    "domain": "thermex_api",
-    "name": "Thermex Hood",
-    "codeowners": ["@hsk-dk"],
-    "config_flow": true,
-    "documentation": "https://github.com/hsk-dk/home-assistant-thermex",
-    "iot_class": "local_push",
-    "issue_tracker": "https://github.com/hsk-dk/home-assistant-thermex/issues",
-    "requirements": ["aiohttp"],
-    "version": "2.10.2"
+  "domain": "thermex_api",
+  "name": "Thermex Hood",
+  "codeowners": [
+    "@hsk-dk"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/hsk-dk/home-assistant-thermex",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/hsk-dk/home-assistant-thermex/issues",
+  "requirements": [
+    "aiohttp"
+  ],
+  "version": "3.0.0"
 }
