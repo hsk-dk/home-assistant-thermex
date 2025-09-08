@@ -2,7 +2,6 @@
 """
 Thermex API sensors for runtime tracking of the Thermex Fan.
 Creates persistent sensors for:
- - runtime_hours
  - last_reset
  - filter_time
 """
@@ -14,6 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.event import async_call_later
 from homeassistant.core import callback
 from homeassistant.util.dt import parse_datetime
 
@@ -34,7 +34,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     device_info = hub.device_info
 
     async_add_entities([
-        RuntimeHoursSensor(hub, runtime_manager, device_info),
         LastResetSensor(hub, runtime_manager, device_info),
         FilterTimeSensor(hub, runtime_manager, device_info),
         ConnectionStatusSensor(hub, runtime_manager, device_info),
@@ -112,6 +111,36 @@ class FilterTimeSensor(BaseRuntimeSensor):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_filter_time"
         self._attr_translation_key = "thermex_sensor_filter_time"
+        self._update_timer = None
+        
+    async def async_added_to_hass(self):
+        """Set up the sensor and start periodic updates."""
+        await super().async_added_to_hass()
+        # Start periodic updates (every 30 seconds)
+        self._schedule_update()
+        
+    async def async_will_remove_from_hass(self):
+        """Clean up when removing sensor."""
+        await super().async_will_remove_from_hass()
+        if self._update_timer:
+            self._update_timer()
+            self._update_timer = None
+            
+    def _schedule_update(self):
+        """Schedule the next update."""
+        if self._update_timer:
+            self._update_timer()
+        
+        # Schedule next update in 30 seconds
+        self._update_timer = async_call_later(
+            self.hass, 30, self._periodic_update
+        )
+    
+    async def _periodic_update(self, _):
+        """Periodic update callback."""
+        self.async_write_ha_state()
+        # Schedule the next update
+        self._schedule_update()
      
     @property
     def native_value(self):

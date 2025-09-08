@@ -35,9 +35,6 @@
       "thermex_sensor_last_reset": {
         "name": "Last filter time reset"
       },
-      "thermex_sensor_runtime_hours": {
-        "name": "Filter runtime since last reset"
-      },
       "thermex_sensor_filter_time": {
         "name": "Filter time"
       },
@@ -59,12 +56,16 @@
     "fan": {
       "thermex_fan": {
         "name": "Hood",
-        "state": {
-          "off": "Off",
-          "low": "Low",
-          "medium": "Medium",
-          "high": "High",
-          "boost": "Boost"
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Off",
+              "low": "Low",
+              "medium": "Medium",
+              "high": "High",
+              "boost": "Boost"
+            }
+          }
         }
       }
     },

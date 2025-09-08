@@ -35,7 +35,16 @@ class RuntimeManager:
         self._data["last_start"] = None
 
     def get_runtime_hours(self):
-        return round(self._data.get("runtime_hours", 0.0), 2)
+        """Get total runtime hours, including current session if fan is running."""
+        total_hours = self._data.get("runtime_hours", 0.0)
+        
+        # If fan is currently running, add current session time
+        last_start = self._data.get("last_start")
+        if last_start:
+            current_session = (datetime.utcnow().timestamp() - last_start) / 3600.0
+            total_hours += current_session
+            
+        return round(total_hours, 2)
 
     def get_last_reset(self):
         return self._data.get("last_reset")

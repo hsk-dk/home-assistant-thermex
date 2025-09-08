@@ -35,9 +35,6 @@
       "thermex_sensor_last_reset": {
         "name": "Sidste nulstilling af filtertid"
       },
-      "thermex_sensor_runtime_hours": {
-        "name": "Filterdriftstid siden sidste nulstilling"
-      },
       "thermex_sensor_filter_time": {
         "name": "Filtertid"
       },
@@ -59,12 +56,16 @@
     "fan": {
       "thermex_fan": {
         "name": "Emhætte",
-        "state": {
-          "off": "Slukket",
-          "low": "Lav",
-          "medium": "Mellem",
-          "high": "Høj",
-          "boost": "Boost"
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Slukket",
+              "low": "Lav",
+              "medium": "Mellem",
+              "high": "Høj",
+              "boost": "Boost"
+            }
+          }
         }
       }
     },
