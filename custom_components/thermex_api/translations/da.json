@@ -24,7 +24,8 @@
         "data": {
           "enable_decolight": "Aktivér Decolys",
           "fan_alert_hours": "Filter rengøringsadvarsel efter (timer)",
-          "fan_alert_days": "Filter rengøringsadvarsel efter (dage)"
+          "fan_alert_days": "Filter rengøringsadvarsel efter (dage)",
+          "fan_auto_off_delay": "Forsinket slukning timer (minutter)"
         }
       }
     }
@@ -42,11 +43,17 @@
       },
       "thermex_sensor_connection_status": {
         "name": "Forbindelsesstatus"
+      },
+      "thermex_sensor_delayed_turn_off": {
+        "name": "Forsinket slukning tid"
       }
     },
     "button": {
       "thermex_button_reset_runtime": {
         "name": "Nulstil filtertid"
+      },
+      "thermex_button_delayed_turn_off": {
+        "name": "Start forsinket slukning"
       }
     },
     "fan": {

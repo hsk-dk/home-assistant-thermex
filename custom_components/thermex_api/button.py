@@ -20,6 +20,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     runtime_manager = entry_data["runtime_manager"]
     async_add_entities([
         ResetRuntimeButton(hub, runtime_manager, entry.entry_id),
+        DelayedTurnOffButton(hub, entry.entry_id),
     ])
 
 
@@ -59,3 +60,54 @@ class ResetRuntimeButton(ButtonEntity):
         coordinator = getattr(entry_data, "coordinator", None) if entry_data else None
         if coordinator:
             await coordinator.async_request_refresh()
+
+
+class DelayedTurnOffButton(ButtonEntity):
+    """Button that starts delayed turn-off for the fan."""
+
+    def __init__(self, hub: ThermexHub, entry_id: str):
+        self._hub = hub
+        self._entry_id = entry_id
+
+        self._attr_unique_id = f"{hub.unique_id}_delayed_turn_off"
+        self._attr_translation_key = "thermex_button_delayed_turn_off"
+        self._attr_has_entity_name = True
+        self._attr_icon = "mdi:timer-off"
+        self._attr_device_info = hub.device_info
+
+    async def async_press(self) -> None:
+        """Handle the button press: start delayed turn-off for the fan."""
+        _LOGGER.info("DelayedTurnOffButton pressed")
+        
+        try:
+            # Try the new domain service first
+            _LOGGER.info("Calling start_delayed_off_domain service")
+            
+            await self.hass.services.async_call(
+                DOMAIN,
+                "start_delayed_off_domain",
+                {},  # No entity_id needed for domain service
+                blocking=False
+            )
+            _LOGGER.info("Domain service call completed")
+            
+        except Exception as err:
+            _LOGGER.error("Domain service failed, trying entity service: %s", err)
+            
+            try:
+                # Fallback to entity service
+                entity_id = f"fan.{self._hub.unique_id}_fan"
+                _LOGGER.info("Calling start_delayed_off entity service for: %s", entity_id)
+                
+                await self.hass.services.async_call(
+                    DOMAIN,
+                    "start_delayed_off",
+                    {"entity_id": entity_id},
+                    blocking=False
+                )
+                _LOGGER.info("Entity service call completed")
+                
+            except Exception as err2:
+                _LOGGER.error("Both service calls failed: %s", err2)
+                import traceback
+                _LOGGER.error("Traceback: %s", traceback.format_exc())

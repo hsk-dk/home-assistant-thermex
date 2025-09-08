@@ -109,8 +109,14 @@ class ThermexHub:
 
         # Authenticate
         auth_payload = {"Request": "Authenticate", "Data": {"Code": self._api_key}}
-        await self._ws.send_json(auth_payload)
-        msg = await self._ws.receive()
+        try:
+            await self._ws.send_json(auth_payload)
+            msg = await self._ws.receive()
+        except Exception as err:
+            self._connection_state = "error"
+            self.last_error = f"Authentication send/receive failed: {err}"
+            raise ConnectionError(f"Authentication send/receive failed: {err}")
+            
         if msg.type != WSMsgType.TEXT:
             self._connection_state = "error"
             self.last_error = "Authentication failed: no text response"
@@ -218,9 +224,12 @@ class ThermexHub:
                     _LOGGER.debug("ThermexHub: Sending heartbeat status request")
                     await self.send_request("status", {})
                     _LOGGER.debug("ThermexHub: Heartbeat successful")
+                except ConnectionError as err:
+                    _LOGGER.warning("ThermexHub: Heartbeat failed due to connection: %s", err)
+                    # Don't immediately reconnect on connection errors - let the next iteration handle it
                 except Exception as err:
                     _LOGGER.warning("ThermexHub: Heartbeat failed: %s", err)
-                    await self._ensure_connected()
+                    # Only try to reconnect for unexpected errors, not connection issues
                     
             except asyncio.CancelledError:
                 _LOGGER.debug("ThermexHub: Watchdog loop cancelled")
@@ -250,10 +259,18 @@ class ThermexHub:
 
         # Send the JSON payload once before any waits
         async with self._ws_lock:
-            await self._ws.send_json(payload)
-            # Update activity timestamp when sending
-            self._last_activity = asyncio.get_event_loop().time()
-            _LOGGER.debug("ThermexHub: Sent %s payload: %s", request, payload)
+            # Double-check connection right before sending
+            if self._ws is None or self._ws.closed:
+                self._pending.pop(key, None)
+                raise ConnectionError("WebSocket connection lost before sending")
+            try:
+                await self._ws.send_json(payload)
+                # Update activity timestamp when sending
+                self._last_activity = asyncio.get_event_loop().time()
+                _LOGGER.debug("ThermexHub: Sent %s payload: %s", request, payload)
+            except Exception as exc:
+                self._pending.pop(key, None)
+                raise ConnectionError(f"Failed to send WebSocket message: {exc}")
 
         try:
             # Try up to 2 attempts
@@ -276,10 +293,17 @@ class ThermexHub:
                         fut = loop.create_future()
                         self._pending[key] = fut
                         async with self._ws_lock:
-                            await self._ws.send_json(payload)
-                            _LOGGER.debug(
-                                "ThermexHub: Retrying %s payload: %s", request, payload
-                            )
+                            # Double-check connection before retry
+                            if self._ws is None or self._ws.closed:
+                                raise ConnectionError("WebSocket connection lost during retry")
+                            try:
+                                await self._ws.send_json(payload)
+                                _LOGGER.debug(
+                                    "ThermexHub: Retrying %s payload: %s", request, payload
+                                )
+                            except Exception as exc:
+                                self._pending.pop(key, None)
+                                raise ConnectionError(f"Failed to retry WebSocket message: {exc}")
                         continue
 
                     # Second timeout → reconnect once and give up
