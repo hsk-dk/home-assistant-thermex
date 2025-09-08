@@ -35,9 +35,6 @@
       "thermex_sensor_last_reset": {
         "name": "Senaste nollställning av filtertiden"
       },
-      "thermex_sensor_runtime_hours": {
-        "name": "Filtertid efter senaste nollställning"
-      },
       "thermex_sensor_filter_time": {
         "name": "Filtertid"
       },
@@ -59,12 +56,16 @@
     "fan": {
       "thermex_fan": {
         "name": "Köksfläkt",
-        "state": {
-          "off": "Av",
-          "low": "Låg",
-          "medium": "Medel",
-          "high": "Hög",
-          "boost": "Boost"
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Av",
+              "low": "Låg",
+              "medium": "Medel",
+              "high": "Hög",
+              "boost": "Boost"
+            }
+          }
         }
       }
     },
