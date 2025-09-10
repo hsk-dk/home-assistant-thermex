@@ -67,6 +67,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     default=self.entry.options.get("fan_alert_hours", 30)
                 ): int,
                 vol.Optional(
+                    "fan_alert_days",
+                    default=self.entry.options.get("fan_alert_days", 90)
+                ): int,
+                vol.Optional(
                     "fan_auto_off_delay",
                     default=self.entry.options.get("fan_auto_off_delay", 10),
                     description="Time in minutes before automatic fan turn-off"

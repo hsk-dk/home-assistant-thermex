@@ -22,18 +22,22 @@
       "init": {
         "title": "Thermex options",
         "data": {
-          "enable_decolight": "Activate DecoLight",
-          "fan_alert_hours": "Filter cleaning notice after (hours)",
-          "fan_alert_days": "Filter cleaning notice after (days)",
+          "enable_decolight": "Activate Ambient light",
+          "fan_alert_hours": "Grease filter cleaning notice after (runtime hours)",
+          "fan_alert_days": "Grease filter cleaning notice after (days since reset)",
           "fan_auto_off_delay": "Delayed turn-off timer (minutes)"
-        }
+        },
+        "description": "Filter alert triggers when EITHER runtime hours OR days since reset threshold is exceeded."
       }
     }
   },
   "entity": {
     "sensor": {
       "thermex_sensor_last_reset": {
-        "name": "Last filter time reset"
+        "name": "Last grease filter time reset"
+      },
+      "thermex_sensor_runtime_hours": {
+        "name": "Grease filter runtime since last reset"
       },
       "thermex_sensor_filter_time": {
         "name": "Filter time"

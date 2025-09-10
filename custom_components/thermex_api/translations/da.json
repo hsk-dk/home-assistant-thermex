@@ -23,10 +23,11 @@
         "title": "Thermex-indstillinger",
         "data": {
           "enable_decolight": "Aktivér Decolys",
-          "fan_alert_hours": "Filter rengøringsadvarsel efter (timer)",
-          "fan_alert_days": "Filter rengøringsadvarsel efter (dage)",
+          "fan_alert_hours": "Filter rengøringsadvarsel efter (driftstimer)",
+          "fan_alert_days": "Filter rengøringsadvarsel efter (dage siden nulstilling)",
           "fan_auto_off_delay": "Forsinket slukning timer (minutter)"
-        }
+        },
+        "description": "Filter alarm udløses når ENTEN driftstimer ELLER dage siden nulstilling overskrides."
       }
     }
   },
@@ -34,6 +35,9 @@
     "sensor": {
       "thermex_sensor_last_reset": {
         "name": "Sidste nulstilling af filtertid"
+      },
+      "thermex_sensor_runtime_hours": {
+        "name": "Filter driftstimer siden sidste nulstilling"
       },
       "thermex_sensor_filter_time": {
         "name": "Filtertid"
