@@ -47,25 +47,80 @@ class ThermexFilterAlert(BinarySensorEntity):
 
     @property
     def is_on(self) -> bool:
-        return (
-            self._runtime_manager.get_runtime_hours()
-            >= self._options.get("runtime_threshold", 30)
-        )
+        """Return True if filter alert should be triggered."""
+        # Check runtime hours threshold
+        runtime_hours = self._runtime_manager.get_runtime_hours()
+        hours_threshold = self._options.get("fan_alert_hours", 30)
+        hours_exceeded = runtime_hours >= hours_threshold
+        
+        # Check days since reset threshold
+        days_since_reset = self._runtime_manager.get_days_since_reset()
+        days_threshold = self._options.get("fan_alert_days", 90)
+        days_exceeded = False
+        
+        if days_since_reset is not None:
+            # Normal case: we have a reset date
+            days_exceeded = days_since_reset >= days_threshold
+        else:
+            # No reset date recorded - assume filter needs attention after some runtime
+            # Only trigger days-based alert if we have significant runtime hours (> 5 hours)
+            # This prevents false alerts on new installations with no usage
+            days_exceeded = runtime_hours > 5
+        
+        # Trigger alert if either condition is met
+        return hours_exceeded or days_exceeded
     
     @property
     def extra_state_attributes(self) -> dict:
-        """Return additional state attributes including connection status."""
+        """Return additional state attributes including dual threshold information."""
+        runtime_hours = self._runtime_manager.get_runtime_hours()
+        days_since_reset = self._runtime_manager.get_days_since_reset()
+        hours_threshold = self._options.get("fan_alert_hours", 30)
+        days_threshold = self._options.get("fan_alert_days", 90)
+        
+        hours_exceeded = runtime_hours >= hours_threshold
+        days_exceeded = False
+        
+        if days_since_reset is not None:
+            # Normal case: we have a reset date
+            days_exceeded = days_since_reset >= days_threshold
+        else:
+            # No reset date recorded - trigger if significant runtime
+            days_exceeded = runtime_hours > 5
+        
+        # Get hub data for connection status
         hub_data = self._hub.get_coordinator_data()
         
         return {
-            "runtime_hours": self._runtime_manager.get_runtime_hours(),
-            "threshold": self._options.get("runtime_threshold", 30),
+            "runtime_hours": runtime_hours,
+            "days_since_reset": days_since_reset if days_since_reset is not None else "No reset date",
+            "hours_threshold": hours_threshold,
+            "days_threshold": days_threshold,
+            "hours_exceeded": hours_exceeded,
+            "days_exceeded": days_exceeded,
             "last_reset": self._runtime_manager.get_last_reset() or "never",
+            "trigger_reason": self._get_trigger_reason(hours_exceeded, days_exceeded, days_since_reset),
             # Connection status attributes
             "connection_state": hub_data.get("connection_state", "unknown"),
             "watchdog_active": hub_data.get("watchdog_active", False),
             "time_since_activity": hub_data.get("time_since_activity", 0),
         }
+    
+    def _get_trigger_reason(self, hours_exceeded: bool, days_exceeded: bool, days_since_reset) -> str:
+        """Get a human-readable reason for why the alert is triggered."""
+        if not (hours_exceeded or days_exceeded):
+            return "No alert"
+        
+        reasons = []
+        if hours_exceeded:
+            reasons.append("Runtime hours exceeded")
+        if days_exceeded:
+            if days_since_reset is not None:
+                reasons.append("Days since reset exceeded")
+            else:
+                reasons.append("No filter reset date recorded")
+        
+        return " and ".join(reasons)
 
     async def async_added_to_hass(self):
         self._unsub = async_dispatcher_connect(

@@ -49,6 +49,21 @@ class RuntimeManager:
     def get_last_reset(self):
         return self._data.get("last_reset")
 
+    def get_days_since_reset(self):
+        """Get number of days since last filter reset."""
+        last_reset = self._data.get("last_reset")
+        if not last_reset:
+            return None
+        
+        try:
+            reset_time = datetime.fromisoformat(last_reset.replace("Z", "+00:00"))
+            now = utcnow()
+            days_diff = (now - reset_time).days
+            return days_diff
+        except (ValueError, AttributeError) as e:
+            _LOGGER.warning("Error calculating days since reset: %s", e)
+            return None
+
     def get_filter_time(self):
         # For clarity: filter time is always runtime hours
         return self.get_runtime_hours()

@@ -23,10 +23,11 @@
         "title": "Thermex-inställningar",
         "data": {
           "enable_decolight": "Aktivera DecoLight",
-          "fan_alert_hours": "Notis för filterbyte efter (timmar)",
-          "fan_alert_days": "Notis för filterbyte efter (dagar)",
+          "fan_alert_hours": "Notis för filterbyte efter (driftstimmar)",
+          "fan_alert_days": "Notis för filterbyte efter (dagar sedan nollställning)",
           "fan_auto_off_delay": "Fördröjd avstängning timer (minuter)"
-        }
+        },
+        "description": "Filteralarm utlöses när ANTINGEN driftstimmar ELLER dagar sedan nollställning överskrids."
       }
     }
   },
@@ -34,6 +35,9 @@
     "sensor": {
       "thermex_sensor_last_reset": {
         "name": "Senaste nollställning av filtertiden"
+      },
+      "thermex_sensor_runtime_hours": {
+        "name": "Filter driftstimmar sedan senaste nollställning"
       },
       "thermex_sensor_filter_time": {
         "name": "Filtertid"

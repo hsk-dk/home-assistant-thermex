@@ -35,6 +35,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     async_add_entities([
         LastResetSensor(hub, runtime_manager, device_info),
+        RuntimeHoursSensor(hub, runtime_manager, device_info),
         FilterTimeSensor(hub, runtime_manager, device_info),
         ConnectionStatusSensor(hub, runtime_manager, device_info),
         DelayedTurnOffSensor(hub, runtime_manager, device_info, entry.entry_id),
