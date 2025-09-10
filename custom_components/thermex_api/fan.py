@@ -247,13 +247,11 @@ class ThermexFan(FanEntity):
         # Cancel any existing delayed turn-off
         await self.cancel_delayed_off()
 
-        # For debugging, use 2 minutes instead of config value
-        # Get current options from config entry
+        # Get delay from config entry options
         current_options = self._entry.options
-        # delay_minutes = max(1, min(120, current_options.get("fan_auto_off_delay", 10)))
-        delay_minutes = 2  # DEBUG: Use 2 minutes for testing
+        delay_minutes = max(1, min(120, current_options.get("fan_auto_off_delay", 10)))
         
-        _LOGGER.info("DEBUG: Using %d minutes for delayed turn-off", delay_minutes)
+        _LOGGER.info("Starting delayed turn-off in %d minutes", delay_minutes)
         
         self._delayed_off_active = True
         self._delayed_off_remaining = delay_minutes
