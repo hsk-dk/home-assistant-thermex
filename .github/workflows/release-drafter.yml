@@ -5,20 +5,22 @@ on:
     branches:
       - main
       - master
-  pull_request_target:
-    types: [opened, reopened, synchronize, edited]
+  pull_request:
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: read
 
 jobs:
   update_release_draft:
+    if: github.repository_owner == 'hsk-dk'
     permissions:
       contents: write
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      - uses: release-drafter/release-drafter@v5
+      - name: Update release draft
+        uses: release-drafter/release-drafter@v6
         with:
           config-name: release-drafter.yml
           disable-autolabeler: false

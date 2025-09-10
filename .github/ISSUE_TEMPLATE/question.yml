@@ -1,0 +1,39 @@
+name: Question
+description: Ask a question about usage or configuration
+title: "[Question]: "
+labels: ["question", "documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question? We're here to help!
+        
+        Before asking, please check:
+        - [README.md](../README.md) for basic setup
+        - [Workflows Guide](../WORKFLOWS_GUIDE.md) for development questions
+        - [Existing issues](../../issues) for similar questions
+        
+  - type: input
+    id: version
+    attributes:
+      label: Integration Version
+      description: What version of the integration are you using?
+      placeholder: e.g., v2.10.3
+    validations:
+      required: false
+      
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+    validations:
+      required: true
+      
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any additional information that might help us answer your question
+    validations:
+      required: false
