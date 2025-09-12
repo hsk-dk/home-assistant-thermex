@@ -1,11 +1,7 @@
 {
   "config": {
     "step": {
-              "name": "Fedtfilter køretid siden sidste nulstilling"
-      },
-      "thermex_sensor_connection_status": {
-        "name": "Forbindelsesstatus"
-      },{
+      "user": {
         "title": "Forbind til Thermex-emhætten",
         "description": "Indtast Thermex-emhættens IP-adresse og API-password.",
         "data": {
