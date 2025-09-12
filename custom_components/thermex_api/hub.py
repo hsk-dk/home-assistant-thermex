@@ -42,12 +42,19 @@ class ThermexHub:
         self._reconnect_lock = asyncio.Lock()
         self._reconnect_delay = 2  # seconds, backoff could be added
         self._reconnecting = False
+        self._closing = False  # Flag to prevent operations during close
+        self._is_closing = False  # Additional flag for async close operations
+        self._is_reconnecting = False  # Flag to prevent concurrent reconnections
         
         # Watchdog settings
         self._watchdog_task: asyncio.Task | None = None
         self._last_activity = 0.0  # Will be set properly when loop starts
         self._heartbeat_interval = 30  # Send heartbeat every 30 seconds
+        self._heartbeat_lock = asyncio.Lock()  # Prevent concurrent heartbeats
+        self._last_heartbeat = 0.0  # Track last heartbeat time
+        self._connection_timeout = 60  # seconds
         self._connection_timeout = 120  # Consider connection dead after 2 minutes of no activity
+        self._heartbeat_in_progress = False  # Prevent concurrent heartbeats
 
     def configure_watchdog(self, heartbeat_interval: int = 30, connection_timeout: int = 120) -> None:
         """Configure watchdog parameters.
@@ -66,30 +73,71 @@ class ThermexHub:
 
     async def _ensure_connected(self) -> None:
         """Ensure that the WebSocket connection is alive, reconnect if needed."""
+        # Don't reconnect if we're closing
+        if self._closing:
+            raise ConnectionError("Hub is closing")
+            
         if self._ws and not self._ws.closed:
             return
 
         async with self._reconnect_lock:
+            # Check again after acquiring lock
+            if self._closing:
+                raise ConnectionError("Hub is closing")
+                
             if self._ws and not self._ws.closed:
                 return  # another coroutine already reconnected
 
-            # Clean up old session and ws if not already done
-            await self.close()
+            # Set reconnecting flags to prevent cascading attempts
+            if self._reconnecting or self._is_reconnecting:
+                # Wait a bit and check if another coroutine fixed it
+                await asyncio.sleep(0.5)
+                if self._ws and not self._ws.closed:
+                    return
+                raise ConnectionError("Reconnection already in progress")
+                
+            self._reconnecting = True
+            self._is_reconnecting = True
+            
+            try:
+                # Clean up old session and ws if not already done
+                await self._close_connection()
 
-            # Try to reconnect
-            _LOGGER.warning("ThermexHub: WebSocket disconnected, attempting to reconnect...")
-            attempt = 0
-            while True:
-                try:
-                    await self.connect()
-                    _LOGGER.info("ThermexHub: WebSocket reconnected successfully.")
-                    break
-                except Exception as err:
-                    attempt += 1
-                    self.last_error = f"Reconnect attempt {attempt} failed: {err}"
-                    _LOGGER.error("ThermexHub: Reconnect attempt %d failed: %s", attempt, err)
-                    await asyncio.sleep(self._reconnect_delay)
-                    # Optionally add a backoff strategy here
+                # Try to reconnect
+                _LOGGER.warning("ThermexHub: WebSocket disconnected, attempting to reconnect...")
+                attempt = 0
+                while not self._closing:
+                    try:
+                        await self.connect()
+                        _LOGGER.info("ThermexHub: WebSocket reconnected successfully.")
+                        break
+                    except Exception as err:
+                        attempt += 1
+                        self.last_error = f"Reconnect attempt {attempt} failed: {err}"
+                        _LOGGER.error("ThermexHub: Reconnect attempt %d failed: %s", attempt, err)
+                        if attempt >= 3:  # Limit reconnection attempts
+                            raise ConnectionError(f"Failed to reconnect after {attempt} attempts")
+                        await asyncio.sleep(self._reconnect_delay)
+                        # Optionally add a backoff strategy here
+            finally:
+                self._reconnecting = False
+                self._is_reconnecting = False
+
+    async def _close_connection(self) -> None:
+        """Close WebSocket and session without affecting tasks."""
+        if self._ws:
+            try:
+                await self._ws.close()
+            except Exception as e:
+                _LOGGER.debug("Error closing WebSocket: %s", e)
+            self._ws = None
+            
+        if self._session:
+            try:
+                await self._session.close()
+            except Exception as e:
+                _LOGGER.debug("Error closing session: %s", e)
+            self._session = None
 
     async def connect(self) -> None:
         # Initialize activity timer and reset startup flag
@@ -197,14 +245,21 @@ class ThermexHub:
         """Watchdog loop that monitors connection health and sends periodic heartbeats."""
         _LOGGER.debug("ThermexHub: Watchdog loop started")
         
-        while True:
+        while not self._closing:
             try:
                 await asyncio.sleep(self._heartbeat_interval)
+                
+                # Skip if we're closing or reconnecting
+                if self._closing or self._reconnecting:
+                    continue
                 
                 # Check if connection is still alive
                 if not self._ws or self._ws.closed:
                     _LOGGER.warning("ThermexHub: Watchdog detected closed WebSocket")
-                    await self._ensure_connected()
+                    try:
+                        await self._ensure_connected()
+                    except Exception as e:
+                        _LOGGER.error("ThermexHub: Watchdog reconnection failed: %s", e)
                     continue
                 
                 current_time = asyncio.get_event_loop().time()
@@ -216,20 +271,28 @@ class ThermexHub:
                         "ThermexHub: No activity for %.1f seconds, reconnecting...", 
                         time_since_activity
                     )
-                    await self._ensure_connected()
+                    try:
+                        await self._ensure_connected()
+                    except Exception as e:
+                        _LOGGER.error("ThermexHub: Timeout reconnection failed: %s", e)
                     continue
                 
-                # Send heartbeat (status request) to keep connection alive
-                try:
-                    _LOGGER.debug("ThermexHub: Sending heartbeat status request")
-                    await self.send_request("status", {})
-                    _LOGGER.debug("ThermexHub: Heartbeat successful")
-                except ConnectionError as err:
-                    _LOGGER.warning("ThermexHub: Heartbeat failed due to connection: %s", err)
-                    # Don't immediately reconnect on connection errors - let the next iteration handle it
-                except Exception as err:
-                    _LOGGER.warning("ThermexHub: Heartbeat failed: %s", err)
-                    # Only try to reconnect for unexpected errors, not connection issues
+                # Send heartbeat (status request) to keep connection alive - but only if not already in progress
+                async with self._heartbeat_lock:
+                    current_time = asyncio.get_event_loop().time()
+                    # Only send heartbeat if enough time has passed since last one
+                    if current_time - self._last_heartbeat > self._heartbeat_interval / 2:
+                        try:
+                            _LOGGER.debug("ThermexHub: Sending heartbeat status request")
+                            await self.send_request("status", {})
+                            _LOGGER.debug("ThermexHub: Heartbeat successful")
+                            self._last_heartbeat = current_time
+                        except ConnectionError as err:
+                            _LOGGER.warning("ThermexHub: Heartbeat failed due to connection: %s", err)
+                            # Don't immediately reconnect on connection errors - let the next iteration handle it
+                        except Exception as err:
+                            _LOGGER.warning("ThermexHub: Heartbeat failed: %s", err)
+                            # Only try to reconnect for unexpected errors, not connection issues
                     
             except asyncio.CancelledError:
                 _LOGGER.debug("ThermexHub: Watchdog loop cancelled")
@@ -240,8 +303,16 @@ class ThermexHub:
 
     async def send_request(self, request: str, body: Dict[str, Any]) -> Dict[str, Any]:
         """Send a JSON-RPC request and wait for its matching response, with one retry and reconnect on repeated timeout."""
+        # Don't send requests if we're closing
+        if self._closing:
+            raise ConnectionError("Hub is closing")
+            
         # Ensure websocket is open (and reconnect if not)
-        await self._ensure_connected()
+        try:
+            await self._ensure_connected()
+        except ConnectionError:
+            # If we can't connect, don't try to send the request
+            raise
 
         # Prepare future and track it by lowercase key
         loop = asyncio.get_running_loop()
@@ -260,6 +331,10 @@ class ThermexHub:
         # Send the JSON payload once before any waits
         async with self._ws_lock:
             # Double-check connection right before sending
+            if self._closing:
+                self._pending.pop(key, None)
+                raise ConnectionError("Hub is closing")
+                
             if self._ws is None or self._ws.closed:
                 self._pending.pop(key, None)
                 raise ConnectionError("WebSocket connection lost before sending")
@@ -279,7 +354,7 @@ class ThermexHub:
                     # Wait for matching response
                     return await asyncio.wait_for(fut, timeout=10)
                 except asyncio.TimeoutError:
-                    # Timeout: either retry or reconnect
+                    # Timeout: either retry or give up (don't cascade reconnections)
                     _LOGGER.debug(
                         "ThermexHub: Timeout waiting for '%s' response (attempt %d/2)",
                         request,
@@ -290,11 +365,19 @@ class ThermexHub:
 
                     if attempt == 1:
                         # First timeout → retry: recreate future, re-send
+                        if self._closing:
+                            raise ConnectionError("Hub is closing")
+                            
                         fut = loop.create_future()
                         self._pending[key] = fut
                         async with self._ws_lock:
                             # Double-check connection before retry
+                            if self._closing:
+                                self._pending.pop(key, None)
+                                raise ConnectionError("Hub is closing")
+                                
                             if self._ws is None or self._ws.closed:
+                                self._pending.pop(key, None)
                                 raise ConnectionError("WebSocket connection lost during retry")
                             try:
                                 await self._ws.send_json(payload)
@@ -306,14 +389,11 @@ class ThermexHub:
                                 raise ConnectionError(f"Failed to retry WebSocket message: {exc}")
                         continue
 
-                    # Second timeout → reconnect once and give up
+                    # Second timeout → give up (don't trigger cascading reconnections)
                     _LOGGER.warning(
-                        "ThermexHub: Second timeout for '%s', reconnecting WebSocket...", request
+                        "ThermexHub: Second timeout for '%s', giving up", request
                     )
-                    # Tear down and re-establish connection
-                    await self.close()
-                    await self._ensure_connected()
-                    raise
+                    raise asyncio.TimeoutError(f"Request '{request}' timed out after 2 attempts")
 
         finally:
             # Always remove pending entry (in case of success or error)
@@ -384,6 +464,15 @@ class ThermexHub:
     
     async def close(self) -> None:
         """Cancel receive loop and close connections."""
+        self._closing = True
+        self._is_closing = True
+        
+        # Cancel pending requests with a clear error
+        for fut in list(self._pending.values()):
+            if not fut.done():
+                fut.set_exception(ConnectionError("Hub is closing"))
+        self._pending.clear()
+        
         if self._watchdog_task:
             self._watchdog_task.cancel()
             try:
@@ -399,9 +488,8 @@ class ThermexHub:
             except asyncio.CancelledError:
                 pass
             self._recv_task = None
-        if self._ws:
-            await self._ws.close()
-            self._ws = None
-        if self._session:
-            await self._session.close()
-            self._session = None
+            
+        # Close connection
+        await self._close_connection()
+        
+        self._connection_state = "closed"

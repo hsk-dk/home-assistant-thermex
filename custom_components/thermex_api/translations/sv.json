@@ -39,9 +39,6 @@
       "thermex_sensor_runtime_hours": {
         "name": "Filter driftstimmar sedan senaste nollställning"
       },
-      "thermex_sensor_filter_time": {
-        "name": "Filtertid"
-      },
       "thermex_sensor_connection_status": {
         "name": "Anslutningsstatus"
       },

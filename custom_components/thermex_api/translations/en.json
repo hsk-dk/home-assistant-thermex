@@ -39,9 +39,6 @@
       "thermex_sensor_runtime_hours": {
         "name": "Grease filter runtime since last reset"
       },
-      "thermex_sensor_filter_time": {
-        "name": "Filter time"
-      },
       "thermex_sensor_connection_status": {
         "name": "Connection Status"
       },

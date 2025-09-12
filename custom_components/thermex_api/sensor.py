@@ -36,7 +36,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities([
         LastResetSensor(hub, runtime_manager, device_info),
         RuntimeHoursSensor(hub, runtime_manager, device_info),
-        FilterTimeSensor(hub, runtime_manager, device_info),
         ConnectionStatusSensor(hub, runtime_manager, device_info),
         DelayedTurnOffSensor(hub, runtime_manager, device_info, entry.entry_id),
     ], update_before_add=True)
@@ -77,6 +76,36 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
         super().__init__(hub, runtime_manager, device_info)
         self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
         self._attr_translation_key = "thermex_sensor_runtime_hours"
+        self._update_timer = None
+        
+    async def async_added_to_hass(self):
+        """Set up the sensor and start periodic updates."""
+        await super().async_added_to_hass()
+        # Start periodic updates (every 30 seconds) to track runtime while fan is running
+        self._schedule_update()
+        
+    async def async_will_remove_from_hass(self):
+        """Clean up when removing sensor."""
+        await super().async_will_remove_from_hass()
+        if self._update_timer:
+            self._update_timer()
+            self._update_timer = None
+            
+    def _schedule_update(self):
+        """Schedule the next update."""
+        if self._update_timer:
+            self._update_timer()
+        
+        # Schedule next update in 30 seconds
+        self._update_timer = async_call_later(
+            self.hass, 30, self._periodic_update
+        )
+    
+    async def _periodic_update(self, _):
+        """Periodic update callback to track runtime accumulation."""
+        self.async_write_ha_state()
+        # Schedule the next update
+        self._schedule_update()
  
     @property
     def native_value(self):
@@ -99,56 +128,6 @@ class LastResetSensor(BaseRuntimeSensor):
         if iso:
             return parse_datetime(iso)
         return None
-
-
-class FilterTimeSensor(BaseRuntimeSensor):
-    """Sensor to display current filter time from the runtime manager."""
-
-    _attr_icon = "mdi:clock"
-    _attr_native_unit_of_measurement = "h"
-    _attr_state_class = "measurement"
-
-    def __init__(self, hub, runtime_manager, device_info):
-        super().__init__(hub, runtime_manager, device_info)
-        self._attr_unique_id = f"{hub.unique_id}_filter_time"
-        self._attr_translation_key = "thermex_sensor_filter_time"
-        self._update_timer = None
-        
-    async def async_added_to_hass(self):
-        """Set up the sensor and start periodic updates."""
-        await super().async_added_to_hass()
-        # Start periodic updates (every 30 seconds)
-        self._schedule_update()
-        
-    async def async_will_remove_from_hass(self):
-        """Clean up when removing sensor."""
-        await super().async_will_remove_from_hass()
-        if self._update_timer:
-            self._update_timer()
-            self._update_timer = None
-            
-    def _schedule_update(self):
-        """Schedule the next update."""
-        if self._update_timer:
-            self._update_timer()
-        
-        # Schedule next update in 30 seconds
-        self._update_timer = async_call_later(
-            self.hass, 30, self._periodic_update
-        )
-    
-    async def _periodic_update(self, _):
-        """Periodic update callback."""
-        self.async_write_ha_state()
-        # Schedule the next update
-        self._schedule_update()
-     
-    @property
-    def native_value(self):
-        # If filter time is equivalent to runtime_hours, simply return that
-        return self._runtime_manager.get_filter_time()
-        # If you want to display runtime_hours as filter time, use:
-        # return self._runtime_manager.get_runtime_hours()
 
 
 class ConnectionStatusSensor(BaseRuntimeSensor):
