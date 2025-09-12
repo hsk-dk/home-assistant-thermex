@@ -1,12 +1,6 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
-change-template: '- #$NUMBER $TITLE @$AUTHOR'
-sort-direction: ascending
-exclude-labels:
-  - 'skip-changelog'
-  - 'duplicate'
-  - 'invalid'
-  - 'wontfix'
+version-template: '$MAJOR.$MINOR.$PATCH'
 
 categories:
   - title: '🛠 Breaking Changes'
@@ -17,25 +11,33 @@ categories:
     labels:
       - 'feature'
       - 'enhancement'
+      - 'feat'
       - 'feature request'
   - title: '🐛 Bug Fixes'
     labels:
-      - 'bug'
       - 'fix'
       - 'bugfix'
+      - 'bug'
   - title: '🧰 Maintenance'
     labels:
       - 'chore'
+      - 'dependencies'
       - 'maintenance'
       - 'refactor'
   - title: '📚 Documentation'
     labels:
       - 'documentation'
       - 'docs'
-  - title: '📦 Dependencies'
+  - title: '⚡ Performance'
     labels:
-      - 'dependencies'
-      - 'dependency'
+      - 'performance'
+      - 'perf'
+  - title: '🔒 Security'
+    labels:
+      - 'security'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
 
 version-resolver:
   major:
@@ -50,24 +52,73 @@ version-resolver:
   patch:
     labels:
       - 'patch'
-      - 'bug'
       - 'fix'
       - 'bugfix'
       - 'chore'
-      - 'maintenance'
       - 'dependencies'
+      - 'maintenance'
   default: patch
 
 template: |
-  ## Changes
+  ## What's Changed
 
   $CHANGES
 
+  ## 📈 Statistics
+  
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+  
+  ## 🏠 Home Assistant Integration
+  
+  To install or update this integration:
+  
+  1. **HACS (Recommended)**:
+     - Go to HACS → Integrations
+     - Search for "Thermex" and update
+  
+  2. **Manual Installation**:
+     - Download `thermex_api.zip` from this release
+     - Extract to `config/custom_components/thermex_api/`
+     - Restart Home Assistant
+  
+  ## 🔧 Configuration
+  
+  After installation, go to Settings → Devices & Services → Add Integration → Thermex to configure.
+  
+  ## 📝 Notes
+  
+  - This release is compatible with Home Assistant Core 2024.1.0+
+  - Please restart Home Assistant after updating
+  - Check the [documentation](https://github.com/$OWNER/$REPOSITORY#readme) for configuration details
+  
   ## Say thanks
 
   <a href="https://www.buymeacoffee.com/hskdk" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 
+exclude-labels:
+  - 'skip-changelog'
+  - 'duplicate'
+  - 'question'
+  - 'invalid'
+  - 'wontfix'
+
+replacers:
+  # Clean up commit messages
+  - search: '/^(\w+)(\(.+\))?: (.+)$/'
+    replace: '$3'
+  # Remove conventional commit prefixes for cleaner display
+  - search: '/^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: /'
+    replace: ''
+
 autolabeler:
+  - label: 'documentation'
+    files:
+      - '*.md'
+      - 'docs/**/*'
+    branch:
+      - '/docs?\/.+/'
+    title:
+      - '/docs?/i'
   - label: 'bug'
     branch:
       - '/fix\/.+/'
@@ -78,18 +129,13 @@ autolabeler:
     branch:
       - '/feature\/.+/'
     title:
-      - '/feature/i'
       - '/feat/i'
+      - '/feature/i'
   - label: 'chore'
     branch:
       - '/chore\/.+/'
     title:
       - '/chore/i'
-  - label: 'documentation'
-    branch:
-      - '/docs?\/.+/'
-    title:
-      - '/docs?/i'
   - label: 'dependencies'
     files:
       - 'requirements.txt'

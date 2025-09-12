@@ -1,1 +1,11 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Workflows Documentation
+    url: https://github.com/hsk-dk/home-assistant-thermex/blob/main/WORKFLOWS_GUIDE.md
+    about: Complete guide for development workflows and release management
+  - name: Quick Reference
+    url: https://github.com/hsk-dk/home-assistant-thermex/blob/main/WORKFLOWS_QUICKREF.md
+    about: Quick reference for common workflow tasks
+  - name: Home Assistant Community
+    url: https://community.home-assistant.io/
+    about: General Home Assistant support and community discussions

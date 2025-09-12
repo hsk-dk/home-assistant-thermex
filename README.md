@@ -110,6 +110,25 @@ logger:
 
 Issues and feature requests are welcome! Please use the [GitHub Issues](https://github.com/hsk-dk/home-assistant-thermex/issues) page.
 
+### Development Workflows
+
+This repository uses automated workflows for release management:
+
+- **📖 [Complete Workflows Guide](WORKFLOWS_GUIDE.md)** - Detailed documentation for developers and maintainers
+- **🚀 [Quick Reference](WORKFLOWS_QUICKREF.md)** - Quick lookup for common tasks
+
+#### For Contributors
+1. Use proper branch naming: `feature/new-sensor`, `fix/bug-description`
+2. Label your PRs appropriately for automatic release notes
+3. Follow semantic commit messages: `feat:`, `fix:`, `docs:`, `chore:`
+
+#### For Maintainers
+- **Creating Releases**: Use the automated workflows in GitHub Actions
+- **Release Notes**: Automatically generated from PR labels
+- **Pre-releases**: Available for testing new features
+
+See the [workflows documentation](WORKFLOWS_GUIDE.md) for complete details on labeling, branching, and release processes.
+
 ## Support
 
 [![Buy me a coffee](https://img.shields.io/static/v1?label=Buy%20me%20a%20coffee&message=and%20say%20thanks&color=orange&logo=buymeacoffee&logoColor=white&style=plastic)](https://www.buymeacoffee.com/hskdk)

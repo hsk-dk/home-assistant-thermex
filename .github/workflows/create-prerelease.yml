@@ -1,0 +1,99 @@
+name: Create Pre-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - 'patch'
+          - 'minor'
+          - 'major'
+        default: 'patch'
+      prerelease_type:
+        description: 'Pre-release type'
+        required: true
+        type: choice
+        options:
+          - 'alpha'
+          - 'beta'
+          - 'rc'
+        default: 'beta'
+
+jobs:
+  create-prerelease:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate next version
+        id: version
+        run: |
+          # Get current version from manifest.json
+          sudo apt-get update && sudo apt-get install -y jq
+          CURRENT_VERSION=$(jq -r '.version' custom_components/thermex_api/manifest.json)
+          
+          # Parse version components
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          
+          # Bump version based on input
+          case "${{ github.event.inputs.version_bump }}" in
+            "major")
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            "minor")
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            "patch")
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          # Create pre-release version
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          PRERELEASE_VERSION="$NEW_VERSION-${{ github.event.inputs.prerelease_type }}.1"
+          TAG_NAME="v$PRERELEASE_VERSION"
+          
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$PRERELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+          echo "Current version: $CURRENT_VERSION"
+          echo "New pre-release version: $PRERELEASE_VERSION"
+          echo "Tag: $TAG_NAME"
+
+      - name: Create pre-release
+        uses: ./.github/workflows/create-release.yml
+        with:
+          tag: ${{ steps.version.outputs.tag_name }}
+          use_draft: false
+          prerelease: true
+          release_notes: |
+            ## 🧪 Pre-release ${{ steps.version.outputs.tag_name }}
+            
+            This is a pre-release version for testing purposes.
+            
+            **⚠️ Warning**: This version may contain bugs and is not recommended for production use.
+            
+            ### Changes since ${{ steps.version.outputs.current_version }}
+            
+            <!-- Add your changes here or they will be auto-generated -->
+            
+            ### Installation
+            
+            Download the `thermex_api.zip` file and install manually, or use HACS with the pre-release option enabled.
+            
+            ### Feedback
+            
+            Please report any issues on the [GitHub repository](https://github.com/${{ github.repository }}/issues).
