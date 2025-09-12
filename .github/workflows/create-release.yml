@@ -138,36 +138,38 @@ jobs:
           # Find the most recent draft release
           DRAFT_INFO=$(gh release list \
             --limit 10 \
-            --json tagName,name,body,isDraft,createdAt,id \
+            --json tagName,name,isDraft,createdAt \
             --jq 'map(select(.isDraft == true)) | sort_by(.createdAt) | reverse | first')
           
           if [ "$DRAFT_INFO" != "null" ] && [ -n "$DRAFT_INFO" ]; then
             DRAFT_TAG=$(echo "$DRAFT_INFO" | jq -r '.tagName // empty')
-            DRAFT_ID=$(echo "$DRAFT_INFO" | jq -r '.id // empty')
-            DRAFT_BODY=$(echo "$DRAFT_INFO" | jq -r '.body // empty')
             DRAFT_NAME=$(echo "$DRAFT_INFO" | jq -r '.name // empty')
             
             echo "📝 Found draft release:"
             echo "   Tag: $DRAFT_TAG"
             echo "   Name: $DRAFT_NAME"
-            echo "   ID: $DRAFT_ID"
             
-            # Validate draft has meaningful content
-            BODY_LENGTH=$(echo "$DRAFT_BODY" | wc -c)
-            if [ "$BODY_LENGTH" -lt 10 ]; then
-              echo "⚠️  Warning: Draft release notes are very short ($BODY_LENGTH characters)"
-              echo "draft_has_content=false" >> $GITHUB_OUTPUT
+            # Get the release body separately using gh release view
+            if DRAFT_BODY=$(gh release view "$DRAFT_TAG" --json body --jq '.body // empty' 2>/dev/null); then
+              # Validate draft has meaningful content
+              BODY_LENGTH=$(echo "$DRAFT_BODY" | wc -c)
+              if [ "$BODY_LENGTH" -lt 10 ]; then
+                echo "⚠️  Warning: Draft release notes are very short ($BODY_LENGTH characters)"
+                echo "draft_has_content=false" >> $GITHUB_OUTPUT
+              else
+                echo "✅ Draft has substantial release notes ($BODY_LENGTH characters)"
+                echo "draft_has_content=true" >> $GITHUB_OUTPUT
+              fi
+              
+              # Save draft body to file (handle multiline properly)
+              echo "$DRAFT_BODY" > draft_notes.md
             else
-              echo "✅ Draft has substantial release notes ($BODY_LENGTH characters)"
-              echo "draft_has_content=true" >> $GITHUB_OUTPUT
+              echo "⚠️  Could not retrieve draft release body"
+              echo "draft_has_content=false" >> $GITHUB_OUTPUT
             fi
             
             echo "draft_exists=true" >> $GITHUB_OUTPUT
             echo "draft_tag=$DRAFT_TAG" >> $GITHUB_OUTPUT
-            echo "draft_id=$DRAFT_ID" >> $GITHUB_OUTPUT
-            
-            # Save draft body to file (handle multiline properly)
-            echo "$DRAFT_BODY" > draft_notes.md
           else
             echo "ℹ️  No draft release found"
             echo "draft_exists=false" >> $GITHUB_OUTPUT
