@@ -1,11 +1,7 @@
 {
   "config": {
     "step": {
-              "name": "Fettfilter körtid sedan senaste återställning"
-      },
-      "thermex_sensor_connection_status": {
-        "name": "Anslutningsstatus"
-      },{
+      "user": {
         "title": "Thermex köksfläktsanslutning",
         "description": "Fyll i Thermex köksfläkt IP och API lösenord.",
         "data": {
@@ -42,9 +38,6 @@
       },
       "thermex_sensor_runtime_hours": {
         "name": "Filter driftstimmar sedan senaste nollställning"
-      },
-      "thermex_sensor_filter_time": {
-        "name": "Filtertid"
       },
       "thermex_sensor_connection_status": {
         "name": "Anslutningsstatus"
