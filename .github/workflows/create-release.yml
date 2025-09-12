@@ -20,6 +20,33 @@ on:
         required: false
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release Tag (e.g., v2.10.3)'
+        required: true
+        type: string
+      release_notes:
+        description: 'Custom Release Notes (optional - overrides draft if provided)'
+        required: false
+        type: string
+      use_draft:
+        description: 'Use existing draft release notes'
+        required: false
+        type: boolean
+        default: true
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      release_url:
+        description: "URL of the created release"
+        value: ${{ jobs.create-release.outputs.release_url }}
+      release_tag:
+        description: "Tag of the created release"
+        value: ${{ jobs.create-release.outputs.release_tag }}
 
 jobs:
   create-release:
@@ -42,7 +69,7 @@ jobs:
       - name: Validate inputs and setup environment
         id: setup
         run: |
-          TAG="${{ github.event.inputs.tag }}"
+          TAG="${{ inputs.tag }}"
           
           # Validate tag format
           if [[ ! $TAG =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
@@ -62,7 +89,7 @@ jobs:
           
           echo "✅ Tag: $TAG"
           echo "✅ Version: $VERSION"
-          echo "✅ Pre-release: ${{ github.event.inputs.prerelease }}"
+          echo "✅ Pre-release: ${{ inputs.prerelease }}"
 
       - name: Check if tag already exists
         run: |
@@ -182,12 +209,12 @@ jobs:
         id: prepare_notes
         run: |
           # Priority: Custom notes > Draft notes > Auto-generated
-          if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+          if [ -n "${{ inputs.release_notes }}" ]; then
             echo "📝 Using custom release notes"
-            echo "${{ github.event.inputs.release_notes }}" > release_notes.md
+            echo "${{ inputs.release_notes }}" > release_notes.md
             echo "notes_source=custom" >> $GITHUB_OUTPUT
             
-          elif [ "${{ github.event.inputs.use_draft }}" == "true" ] && \
+          elif [ "${{ inputs.use_draft }}" == "true" ] && \
                [ "${{ steps.find_draft.outputs.draft_exists }}" == "true" ] && \
                [ "${{ steps.find_draft.outputs.draft_has_content }}" == "true" ]; then
             echo "📝 Using draft release notes"
@@ -211,7 +238,7 @@ jobs:
           fi
 
       - name: Update existing draft release
-        if: ${{ github.event.inputs.use_draft == 'true' && steps.find_draft.outputs.draft_exists == 'true' && steps.find_draft.outputs.draft_has_content == 'true' && github.event.inputs.release_notes == '' }}
+        if: ${{ inputs.use_draft == 'true' && steps.find_draft.outputs.draft_exists == 'true' && steps.find_draft.outputs.draft_has_content == 'true' && inputs.release_notes == '' }}
         id: update_draft
         run: |
           echo "🔄 Converting draft release to published release..."
@@ -222,7 +249,7 @@ jobs:
             --title "Release ${{ env.TAG_NAME }}" \
             --notes-file "release_notes.md" \
             --draft=false \
-            --prerelease=${{ github.event.inputs.prerelease }}
+            --prerelease=${{ inputs.prerelease }}
           
           # Upload ZIP file
           gh release upload "${{ env.TAG_NAME }}" thermex_api.zip --clobber
@@ -237,7 +264,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create new release
-        if: ${{ !(github.event.inputs.use_draft == 'true' && steps.find_draft.outputs.draft_exists == 'true' && steps.find_draft.outputs.draft_has_content == 'true' && github.event.inputs.release_notes == '') }}
+        if: ${{ !(inputs.use_draft == 'true' && steps.find_draft.outputs.draft_exists == 'true' && steps.find_draft.outputs.draft_has_content == 'true' && inputs.release_notes == '') }}
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
@@ -247,7 +274,7 @@ jobs:
           body_path: ${{ steps.prepare_notes.outputs.notes_source != 'auto' && 'release_notes.md' || '' }}
           generate_release_notes: ${{ steps.prepare_notes.outputs.notes_source == 'auto' }}
           draft: false
-          prerelease: ${{ github.event.inputs.prerelease }}
+          prerelease: ${{ inputs.prerelease }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -282,7 +309,7 @@ jobs:
           echo "📊 Release Details:"
           echo "   Tag: ${{ env.TAG_NAME }}"
           echo "   Version: ${{ env.VERSION }}"
-          echo "   Pre-release: ${{ github.event.inputs.prerelease }}"
+          echo "   Pre-release: ${{ inputs.prerelease }}"
           echo "   Notes source: ${{ steps.prepare_notes.outputs.notes_source }}"
           
           if [ "${{ steps.update_draft.outputs.action_taken }}" == "updated_draft" ]; then

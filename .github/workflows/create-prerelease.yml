@@ -74,7 +74,7 @@ jobs:
           echo "Tag: $TAG_NAME"
 
       - name: Create pre-release
-        uses: ./.github/workflows/create-release.yml
+        uses: ./.github/workflows/create-release.yml@main
         with:
           tag: ${{ steps.version.outputs.tag_name }}
           use_draft: false
@@ -96,4 +96,4 @@ jobs:
             
             ### Feedback
             
-            Please report any issues on the [GitHub repository](https://github.com/${{ github.repository }}/issues).
+            Please report any issues on the [GitHub repository](https://github.com/hsk-dk/home-assistant-thermex/issues).
