@@ -1,0 +1,87 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermex kjøkkenhette-tilkobling",
+        "description": "Angi IP-adresse og API-passord for Thermex-hette.",
+        "data": {
+          "host": "IP-adresse for hetten",
+          "api_key": "API-passord"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kan ikke koble til. Kontroller IP-adresse og passord."
+    },
+    "abort": {
+      "already_configured": "Denne Thermex-hetten er allerede konfigurert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Thermex-innstillinger",
+        "data": {
+          "enable_decolight": "Aktiver stemningslys",
+          "fan_alert_hours": "Varsel for rengjøring av fettfilter etter (driftstimer)",
+          "fan_alert_days": "Varsel for rengjøring av fettfilter etter (dager siden tilbakestilling)",
+          "fan_auto_off_delay": "Forsinket avslåing (minutter)"
+        },
+        "description": "Filtervarsel utløses når ENTEN grense for driftstimer ELLER dager siden tilbakestilling overskrides."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "thermex_sensor_last_reset": {
+        "name": "Siste tilbakestilling av fettfiltertid"
+      },
+      "thermex_sensor_runtime_hours": {
+        "name": "Driftstid for fettfilter siden siste tilbakestilling"
+      },
+      "thermex_sensor_connection_status": {
+        "name": "Tilkoblingsstatus"
+      },
+      "thermex_sensor_delayed_turn_off": {
+        "name": "Forsinket avslåingstid"
+      }
+    },
+    "button": {
+      "thermex_button_reset_runtime": {
+        "name": "Tilbakestill filtertid"
+      },
+      "thermex_button_delayed_turn_off": {
+        "name": "Start forsinket avslåing"
+      }
+    },
+    "fan": {
+      "thermex_fan": {
+        "name": "Kjøkkenhette",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Av",
+              "low": "Lav",
+              "medium": "Middels",
+              "high": "Høy",
+              "boost": "Boost"
+            }
+          }
+        }
+      }
+    },
+    "binary_sensor": {
+      "thermex_binary_sensor_threshold_alert": {
+        "name": "Rengjøring av filter nødvendig"
+      }
+    },
+    "light": {
+      "thermex_light": {
+        "name": "Lys i kjøkkenhette"
+      },
+      "thermex_decolight": {
+        "name": "Dekorlys i kjøkkenhette"
+      }
+    }
+  }
+}
