@@ -1,0 +1,87 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermex-liesituulettimen yhdistäminen",
+        "description": "Syötä Thermex-liesituulettimen IP-osoite ja API-salasana.",
+        "data": {
+          "host": "Liesituulettimen IP-osoite",
+          "api_key": "API-salasana"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Yhteyttä ei voida muodostaa. Tarkista IP-osoite ja salasana."
+    },
+    "abort": {
+      "already_configured": "Tämä Thermex-liesituuletin on jo määritetty."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Thermex-asetukset",
+        "data": {
+          "enable_decolight": "Ota tunnelmavalaistus käyttöön",
+          "fan_alert_hours": "Rasvasuodattimen puhdistusilmoitus (käyttötunnit)",
+          "fan_alert_days": "Rasvasuodattimen puhdistusilmoitus (päiviä nollauksesta)",
+          "fan_auto_off_delay": "Viivästetty sammutus (minuutit)"
+        },
+        "description": "Suodatinilmoitus aktivoituu, kun JOKO käyttötuntien raja TAI päivien määrä nollauksesta ylittyy."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "thermex_sensor_last_reset": {
+        "name": "Rasvasuodattimen ajan viimeisin nollaus"
+      },
+      "thermex_sensor_runtime_hours": {
+        "name": "Rasvasuodattimen käyttöaika viimeisimmästä nollauksesta"
+      },
+      "thermex_sensor_connection_status": {
+        "name": "Yhteyden tila"
+      },
+      "thermex_sensor_delayed_turn_off": {
+        "name": "Viivästetyn sammutuksen aika"
+      }
+    },
+    "button": {
+      "thermex_button_reset_runtime": {
+        "name": "Nollaa suodattimen aika"
+      },
+      "thermex_button_delayed_turn_off": {
+        "name": "Käynnistä viivästetty sammutus"
+      }
+    },
+    "fan": {
+      "thermex_fan": {
+        "name": "Liesituuletin",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Pois",
+              "low": "Matala",
+              "medium": "Keskitaso",
+              "high": "Korkea",
+              "boost": "Tehostus"
+            }
+          }
+        }
+      }
+    },
+    "binary_sensor": {
+      "thermex_binary_sensor_threshold_alert": {
+        "name": "Suodattimen puhdistus tarpeen"
+      }
+    },
+    "light": {
+      "thermex_light": {
+        "name": "Liesituulettimen valo"
+      },
+      "thermex_decolight": {
+        "name": "Liesituulettimen koristevalo"
+      }
+    }
+  }
+}
