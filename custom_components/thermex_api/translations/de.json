@@ -1,0 +1,87 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Thermex Dunstabzugshauben-Verbindung",
+        "description": "IP-Adresse und API-Passwort der Thermex-Dunstabzugshaube eingeben.",
+        "data": {
+          "host": "IP-Adresse der Dunstabzugshaube",
+          "api_key": "API-Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung nicht möglich. Bitte IP-Adresse und Passwort prüfen."
+    },
+    "abort": {
+      "already_configured": "Diese Thermex-Dunstabzugshaube wurde bereits konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Thermex-Optionen",
+        "data": {
+          "enable_decolight": "Ambientebeleuchtung aktivieren",
+          "fan_alert_hours": "Hinweis zur Reinigung des Fettfilters nach (Betriebsstunden)",
+          "fan_alert_days": "Hinweis zur Reinigung des Fettfilters nach (Tage seit Zurücksetzen)",
+          "fan_auto_off_delay": "Verzögerte Abschaltung (Minuten)"
+        },
+        "description": "Der Filterhinweis wird ausgelöst, wenn ENTWEDER die Grenze der Betriebsstunden ODER der Tage seit dem Zurücksetzen überschritten wird."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "thermex_sensor_last_reset": {
+        "name": "Letzte Rücksetzung der Fettfilterzeit"
+      },
+      "thermex_sensor_runtime_hours": {
+        "name": "Betriebszeit des Fettfilters seit letzter Rücksetzung"
+      },
+      "thermex_sensor_connection_status": {
+        "name": "Verbindungsstatus"
+      },
+      "thermex_sensor_delayed_turn_off": {
+        "name": "Zeit bis zur verzögerten Abschaltung"
+      }
+    },
+    "button": {
+      "thermex_button_reset_runtime": {
+        "name": "Filterzeit zurücksetzen"
+      },
+      "thermex_button_delayed_turn_off": {
+        "name": "Verzögerte Abschaltung starten"
+      }
+    },
+    "fan": {
+      "thermex_fan": {
+        "name": "Dunstabzugshaube",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "off": "Aus",
+              "low": "Niedrig",
+              "medium": "Mittel",
+              "high": "Hoch",
+              "boost": "Boost"
+            }
+          }
+        }
+      }
+    },
+    "binary_sensor": {
+      "thermex_binary_sensor_threshold_alert": {
+        "name": "Filterreinigung erforderlich"
+      }
+    },
+    "light": {
+      "thermex_light": {
+        "name": "Licht der Dunstabzugshaube"
+      },
+      "thermex_decolight": {
+        "name": "Dekorlicht der Dunstabzugshaube"
+      }
+    }
+  }
+}
