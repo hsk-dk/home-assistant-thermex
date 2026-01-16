@@ -9,7 +9,7 @@ This custom component integrates Thermex extractor hoods into Home Assistant, pr
 ## Installation
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=hsk-dk&repository=home-assistant-thermex)
 
-Install through [HACS](https://hacs.xyz/) by seaching for "Thermex Hood Integration".
+Install through [HACS](https://hacs.xyz/) by searching for "Thermex Hood Integration".
 
 ---
 
@@ -25,7 +25,7 @@ Install through [HACS](https://hacs.xyz/) by seaching for "Thermex Hood Integrat
 - **Delayed Turn-Off**: Manual activation of delayed fan turn-off with configurable timer (1-120 minutes)
 - **Runtime Tracking**: Persistent filter runtime tracking with reset functionality
 - **Diagnostic Sensors**: Connection status, protocol version, and system health monitoring
-- **Multi-language Support**: Full localization in English, Danish, and Swedish
+- **Multi-language Support**: Full localisation in English, Danish, Swedish, Norwegian, Finnish and German
 
 ### Entities Created
 - **Fan Entity**: `fan.thermex_hood` with speed presets and runtime attributes
@@ -90,7 +90,7 @@ Install through [HACS](https://hacs.xyz/) by seaching for "Thermex Hood Integrat
    - Ensure API is enabled in Thermex app
 
 2. **No Initial Status**: 
-   - Integration includes connection watchdog for automatic recovery
+   - Integration includes a connection watchdog for automatic recovery
    - Check hood software version (minimum 1.30/1.10 required)
 
 3. **Filter Alerts Not Working**:
