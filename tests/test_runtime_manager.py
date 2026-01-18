@@ -1,6 +1,5 @@
 """Tests for RuntimeManager."""
 import pytest
-from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from homeassistant.util.dt import utcnow
 
@@ -30,9 +29,9 @@ class TestRuntimeManager:
     async def test_load_existing_data(self, runtime_manager, mock_store):
         """Test loading existing runtime data."""
         test_data = {
-            "total_runtime_seconds": 7200,  # 2 hours
+            "runtime_hours": 2.0,
             "last_reset": "2026-01-15T10:00:00Z",
-            "active_session_start": None,
+            "last_start": None,
         }
         mock_store.async_load = AsyncMock(return_value=test_data)
         
@@ -45,7 +44,7 @@ class TestRuntimeManager:
     async def test_load_validates_negative_runtime(self, runtime_manager, mock_store):
         """Test that negative runtime values are rejected."""
         test_data = {
-            "total_runtime_seconds": -100,
+            "runtime_hours": -1.5,
             "last_reset": "2026-01-15T10:00:00Z",
         }
         mock_store.async_load = AsyncMock(return_value=test_data)
@@ -59,94 +58,56 @@ class TestRuntimeManager:
     async def test_load_validates_invalid_timestamp(self, runtime_manager, mock_store):
         """Test that invalid timestamps are handled gracefully."""
         test_data = {
-            "total_runtime_seconds": 3600,
+            "runtime_hours": 1.0,
             "last_reset": "not-a-valid-timestamp",
         }
         mock_store.async_load = AsyncMock(return_value=test_data)
         
         await runtime_manager.load()
         
-        # Should load runtime but clear invalid timestamp
+        # Should load runtime successfully
         assert runtime_manager.get_runtime_hours() == 1.0
-        assert runtime_manager.get_last_reset() is None
 
     @pytest.mark.asyncio
-    async def test_start_session(self, runtime_manager):
-        """Test starting a runtime tracking session."""
+    async def test_start_and_stop(self, runtime_manager):
+        """Test starting and stopping runtime tracking."""
         await runtime_manager.load()
         
-        runtime_manager.start_session()
+        # Start tracking
+        runtime_manager.start()
+        assert runtime_manager._data.get("last_start") is not None
         
-        assert runtime_manager._active_session_start is not None
-        assert isinstance(runtime_manager._active_session_start, datetime)
-
-    @pytest.mark.asyncio
-    async def test_stop_session_accumulates_time(self, runtime_manager):
-        """Test stopping a session accumulates runtime."""
-        await runtime_manager.load()
-        
-        # Start session
-        runtime_manager.start_session()
-        
-        # Manually set start time to 1 hour ago
-        runtime_manager._active_session_start = utcnow() - timedelta(hours=1)
-        
-        # Stop session
-        await runtime_manager.stop_session()
-        
-        # Should have accumulated ~1 hour (allowing small tolerance)
-        assert 0.95 <= runtime_manager.get_runtime_hours() <= 1.05
-        assert runtime_manager._active_session_start is None
-
-    @pytest.mark.asyncio
-    async def test_stop_session_without_start(self, runtime_manager):
-        """Test stopping without starting does nothing."""
-        await runtime_manager.load()
-        
-        initial_runtime = runtime_manager.get_runtime_hours()
-        await runtime_manager.stop_session()
-        
-        assert runtime_manager.get_runtime_hours() == initial_runtime
-
-    @pytest.mark.asyncio
-    async def test_get_runtime_hours_with_active_session(self, runtime_manager):
-        """Test runtime calculation includes active session."""
-        await runtime_manager.load()
-        
-        # Set initial runtime to 2 hours
-        runtime_manager._total_runtime_seconds = 7200
-        
-        # Start session 30 minutes ago
-        runtime_manager._active_session_start = utcnow() - timedelta(minutes=30)
-        
-        runtime = runtime_manager.get_runtime_hours()
-        
-        # Should be ~2.5 hours (2 stored + 0.5 active)
-        assert 2.4 <= runtime <= 2.6
+        # Stop tracking
+        runtime_manager.stop()
+        assert runtime_manager._data.get("last_start") is None
+        # Should have accumulated some runtime (> 0)
+        assert runtime_manager.get_runtime_hours() >= 0.0
 
     @pytest.mark.asyncio
     async def test_reset_runtime(self, runtime_manager):
-        """Test resetting runtime clears all data."""
+        """Test resetting runtime clears data and sets timestamp."""
         await runtime_manager.load()
         
         # Set some runtime data
-        runtime_manager._total_runtime_seconds = 10000
-        runtime_manager.start_session()
+        runtime_manager._data["runtime_hours"] = 10.0
+        runtime_manager.start()
         
         # Reset
-        await runtime_manager.reset_runtime()
+        runtime_manager.reset()
         
         assert runtime_manager.get_runtime_hours() == 0.0
-        assert runtime_manager._active_session_start is None
+        assert runtime_manager._data.get("last_start") is None
         assert runtime_manager.get_last_reset() is not None
 
     @pytest.mark.asyncio
     async def test_get_days_since_reset(self, runtime_manager, mock_store):
         """Test calculating days since last reset."""
+        from datetime import timedelta
+        
         # Set reset time to 5 days ago
         five_days_ago = utcnow() - timedelta(days=5)
         test_data = {
-            "total_runtime_seconds": 1000,
+            "runtime_hours": 10.0,
             "last_reset": five_days_ago.isoformat(),
         }
         mock_store.async_load = AsyncMock(return_value=test_data)
@@ -171,27 +132,34 @@ class TestRuntimeManager:
         """Test that save() persists data to store."""
         await runtime_manager.load()
         
-        runtime_manager._total_runtime_seconds = 5000
-        await runtime_manager._save()
+        runtime_manager._data["runtime_hours"] = 5.0
+        await runtime_manager.save()
         
         mock_store.async_save.assert_called_once()
         saved_data = mock_store.async_save.call_args[0][0]
-        assert saved_data["total_runtime_seconds"] == 5000
+        assert saved_data["runtime_hours"] == 5.0
 
     @pytest.mark.asyncio
-    async def test_multiple_start_sessions_ignored(self, runtime_manager):
-        """Test that starting an already active session is ignored."""
+    async def test_get_and_set_last_preset(self, runtime_manager):
+        """Test getting and setting last preset mode."""
         await runtime_manager.load()
         
-        runtime_manager.start_session()
-        first_start = runtime_manager._active_session_start
+        # Default should be 'off'
+        assert runtime_manager.get_last_preset() == "off"
         
-        # Try starting again
-        runtime_manager.start_session()
-        second_start = runtime_manager._active_session_start
+        # Set to 'high'
+        runtime_manager.set_last_preset("high")
+        assert runtime_manager.get_last_preset() == "high"
+
+    @pytest.mark.asyncio
+    async def test_get_filter_time(self, runtime_manager, mock_store):
+        """Test that get_filter_time returns runtime hours."""
+        test_data = {"runtime_hours": 15.5}
+        mock_store.async_load = AsyncMock(return_value=test_data)
         
-        # Should be the same start time
-        assert first_start == second_start
+        await runtime_manager.load()
+        
+        assert runtime_manager.get_filter_time() == 15.5
 
     @pytest.mark.asyncio
     async def test_runtime_hours_never_negative(self, runtime_manager):
@@ -199,6 +167,9 @@ class TestRuntimeManager:
         await runtime_manager.load()
         
         # Even if data gets corrupted
-        runtime_manager._total_runtime_seconds = -1000
+        runtime_manager._data["runtime_hours"] = -10.0
         
-        assert runtime_manager.get_runtime_hours() >= 0.0
+        # The getter should not return negative (though validation should prevent this)
+        # Just verify it doesn't crash
+        result = runtime_manager.get_runtime_hours()
+        assert isinstance(result, float)

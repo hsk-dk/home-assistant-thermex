@@ -1,7 +1,7 @@
 """Tests for config flow."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from homeassistant import data_entry_flow
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.const import CONF_HOST
 
 from custom_components.thermex_api.config_flow import ConfigFlow, OptionsFlowHandler
@@ -28,7 +28,7 @@ class TestConfigFlow:
         
         result = await flow.async_step_user()
         
-        assert result["type"] == data_entry_flow.RESULT_TYPE_FORM
+        assert result["type"] == FlowResultType.FORM
         assert result["step_id"] == "user"
 
     @pytest.mark.asyncio
@@ -50,7 +50,7 @@ class TestConfigFlow:
                 }
             )
         
-        assert result["type"] == data_entry_flow.RESULT_TYPE_CREATE_ENTRY
+        assert result["type"] == FlowResultType.CREATE_ENTRY
         assert result["data"][CONF_HOST] == "192.168.1.100"
         assert result["data"]["api_key"] == "test_api_key"
 
@@ -73,7 +73,7 @@ class TestConfigFlow:
                 }
             )
         
-        assert result["type"] == data_entry_flow.RESULT_TYPE_FORM
+        assert result["type"] == FlowResultType.FORM
         assert result["errors"] == {"base": "cannot_connect"}
 
     @pytest.mark.asyncio
@@ -83,7 +83,7 @@ class TestConfigFlow:
         
         result = await flow.async_step_init(user_input=None)
         
-        assert result["type"] == data_entry_flow.RESULT_TYPE_FORM
+        assert result["type"] == FlowResultType.FORM
         assert result["step_id"] == "init"
 
     @pytest.mark.asyncio
@@ -100,6 +100,6 @@ class TestConfigFlow:
             }
         )
         
-        assert result["type"] == data_entry_flow.RESULT_TYPE_CREATE_ENTRY
+        assert result["type"] == FlowResultType.CREATE_ENTRY
         assert result["data"]["fan_alert_hours"] == 120
         assert result["data"]["enable_decolight"] is True

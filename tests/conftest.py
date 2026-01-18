@@ -1,8 +1,7 @@
 """Fixtures for Thermex API integration tests."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.storage import Store
+import asyncio
 
 from custom_components.thermex_api.const import DOMAIN
 
@@ -27,19 +26,29 @@ def mock_hub():
 @pytest.fixture
 def mock_store():
     """Create a mock Store."""
-    store = MagicMock(spec=Store)
+    store = MagicMock()
     store.async_save = AsyncMock()
     store.async_load = AsyncMock(return_value=None)
     return store
 
 
 @pytest.fixture
-async def mock_hass():
-    """Create a mock HomeAssistant instance."""
-    hass = MagicMock(spec=HomeAssistant)
+def event_loop():
+    """Create an event loop for async tests."""
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture
+def mock_hass(event_loop):
+    """Create a mock HomeAssistant instance with proper loop."""
+    hass = MagicMock()
     hass.data = {}
     hass.states = MagicMock()
     hass.config_entries = MagicMock()
+    hass.loop = event_loop
+    hass.async_create_task = MagicMock(side_effect=lambda coro, name=None: asyncio.create_task(coro))
     return hass
 
 

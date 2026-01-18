@@ -10,9 +10,11 @@ class TestThermexLight:
     """Test ThermexLight entity."""
 
     @pytest.fixture
-    def light_entity(self, mock_hub):
+    def light_entity(self, mock_hub, mock_hass):
         """Create a ThermexLight entity."""
-        return ThermexLight(mock_hub)
+        light = ThermexLight(mock_hub)
+        light.hass = mock_hass
+        return light
 
     def test_light_initialization(self, light_entity, mock_hub):
         """Test light entity initialization."""
@@ -69,9 +71,13 @@ class TestThermexLight:
 
     def test_light_brightness_clamping(self, light_entity):
         """Test brightness values are clamped to valid range."""
-        # Test min brightness
-        result = light_entity._clamp_brightness(0)
+        # Test below min brightness (gets clamped to 1)
+        result = light_entity._clamp_brightness(-10)
         assert result == 1  # MIN_BRIGHTNESS
+        
+        # Test at min brightness
+        result = light_entity._clamp_brightness(1)
+        assert result == 1
         
         # Test max brightness
         result = light_entity._clamp_brightness(300)
@@ -105,9 +111,11 @@ class TestThermexDecoLight:
     """Test ThermexDecoLight entity."""
 
     @pytest.fixture
-    def decolight_entity(self, mock_hub):
+    def decolight_entity(self, mock_hub, mock_hass):
         """Create a ThermexDecoLight entity."""
-        return ThermexDecoLight(mock_hub)
+        light = ThermexDecoLight(mock_hub)
+        light.hass = mock_hass
+        return light
 
     def test_decolight_initialization(self, decolight_entity, mock_hub):
         """Test deco light entity initialization."""
