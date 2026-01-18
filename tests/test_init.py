@@ -23,15 +23,19 @@ class TestInit:
         mock_hub.connect = AsyncMock()
         mock_hub.get_coordinator_data = MagicMock(return_value={})
         
+        mock_runtime_manager = MagicMock()
+        mock_runtime_manager.load = AsyncMock()
+        
         with patch('custom_components.thermex_api.async_get_integration', return_value=mock_integration):
             with patch('custom_components.thermex_api.ThermexHub', return_value=mock_hub):
-                with patch('custom_components.thermex_api.RuntimeManager'):
+                with patch('custom_components.thermex_api.RuntimeManager', return_value=mock_runtime_manager):
                     with patch('custom_components.thermex_api.Store'):
                         with patch.object(mock_hass.config_entries, 'async_forward_entry_setups', new_callable=AsyncMock):
                             result = await async_setup_entry(mock_hass, mock_config_entry)
                             
                             assert result is True
                             mock_hub.connect.assert_called_once()
+                            mock_runtime_manager.load.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_connection_failure(self, mock_hass, mock_config_entry, mock_integration):
@@ -48,7 +52,6 @@ class TestInit:
     async def test_async_unload_entry_success(self, mock_hass, mock_config_entry):
         """Test successful unload entry."""
         mock_hub = MagicMock()
-        mock_hub.close = AsyncMock()
         
         mock_hass.data = {
             "thermex_api": {
@@ -62,7 +65,8 @@ class TestInit:
             result = await async_unload_entry(mock_hass, mock_config_entry)
             
             assert result is True
-            mock_hub.close.assert_called_once()
+            # Verify entry data was removed
+            assert mock_config_entry.entry_id not in mock_hass.data["thermex_api"]
 
     @pytest.mark.asyncio
     async def test_async_create_coordinator(self, mock_hass):

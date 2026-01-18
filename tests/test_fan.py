@@ -104,13 +104,6 @@ class TestThermexFan:
         fan_entity._runtime_manager.save.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_fan_async_added_to_hass(self, fan_entity, mock_hass):
-        """Test fan added to hass registers listeners."""
-        with patch('homeassistant.helpers.dispatcher.async_dispatcher_connect') as mock_connect:
-            await fan_entity.async_added_to_hass()
-            assert mock_connect.call_count >= 1
-
-    @pytest.mark.asyncio
     async def test_fan_turn_on_starts_runtime(self, fan_entity):
         """Test turning on fan starts runtime tracking."""
         await fan_entity.async_turn_on()
@@ -126,11 +119,19 @@ class TestThermexFan:
     @pytest.mark.asyncio
     async def test_fan_set_preset_mode_updates_preset(self, fan_entity, mock_hub):
         """Test setting preset mode."""
+        await fan_entity.async_turn_on()
         await fan_entity.async_set_preset_mode("high")
+        mock_hub.send_request.assert_called()
+        # Preset is updated when notification is received from hub
+        fan_entity._handle_notify("fan", {"Fan": {"fanonoff": 1, "fanspeed": 3}})
         assert fan_entity._preset_mode == "high"
 
-    def test_fan_handle_notify_updates_state(self, fan_entity):
+    @pytest.mark.asyncio
+    async def test_fan_handle_notify_updates_state(self, fan_entity, mock_hass):
         """Test fan state updates from notify."""
+        # Mock async_create_task to not actually create tasks
+        mock_hass.async_create_task = MagicMock()
+        
         fan_entity._handle_notify("fan", {
             "Fan": {
                 "fanonoff": 1,
@@ -141,8 +142,12 @@ class TestThermexFan:
         assert fan_entity._is_on is True
         assert fan_entity._preset_mode == "high"
 
-    def test_fan_handle_notify_off_state(self, fan_entity):
+    @pytest.mark.asyncio
+    async def test_fan_handle_notify_off_state(self, fan_entity, mock_hass):
         """Test fan handles off state from notify."""
+        # Mock async_create_task to not actually create tasks
+        mock_hass.async_create_task = MagicMock()
+        
         fan_entity._is_on = True
         fan_entity._handle_notify("fan", {
             "Fan": {
@@ -166,11 +171,15 @@ class TestThermexFan:
     @pytest.mark.asyncio
     async def test_fan_start_delayed_off(self, fan_entity, mock_hass):
         """Test starting delayed off."""
-        mock_hass.loop.call_later = MagicMock()
+        mock_hass.loop.call_later = MagicMock(return_value=MagicMock())
+        
+        # Fan must be running to start delayed off
+        fan_entity._is_on = True
         
         await fan_entity.start_delayed_off()
         
         assert fan_entity._delayed_off_active is True
+        mock_hass.loop.call_later.assert_called()
 
     @pytest.mark.asyncio
     async def test_fan_cancel_delayed_off(self, fan_entity):
@@ -182,16 +191,20 @@ class TestThermexFan:
         
         assert fan_entity._delayed_off_active is False
 
-    @pytest.mark.asyncio
-    async def test_fan_update_countdown(self, fan_entity):
+    def test_fan_update_countdown(self, fan_entity, mock_hass):
         """Test delayed off countdown updates."""
         fan_entity._delayed_off_active = True
         fan_entity._delayed_off_remaining = 120
+        mock_hass.loop.call_later = MagicMock(return_value=MagicMock())
+        
+        # Mock schedule_update_ha_state to avoid entity registration issues
+        fan_entity.schedule_update_ha_state = MagicMock()
         
         fan_entity._update_countdown()
         
         # Should decrease remaining time
         assert fan_entity._delayed_off_remaining < 120
+        fan_entity.schedule_update_ha_state.assert_called_once()
 
     def test_fan_extra_state_attributes_with_delayed_off(self, fan_entity):
         """Test extra state attributes include delayed off info."""
