@@ -79,6 +79,22 @@ class ThermexHub:
             
         if self._ws and not self._ws.closed:
             return
+        
+        # Check if reconnection is already in progress BEFORE acquiring lock
+        if self._reconnecting or self._is_reconnecting:
+            _LOGGER.debug("Reconnection already in progress, waiting...")
+            # Wait for the ongoing reconnection to complete
+            for _ in range(20):  # Wait up to 10 seconds
+                await asyncio.sleep(0.5)
+                if self._ws and not self._ws.closed:
+                    _LOGGER.debug("Connection restored by another task")
+                    return
+                if not (self._reconnecting or self._is_reconnecting):
+                    # Reconnection finished but failed, we can try again
+                    break
+            else:
+                # Still reconnecting after 10 seconds
+                raise ConnectionError("Reconnection timeout - another task is still reconnecting")
 
         async with self._reconnect_lock:
             # Check again after acquiring lock
@@ -88,13 +104,9 @@ class ThermexHub:
             if self._ws and not self._ws.closed:
                 return  # another coroutine already reconnected
 
-            # Set reconnecting flags to prevent cascading attempts
+            # Final check - another task might have started reconnecting while we waited for lock
             if self._reconnecting or self._is_reconnecting:
-                # Wait a bit and check if another coroutine fixed it
-                await asyncio.sleep(0.5)
-                if self._ws and not self._ws.closed:
-                    return
-                raise ConnectionError("Reconnection already in progress")
+                raise ConnectionError("Reconnection started by another task while acquiring lock")
                 
             self._reconnecting = True
             self._is_reconnecting = True

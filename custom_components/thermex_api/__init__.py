@@ -73,15 +73,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # 5) Save entry_data back into hass.data
     hass.data[DOMAIN][entry.entry_id] = entry_data
 
-    # 6) Also keep the old global coordinator key for other platforms
-    hass.data[DOMAIN]["coordinator"] = coordinator # - OBS must be remove at some point
-
-    # 7) Watch for options changes
+    # 6) Watch for options changes
     entry.async_on_unload(
         entry.add_update_listener(_async_update_listener)
     )
 
-    # 8) Forward setup to all platforms
+    # 7) Forward setup to all platforms
     await hass.config_entries.async_forward_entry_setups(
         entry,
         ["light", "fan", "sensor", "binary_sensor", "button"],
