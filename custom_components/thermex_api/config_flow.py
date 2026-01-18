@@ -64,15 +64,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(
                     "fan_alert_hours",
                     default=self.entry.options.get("fan_alert_hours", 30)
-                ): int,
+                ): vol.All(int, vol.Range(min=1, max=1000)),
                 vol.Optional(
                     "fan_alert_days",
                     default=self.entry.options.get("fan_alert_days", 90)
-                ): int,
+                ): vol.All(int, vol.Range(min=1, max=365)),
                 vol.Optional(
                     "fan_auto_off_delay",
                     default=self.entry.options.get("fan_auto_off_delay", 10)
-                ): int,
+                ): vol.All(int, vol.Range(min=1, max=120)),
             })
             return self.async_show_form(
                 step_id="init", data_schema=data_schema
