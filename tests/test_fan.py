@@ -318,4 +318,5 @@ class TestThermexFan:
             # Should turn off fan
             mock_hub.send_request.assert_called_once()
             fan_entity.schedule_update_ha_state.assert_called()
-            mock_send.assert_called_once()
+            # Dispatcher called twice: once in async_turn_off, once in _handle_delayed_off
+            assert mock_send.call_count == 2

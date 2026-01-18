@@ -271,9 +271,9 @@ class TestThermexDecoLight:
 
     def test_light_clamp_brightness(self, decolight_entity):
         """Test brightness clamping."""
-        # Test minimum
-        assert decolight_entity._clamp_brightness(0) == 1
-        assert decolight_entity._clamp_brightness(-10) == 1
+        # Test minimum (MIN_BRIGHTNESS is 0)
+        assert decolight_entity._clamp_brightness(0) == 0
+        assert decolight_entity._clamp_brightness(-10) == 0
         
         # Test maximum
         assert decolight_entity._clamp_brightness(256) == 255

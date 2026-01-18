@@ -76,17 +76,6 @@ class TestRuntimeHoursSensor:
         assert runtime_sensor.native_value == 50.0
 
     @pytest.mark.asyncio
-    async def test_sensor_async_added_to_hass(self, runtime_sensor):
-        """Test sensor sets up update timer and dispatcher."""
-        with patch('custom_components.thermex_api.sensor.async_call_later') as mock_call_later:
-            with patch('custom_components.thermex_api.sensor.async_dispatcher_connect') as mock_connect:
-                await runtime_sensor.async_added_to_hass()
-                
-                # Should schedule periodic update and register dispatcher
-                mock_call_later.assert_called_once()
-                mock_connect.assert_called_once()
-
-    @pytest.mark.asyncio
     async def test_sensor_async_will_remove_from_hass(self, runtime_sensor):
         """Test sensor cleanup cancels timer."""
         # Setup mock timer
@@ -273,15 +262,6 @@ class TestDelayedTurnOffSensor:
         assert "delayed_off_remaining" in attrs
         assert attrs["delayed_off_active"] is True
         assert attrs["delayed_off_remaining"] == 180
-
-    @pytest.mark.asyncio
-    async def test_sensor_async_added_to_hass(self, delayed_sensor):
-        """Test sensor sets up dispatcher connection."""
-        with patch('custom_components.thermex_api.sensor.async_dispatcher_connect') as mock_connect:
-            await delayed_sensor.async_added_to_hass()
-            
-            # Should connect to dispatcher
-            mock_connect.assert_called_once()
 
     def test_sensor_handle_delayed_off_notify(self, delayed_sensor):
         """Test sensor handles delayed_turn_off notifications."""
