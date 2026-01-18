@@ -1,6 +1,6 @@
 """Tests for diagnostics sensor."""
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 
 from custom_components.thermex_api.diagnostics_sensor import ThermexDiagnosticsSensor
 
@@ -16,7 +16,7 @@ class TestThermexDiagnosticsSensor:
         coordinator.api.is_connected = True
         coordinator.api.last_error = None
         coordinator.last_update_success = True
-        coordinator.async_request_refresh = MagicMock()
+        coordinator.async_request_refresh = AsyncMock()
         return coordinator
 
     @pytest.fixture
