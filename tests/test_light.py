@@ -71,13 +71,13 @@ class TestThermexLight:
 
     def test_light_brightness_clamping(self, light_entity):
         """Test brightness values are clamped to valid range."""
-        # Test below min brightness (gets clamped to 1)
+        # Test below min brightness (gets clamped to 0)
         result = light_entity._clamp_brightness(-10)
-        assert result == 1  # MIN_BRIGHTNESS
+        assert result == 0  # MIN_BRIGHTNESS
         
         # Test at min brightness
-        result = light_entity._clamp_brightness(1)
-        assert result == 1
+        result = light_entity._clamp_brightness(0)
+        assert result == 0
         
         # Test max brightness
         result = light_entity._clamp_brightness(300)
