@@ -203,15 +203,13 @@ class TestThermexHub:
         msg1.type = WSMsgType.TEXT
         msg1.data = json.dumps({"Response": "Status", "Status": 200, "Data": {}})
 
-        # Mock async iterator properly
-        mock_ws = AsyncMock()
-        async_iter_mock = AsyncMock()
-        async_iter_mock.__aiter__.return_value = async_iter_mock
-        
-        # Set up __anext__ to return message then raise StopAsyncIteration
-        async_iter_mock.__anext__.side_effect = [msg1, StopAsyncIteration()]
-        
-        mock_ws.__aiter__.return_value = async_iter_mock
+        # Create async generator for messages
+        async def mock_message_generator():
+            yield msg1
+
+        # Mock WebSocket with proper async iterator
+        mock_ws = MagicMock()
+        mock_ws.__aiter__ = lambda self: mock_message_generator().__aiter__()
         hub_instance._ws = mock_ws
 
         # Create a pending future
@@ -219,7 +217,7 @@ class TestThermexHub:
         fut = loop.create_future()
         hub_instance._pending["status"] = fut
 
-        # Run receive loop
+        # Run receive loop (will process one message then stop when generator exhausted)
         await hub_instance._recv_loop()
 
         # Check that future was completed
@@ -236,13 +234,13 @@ class TestThermexHub:
         msg1.type = WSMsgType.TEXT
         msg1.data = json.dumps({"Notify": "fan", "Data": {"Fan": {"fanonoff": 1}}})
 
-        # Mock async iterator properly
-        mock_ws = AsyncMock()
-        async_iter_mock = AsyncMock()
-        async_iter_mock.__aiter__.return_value = async_iter_mock
-        async_iter_mock.__anext__.side_effect = [msg1, StopAsyncIteration()]
-        
-        mock_ws.__aiter__.return_value = async_iter_mock
+        # Create async generator for messages
+        async def mock_message_generator():
+            yield msg1
+
+        # Mock WebSocket with proper async iterator
+        mock_ws = MagicMock()
+        mock_ws.__aiter__ = lambda self: mock_message_generator().__aiter__()
         hub_instance._ws = mock_ws
 
         # Mock dispatcher
