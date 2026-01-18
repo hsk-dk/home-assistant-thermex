@@ -24,7 +24,6 @@ _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Thermex fan with runtime storage."""
-    #hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
     entry_data = hass.data[DOMAIN][entry.entry_id]
     hub = entry_data["hub"]
     runtime_manager = entry_data["runtime_manager"]
@@ -47,39 +46,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
         "cancel_delayed_off",
         {},
         "cancel_delayed_off"
-    )
-    
-    # Also register as domain services for easier access
-    async def handle_start_delayed_off(call):
-        """Handle start delayed off service call."""
-        entity_id = call.data.get("entity_id")
-        if entity_id:
-            # Find the fan entity and call its method
-            if entity_id == fan_entity.entity_id:
-                await fan_entity.start_delayed_off()
-        else:
-            # No entity_id specified, call on our fan
-            await fan_entity.start_delayed_off()
-    
-    async def handle_cancel_delayed_off(call):
-        """Handle cancel delayed off service call."""
-        entity_id = call.data.get("entity_id")
-        if entity_id:
-            if entity_id == fan_entity.entity_id:
-                await fan_entity.cancel_delayed_off()
-        else:
-            await fan_entity.cancel_delayed_off()
-    
-    # Register the domain services
-    hass.services.async_register(
-        DOMAIN, 
-        "start_delayed_off_domain", 
-        handle_start_delayed_off
-    )
-    hass.services.async_register(
-        DOMAIN, 
-        "cancel_delayed_off_domain", 
-        handle_cancel_delayed_off
     )
 
 
@@ -163,7 +129,7 @@ class ThermexFan(FanEntity):
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("ThermexFan: awaiting initial notify for state")
         # Use a longer timeout and check if startup is complete
-        async_call_later(self.hass, 15, self._fallback_status)
+        async_call_later(self.hass, FALLBACK_STATUS_TIMEOUT, self._fallback_status)
 
     @callback
     def _handle_notify(self, ntf_type: str, data: dict) -> None:

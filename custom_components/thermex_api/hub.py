@@ -8,7 +8,18 @@ from aiohttp import WSMsgType, ClientWebSocketResponse
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
-from .const import DOMAIN, THERMEX_NOTIFY, DEFAULT_PORT, WEBSOCKET_PATH
+from .const import (
+    DOMAIN,
+    THERMEX_NOTIFY,
+    DEFAULT_PORT,
+    WEBSOCKET_PATH,
+    DEFAULT_HEARTBEAT_INTERVAL,
+    DEFAULT_CONNECTION_TIMEOUT,
+    DEFAULT_RECONNECT_DELAY,
+    MAX_RECONNECT_ATTEMPTS,
+    RECONNECT_WAIT_ITERATIONS,
+    WEBSOCKET_REQUEST_TIMEOUT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +51,7 @@ class ThermexHub:
         self._startup_complete: bool = False
 
         self._reconnect_lock = asyncio.Lock()
-        self._reconnect_delay = 2  # seconds, backoff could be added
+        self._reconnect_delay = DEFAULT_RECONNECT_DELAY
         self._reconnecting = False
         self._closing = False  # Flag to prevent operations during close
         self._is_closing = False  # Additional flag for async close operations
@@ -49,10 +60,10 @@ class ThermexHub:
         # Watchdog settings
         self._watchdog_task: asyncio.Task | None = None
         self._last_activity = 0.0  # Will be set properly when loop starts
-        self._heartbeat_interval = 30  # Send heartbeat every 30 seconds
+        self._heartbeat_interval = DEFAULT_HEARTBEAT_INTERVAL
         self._heartbeat_lock = asyncio.Lock()  # Prevent concurrent heartbeats
         self._last_heartbeat = 0.0  # Track last heartbeat time
-        self._connection_timeout = 120  # Consider connection dead after 2 minutes of no activity
+        self._connection_timeout = DEFAULT_CONNECTION_TIMEOUT
         self._heartbeat_in_progress = False  # Prevent concurrent heartbeats
 
     def configure_watchdog(self, heartbeat_interval: int = 30, connection_timeout: int = 120) -> None:
@@ -83,7 +94,7 @@ class ThermexHub:
         if self._reconnecting or self._is_reconnecting:
             _LOGGER.debug("Reconnection already in progress, waiting...")
             # Wait for the ongoing reconnection to complete
-            for _ in range(20):  # Wait up to 10 seconds
+            for _ in range(RECONNECT_WAIT_ITERATIONS):
                 await asyncio.sleep(0.5)
                 if self._ws and not self._ws.closed:
                     _LOGGER.debug("Connection restored by another task")
@@ -126,7 +137,7 @@ class ThermexHub:
                         attempt += 1
                         self.last_error = f"Reconnect attempt {attempt} failed: {err}"
                         _LOGGER.error("ThermexHub: Reconnect attempt %d failed: %s", attempt, err)
-                        if attempt >= 3:  # Limit reconnection attempts
+                        if attempt >= MAX_RECONNECT_ATTEMPTS:
                             raise ConnectionError(f"Failed to reconnect after {attempt} attempts")
                         await asyncio.sleep(self._reconnect_delay)
                         # Optionally add a backoff strategy here
@@ -363,7 +374,7 @@ class ThermexHub:
             for attempt in (1, 2):
                 try:
                     # Wait for matching response
-                    return await asyncio.wait_for(fut, timeout=10)
+                    return await asyncio.wait_for(fut, timeout=WEBSOCKET_REQUEST_TIMEOUT)
                 except asyncio.TimeoutError:
                     # Timeout: either retry or give up (don't cascade reconnections)
                     _LOGGER.debug(
