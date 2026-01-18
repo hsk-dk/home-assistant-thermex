@@ -60,15 +60,81 @@ pytest tests/test_runtime_manager.py::TestRuntimeManager::test_load_empty_store
 
 ## Project-Specific Conventions
 
-### WebSocket Communication
+### WebSocket Protocol (Thermex ESP API v1.0)
 
-Hub uses request/response pattern with futures:
+**Connection Details:**
+- Endpoint: `ws://{host}:9999/api`
+- Protocol: WebSocket with JSON request/response/notify objects
+- Must enable API in Thermex mobile app before use
+- Port: 9999 (TCP)
+
+**Authentication Flow:**
+First command after connection must be authentication:
+```json
+{
+  "Request": "Authenticate",
+  "Data": { "Code": "PASSWORD" }
+}
+```
+Response: `{"Response": "Authenticate", "Status": 200}`
+
+**API Commands:**
 ```python
-# In hub.py - all platform methods must follow this pattern
-response = await self._hub.send_request("Update", {"Motor": {"Value": speed}})
+# Status - Request complete device state
+await hub.send_request("Status", {})
+
+# Update - Control device (lowercase keys in Data)
+await hub.send_request("Update", {
+    "fan": {"fanonoff": 1, "fanspeed": 3},
+    "light": {"lightonoff": 1, "lightbrightness": 100}
+})
+
+# ProtocolVersion - Query API version
+await hub.send_request("ProtocolVersion", {})
 ```
 
-Never call `send_request` from entity constructors - only in async methods after `async_added_to_hass()`.
+**Data Object Specifications:**
+- **light**: `lightonoff` (0-1), `lightbrightness` (1-100%)
+- **fan**: `fanonoff` (0-1), `fanspeed` (1-4)
+- **decolight**: `decolightonoff` (0-1), `decolightbrightness` (1-100%), `decolightr/g/b` (0-255)
+
+**Response Format:**
+```json
+{
+  "Response": "Status",
+  "Status": 200,
+  "Data": {
+    "Light": {"lightonoff": 1, "lightbrightness": 100},
+    "Fan": {"fanonoff": 1, "fanspeed": 3},
+    "Decolight": {"decolightonoff": 1, "decolightr": 100, ...}
+  }
+}
+```
+
+**Status Codes:**
+- 200: Success
+- 400: Bad request format
+- 401: Unauthorized (authentication failed)
+- 500: Internal server error
+
+**Notify Messages (Real-time Updates):**
+Server sends unsolicited notify messages when state changes:
+```json
+{"Notify": "fan", "Data": {"Fan": {"fanonoff": 1, "fanspeed": 3}}}
+{"Notify": "light", "Data": {"Light": {"lightonoff": 1, "lightbrightness": 100}}}
+```
+Hub dispatches these via `THERMEX_NOTIFY` signal to all entities.
+
+**Implementation Notes:**
+- Hub code uses `Motor` internally, mapped to API `fan` object
+- Brightness ranges: API uses 1-100%, Home Assistant uses 0-255 (conversion required)
+- Fan speed mapping: API 1-4 → presets: off=0, low=1, medium=2, high=3, boost=4
+- Response keys are capitalized (Light/Fan/Decolight), request keys lowercase
+
+**Critical Rules:**
+- Never call `send_request` from entity constructors - only in async methods after `async_added_to_hass()`
+- All requests must wait for response (uses futures pattern in hub.py)
+- Connection errors trigger automatic reconnection via hub watchdog
 
 ### State Synchronization
 
