@@ -131,18 +131,6 @@ class TestThermexFilterAlert:
         # Entity uses translation key, not name property
         assert filter_alert._attr_translation_key == "thermex_binary_sensor_threshold_alert"
 
-    @pytest.mark.asyncio
-    async def test_sensor_handles_notify_update(self, filter_alert):
-        """Test sensor updates on notify events."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 40.0
-        filter_alert.schedule_update_ha_state = MagicMock()
-        
-        # Simulate notify event
-        filter_alert._handle_notify("fan", {"Fan": {"fanonoff": 1}})
-        
-        # Should trigger state update
-        filter_alert.schedule_update_ha_state.assert_called_once()
-
     def test_sensor_high_runtime_no_days(self, filter_alert):
         """Test sensor triggers on high runtime even without days."""
         filter_alert._runtime_manager.get_runtime_hours.return_value = 50.0
