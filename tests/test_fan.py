@@ -422,3 +422,46 @@ class TestThermexFan:
         
         # Should mark as got state without requesting
         assert fan_entity._got_initial_state is True
+
+    @pytest.mark.asyncio
+    async def test_fan_async_will_remove_from_hass(self, fan_entity):
+        """Test fan cleanup when removed."""
+        mock_unsub = MagicMock()
+        fan_entity._unsub = mock_unsub
+        fan_entity._delayed_off_handle = MagicMock()
+        
+        with patch('custom_components.thermex_api.fan.async_dispatcher_send'):
+            await fan_entity.async_will_remove_from_hass()
+        
+        # Should call unsub and cancel delayed off
+        mock_unsub.assert_called_once()
+        fan_entity._delayed_off_handle.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_handle_auto_off(self, fan_entity, mock_hub):
+        """Test _handle_auto_off turns off fan."""
+        fan_entity._is_on = True
+        fan_entity._auto_off_handle = MagicMock()
+        
+        with patch.object(fan_entity, 'async_write_ha_state'):
+            await fan_entity._handle_auto_off(None)
+        
+        # Should turn off fan and clear handle
+        assert fan_entity._auto_off_handle is None
+        mock_hub.send_request.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_first_on_resets_runtime(self, fan_entity, mock_hub):
+        """Test fan resets runtime on first turn on."""
+        fan_entity._runtime_manager.get_last_reset.return_value = None
+        
+        # Simulate first notify when turning on
+        fan_entity._handle_notify("fan", {
+            "Fan": {
+                "fanonoff": 1,
+                "fanspeed": 2
+            }
+        })
+        
+        # Should have called reset
+        fan_entity._runtime_manager.reset.assert_called_once()

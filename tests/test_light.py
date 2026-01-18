@@ -300,6 +300,46 @@ class TestThermexDecoLight:
         
         # Should not crash, uses defaults
 
+    def test_light_handle_notify_missing_light_key(self, decolight_entity):
+        """Test ThermexLight handles notify with missing Light key."""
+        from custom_components.thermex_api.light import ThermexLight
+        light = ThermexLight(decolight_entity._hub)
+        light.hass = decolight_entity.hass
+        light.schedule_update_ha_state = MagicMock()
+        
+        # Call with missing Light key
+        light._handle_notify("light", {"OtherData": {}})
+        
+        # Should not crash and not update state
+        light.schedule_update_ha_state.assert_not_called()
+
+    def test_decolight_handle_notify_missing_decolight_key(self, decolight_entity):
+        """Test DecoLight handles notify with missing Decolight key."""
+        decolight_entity.schedule_update_ha_state = MagicMock()
+        
+        # Call with missing Decolight key
+        decolight_entity._handle_notify("decolight", {"OtherData": {}})
+        
+        # Should not crash and not update state
+        decolight_entity.schedule_update_ha_state.assert_not_called()
+
+    def test_light_marks_got_initial_state_on_first_notify(self, decolight_entity):
+        """Test light marks got_initial_state on first notify."""
+        from custom_components.thermex_api.light import ThermexLight
+        light = ThermexLight(decolight_entity._hub)
+        light.hass = decolight_entity.hass
+        light._got_initial_state = False
+        light.schedule_update_ha_state = MagicMock()
+        
+        light._handle_notify("light", {
+            "Light": {
+                "lightonoff": 1,
+                "lightbrightness": 100
+            }
+        })
+        
+        assert light._got_initial_state is True
+
     def test_decolight_brightness_state(self, decolight_entity):
         """Test deco light brightness property."""
         decolight_entity._brightness = 128
