@@ -1,6 +1,7 @@
 # custom_components/thermex_api/runtime_manager.py
 import logging
-from homeassistant.util.dt import utcnow
+from datetime import datetime
+from homeassistant.util.dt import utcnow, parse_datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -118,11 +119,16 @@ class RuntimeManager:
             return None
         
         try:
-            reset_time = datetime.fromisoformat(last_reset.replace("Z", "+00:00"))
+            # Try using HA's parse_datetime first (handles various formats)
+            reset_time = parse_datetime(last_reset)
+            if reset_time is None:
+                # Fallback to fromisoformat for strict ISO format
+                reset_time = datetime.fromisoformat(last_reset.replace("Z", "+00:00"))
+            
             now = utcnow()
             days_diff = (now - reset_time).days
             return days_diff
-        except (ValueError, AttributeError) as e:
+        except (ValueError, AttributeError, TypeError) as e:
             _LOGGER.warning("Error calculating days since reset: %s", e)
             return None
 
