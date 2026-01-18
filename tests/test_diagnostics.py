@@ -58,7 +58,9 @@ class TestDiagnostics:
         """Test diagnostics when hub not found."""
         mock_hass.data = {
             "thermex_api": {
-                mock_config_entry.entry_id: {}
+                mock_config_entry.entry_id: {
+                    "runtime_manager": MagicMock()
+                }
             }
         }
         

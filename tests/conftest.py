@@ -55,6 +55,7 @@ def mock_hass(event_loop):
     hass = MagicMock()
     hass.data = {}
     hass.states = MagicMock()
+    hass.states.get = MagicMock(return_value=None)
     hass.config_entries = MagicMock()
     hass.loop = event_loop
     hass.async_create_task = MagicMock(side_effect=lambda coro, name=None: asyncio.create_task(coro))
