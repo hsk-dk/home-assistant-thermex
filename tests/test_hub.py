@@ -251,7 +251,7 @@ class TestThermexHub:
             mock_dispatcher.assert_called_once()
             # Verify it was called with correct arguments
             mock_dispatcher.assert_called_with(
-                hub_instance.hass, "THERMEX_NOTIFY", "fan", {"Fan": {"fanonoff": 1}}
+                hub_instance._hass, "THERMEX_NOTIFY", "fan", {"Fan": {"fanonoff": 1}}
             )
             call_args = mock_dispatcher.call_args[0]
             assert call_args[1] == THERMEX_NOTIFY
