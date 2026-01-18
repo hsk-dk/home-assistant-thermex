@@ -1,7 +1,7 @@
 """Tests for sensor entities."""
 import pytest
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, AsyncMock, patch
+from datetime import datetime, timedelta
 from homeassistant.components.sensor import SensorDeviceClass
 
 from custom_components.thermex_api.sensor import (
@@ -17,18 +17,20 @@ class TestSensorSetup:
     """Test sensor setup."""
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry(self, mock_hass, mock_hub, mock_config_entry, mock_store):
-        """Test sensor setup."""
+    async def test_async_setup_entry(self, mock_hass, mock_hub, mock_config_entry):
+        """Test sensor setup from config entry."""
+        runtime_manager = MagicMock()
         mock_hass.data = {
             "thermex_api": {
                 mock_config_entry.entry_id: {
                     "hub": mock_hub,
-                    "runtime_store": mock_store,
+                    "runtime_manager": runtime_manager,
                 }
             }
         }
         
         async_add_entities = AsyncMock()
+
         await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
         
         entities = async_add_entities.call_args[0][0]

@@ -1,6 +1,6 @@
 """Tests for button entities."""
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from custom_components.thermex_api.button import (
     ThermexResetRuntimeButton,
@@ -14,16 +14,19 @@ class TestButtonSetup:
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(self, mock_hass, mock_hub, mock_config_entry):
-        """Test button setup."""
+        """Test button setup from config entry."""
+        runtime_manager = MagicMock()
         mock_hass.data = {
             "thermex_api": {
                 mock_config_entry.entry_id: {
                     "hub": mock_hub,
+                    "runtime_manager": runtime_manager,
                 }
             }
         }
         
         async_add_entities = AsyncMock()
+
         await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
         
         entities = async_add_entities.call_args[0][0]
@@ -45,7 +48,8 @@ class TestResetRuntimeButton:
     def test_button_initialization(self, button_entity, mock_hub):
         """Test button entity initialization."""
         assert button_entity._hub == mock_hub
-        assert "Reset Runtime" in button_entity.name
+        assert button_entity._entry_id == "test_entry_id"
+        assert button_entity.icon == "mdi:refresh"
 
     @pytest.mark.asyncio
     async def test_button_press_calls_service(self, button_entity, mock_hass):

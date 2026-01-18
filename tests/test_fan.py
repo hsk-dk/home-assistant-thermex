@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from custom_components.thermex_api.fan import ThermexFan, async_setup_entry
+from custom_components.thermex_api.fan import ThermexFan
 
 
 class TestFanSetup:
@@ -109,6 +109,15 @@ class TestThermexFan:
         mock_hub.send_request.assert_called_once()
         call_args = mock_hub.send_request.call_args[0]
         assert call_args[1]["Fan"]["fanspeed"] == 1  # low
+
+    def test_fan_handle_notify_ignores_wrong_type(self, fan_entity):
+        """Test fan ignores non-fan notifications."""
+        original_state = fan_entity._is_on
+        
+        with patch.object(fan_entity, 'async_write_ha_state'):
+            fan_entity._handle_notify("light", {"Light": {"lightonoff": 1}})
+        
+        assert fan_entity._is_on == original_state
 
     def test_fan_extra_state_attributes(self, fan_entity):
         """Test fan extra state attributes."""

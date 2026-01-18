@@ -1,6 +1,6 @@
 """Tests for binary sensor entities."""
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 from custom_components.thermex_api.binary_sensor import ThermexFilterAlertSensor, async_setup_entry
@@ -11,16 +11,19 @@ class TestBinarySensorSetup:
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(self, mock_hass, mock_hub, mock_config_entry):
-        """Test binary sensor setup."""
+        """Test binary sensor setup from config entry."""
+        runtime_manager = MagicMock()
         mock_hass.data = {
             "thermex_api": {
                 mock_config_entry.entry_id: {
                     "hub": mock_hub,
+                    "runtime_manager": runtime_manager,
                 }
             }
         }
         
         async_add_entities = AsyncMock()
+
         await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
         
         entities = async_add_entities.call_args[0][0]

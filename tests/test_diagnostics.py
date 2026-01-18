@@ -1,4 +1,4 @@
-"""Tests for diagnostics."""
+"""Tests for diagnostics module."""
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
@@ -9,8 +9,8 @@ class TestDiagnostics:
     """Test diagnostics functionality."""
 
     @pytest.mark.asyncio
-    async def test_diagnostics_basic(self, mock_hass, mock_hub, mock_config_entry):
-        """Test basic diagnostics data."""
+    async def test_diagnostics_success(self, mock_hass, mock_hub, mock_config_entry):
+        """Test successful diagnostics retrieval."""
         mock_hass.data = {
             "thermex_api": {
                 mock_config_entry.entry_id: {
@@ -19,7 +19,7 @@ class TestDiagnostics:
             }
         }
         
-        diagnostics = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
+        result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
         
         assert "integration_version" in diagnostics
         assert "device_info" in diagnostics
@@ -37,10 +37,10 @@ class TestDiagnostics:
             }
         }
         
-        diagnostics = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
+        result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
         
-        assert "coordinator_data" in diagnostics
-        assert diagnostics["coordinator_data"]["Fan"]["fanonoff"] == 1
+        assert "coordinator_data" in result
+        assert result["coordinator_data"]["Fan"]["fanonoff"] == 1
 
     @pytest.mark.asyncio
     async def test_diagnostics_safe_on_errors(self, mock_hass, mock_hub, mock_config_entry):
@@ -55,6 +55,6 @@ class TestDiagnostics:
         }
         
         # Should not raise exception
-        diagnostics = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
+        result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
         
-        assert isinstance(diagnostics, dict)
+        assert isinstance(result, dict)

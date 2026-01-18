@@ -1,4 +1,4 @@
-"""Tests for runtime manager."""
+"""Tests for RuntimeManager."""
 import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
@@ -7,7 +7,7 @@ from custom_components.thermex_api.runtime_manager import RuntimeManager
 
 
 class TestRuntimeManager:
-    """Test the RuntimeManager class."""
+    """Test RuntimeManager functionality."""
 
     @pytest.fixture
     def runtime_manager(self, mock_hass, mock_store):

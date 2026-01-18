@@ -72,7 +72,7 @@ def mock_config_entry():
         "api_key": "test_api_key",
     }
     entry.options = {
-        "fan_alert_hours": 30,
+        "fan_alert_hours": 100,
         "fan_alert_days": 90,
         "fan_auto_off_delay": 10,
     }

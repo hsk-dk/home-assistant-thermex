@@ -1,6 +1,6 @@
 """Tests for light entities."""
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock
 from homeassistant.components.light import ColorMode
 
 from custom_components.thermex_api.light import ThermexLight, ThermexDecoLight, async_setup_entry
@@ -62,8 +62,8 @@ class TestThermexLight:
     def test_light_initialization(self, light_entity, mock_hub):
         """Test light entity initialization."""
         assert light_entity._hub == mock_hub
-        assert light_entity._is_on is False
-        assert light_entity._brightness == 204  # Default 80%
+        assert light_entity.is_on is False
+        assert light_entity._brightness == 204  # DEFAULT_BRIGHTNESS
 
     def test_light_color_mode(self, light_entity):
         """Test light supports brightness mode."""
@@ -102,16 +102,15 @@ class TestThermexLight:
 
     def test_light_handle_notify_updates_state(self, light_entity):
         """Test light state updates from notifications."""
-        with patch.object(light_entity, 'async_write_ha_state'):
-            light_entity._handle_notify("light", {
-                "Light": {
-                    "lightonoff": 1,
-                    "lightbrightness": 150,
-                }
-            })
-            
-            assert light_entity.is_on is True
-            assert light_entity._brightness == 150
+        light_entity._handle_notify("light", {
+            "Light": {
+                "lightonoff": 1,
+                "lightbrightness": 150,
+            }
+        })
+        
+        assert light_entity.is_on is True
+        assert light_entity._brightness == 150
 
     def test_light_brightness_clamping(self, light_entity):
         """Test brightness values are clamped to valid range."""
@@ -129,15 +128,14 @@ class TestThermexLight:
 
     def test_light_remembers_last_brightness(self, light_entity):
         """Test light remembers last brightness when turned on."""
-        with patch.object(light_entity, 'async_write_ha_state'):
-            light_entity._handle_notify("light", {
-                "Light": {
-                    "lightonoff": 1,
-                    "lightbrightness": 180,
-                }
-            })
-            
-            assert light_entity._last_brightness == 180
+        light_entity._handle_notify("light", {
+            "Light": {
+                "lightonoff": 1,
+                "lightbrightness": 180,
+            }
+        })
+        
+        assert light_entity._last_brightness == 180
 
     @pytest.mark.asyncio
     async def test_light_fallback_status(self, light_entity, mock_hub):
@@ -163,7 +161,7 @@ class TestThermexDecoLight:
     def test_decolight_initialization(self, decolight_entity, mock_hub):
         """Test deco light entity initialization."""
         assert decolight_entity._hub == mock_hub
-        assert decolight_entity._is_on is False
+        assert decolight_entity.is_on is False
         assert decolight_entity._hs_color == (0.0, 0.0)
 
     def test_decolight_color_modes(self, decolight_entity):
@@ -199,21 +197,20 @@ class TestThermexDecoLight:
 
     def test_decolight_handle_notify_with_color(self, decolight_entity):
         """Test deco light updates from notifications including color."""
-        with patch.object(decolight_entity, 'async_write_ha_state'):
-            decolight_entity._handle_notify("decolight", {
-                "Decolight": {
-                    "decolightonoff": 1,
-                    "decolightbrightness": 150,
-                    "decolightr": 0,
-                    "decolightg": 255,
-                    "decolightb": 0,
-                }
-            })
-            
-            assert decolight_entity._is_on is True
-            assert decolight_entity._brightness == 150
-            # Color should be converted to HS (green)
-            assert decolight_entity._hs_color[0] == 120.0  # Green hue
+        decolight_entity._handle_notify("decolight", {
+            "Decolight": {
+                "decolightonoff": 1,
+                "decolightbrightness": 150,
+                "decolightr": 0,
+                "decolightg": 255,
+                "decolightb": 0,
+            }
+        })
+        
+        assert decolight_entity._is_on is True
+        assert decolight_entity._brightness == 150
+        # Color should be converted to HS (green)
+        assert decolight_entity._hs_color[0] == 120.0  # Green hue
 
     def test_decolight_ignores_wrong_notifications(self, decolight_entity):
         """Test deco light ignores non-decolight notifications."""

@@ -1,7 +1,7 @@
 """Tests for config flow."""
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from homeassistant import data_entry_flow
+from unittest.mock import AsyncMock, MagicMock, patch
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.const import CONF_HOST, CONF_PORT
 
 from custom_components.thermex_api.config_flow import ThermexApiConfigFlow
@@ -11,6 +11,12 @@ from custom_components.thermex_api.const import DOMAIN
 class TestConfigFlow:
     """Test the config flow."""
 
+    @pytest.fixture
+    def mock_setup_entry(self):
+        """Mock setup entry."""
+        with patch("custom_components.thermex_api.async_setup_entry", return_value=True):
+            yield
+
     @pytest.mark.asyncio
     async def test_form_user(self, mock_hass):
         """Test user form showing."""
@@ -19,7 +25,7 @@ class TestConfigFlow:
         
         result = await flow.async_step_user()
         
-        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["type"] == FlowResultType.FORM
         assert result["step_id"] == "user"
 
     @pytest.mark.asyncio
@@ -35,7 +41,7 @@ class TestConfigFlow:
                     CONF_PORT: 4899,
                 })
         
-        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        assert result["type"] == FlowResultType.CREATE_ENTRY
         assert result["title"] == "Thermex API"
         assert result["data"][CONF_HOST] == "192.168.1.100"
         assert result["data"][CONF_PORT] == 4899
@@ -53,7 +59,7 @@ class TestConfigFlow:
                     CONF_PORT: 4899,
                 })
         
-        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["type"] == FlowResultType.CREATE_ENTRY
         assert result["errors"]["base"] == "cannot_connect"
 
     @pytest.mark.asyncio
@@ -64,7 +70,7 @@ class TestConfigFlow:
         
         result = await flow.async_step_init(user_input=None)
         
-        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["type"] == FlowResultType.FORM
         assert result["step_id"] == "init"
 
     @pytest.mark.asyncio
@@ -78,4 +84,4 @@ class TestConfigFlow:
             "delayed_off_timeout": 15,
         })
         
-        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        assert result["type"] == FlowResultType.CREATE_ENTRY
