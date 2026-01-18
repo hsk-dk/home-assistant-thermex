@@ -75,6 +75,19 @@ class TestRuntimeHoursSensor:
         # Verify the value would be updated
         assert runtime_sensor.native_value == 50.0
 
+    @pytest.mark.asyncio
+    async def test_sensor_async_will_remove_from_hass(self, runtime_sensor):
+        """Test sensor cleanup cancels timer."""
+        # Setup mock timer
+        mock_timer = MagicMock()
+        runtime_sensor._update_timer = mock_timer
+        runtime_sensor._unsub = MagicMock()
+        
+        await runtime_sensor.async_will_remove_from_hass()
+        
+        # Should cancel timer
+        mock_timer.assert_called_once()
+
 
 class TestLastResetSensor:
     """Test LastResetSensor entity."""
@@ -249,3 +262,19 @@ class TestDelayedTurnOffSensor:
         assert "delayed_off_remaining" in attrs
         assert attrs["delayed_off_active"] is True
         assert attrs["delayed_off_remaining"] == 180
+
+    def test_sensor_handle_delayed_off_notify(self, delayed_sensor):
+        """Test sensor handles delayed_turn_off notifications."""
+        with patch.object(delayed_sensor, 'async_write_ha_state') as mock_write:
+            delayed_sensor._handle_delayed_off_notify("delayed_turn_off", {})
+            
+            # Should trigger state write
+            mock_write.assert_called_once()
+
+    def test_sensor_handle_fan_notify(self, delayed_sensor):
+        """Test sensor handles fan notifications."""
+        with patch.object(delayed_sensor, 'async_write_ha_state') as mock_write:
+            delayed_sensor._handle_delayed_off_notify("fan", {})
+            
+            # Should trigger state write
+            mock_write.assert_called_once()

@@ -121,3 +121,63 @@ class TestThermexFilterAlert:
         assert attrs["days_since_reset"] == 15
         assert attrs["hours_threshold"] == 30
         assert attrs["days_threshold"] == 90
+
+    def test_sensor_device_class(self, filter_alert):
+        """Test sensor has correct device class."""
+        assert filter_alert.device_class == "problem"
+
+    def test_sensor_name(self, filter_alert):
+        """Test sensor name property."""
+        # Entity uses translation key, not name property
+        assert filter_alert._attr_translation_key == "thermex_binary_sensor_threshold_alert"
+
+    def test_sensor_high_runtime_no_days(self, filter_alert):
+        """Test sensor triggers on high runtime even without days."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 50.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = None
+        
+        # Should trigger based on runtime alone
+        assert filter_alert.is_on is True
+
+    def test_sensor_alert_reason_hours_only(self, filter_alert):
+        """Test alert reason when only hours threshold exceeded."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 100.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 30
+        filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
+        
+        reason = filter_alert._get_trigger_reason(True, False, 30)
+        
+        assert "Runtime hours exceeded" in reason
+        assert "Days since reset exceeded" not in reason
+
+    def test_sensor_alert_reason_days_only(self, filter_alert):
+        """Test alert reason when only days threshold exceeded."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 10.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 100
+        filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
+        
+        reason = filter_alert._get_trigger_reason(False, True, 100)
+        
+        assert "Days since reset exceeded" in reason
+        assert "Runtime hours exceeded" not in reason
+
+    def test_sensor_alert_reason_both(self, filter_alert):
+        """Test alert reason when both thresholds exceeded."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 100.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 100
+        filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
+        
+        reason = filter_alert._get_trigger_reason(True, True, 100)
+        
+        assert "Runtime hours exceeded" in reason
+        assert "Days since reset exceeded" in reason
+
+    def test_sensor_alert_reason_no_reset_date(self, filter_alert):
+        """Test alert reason when no reset date recorded."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 50.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = None
+        filter_alert._options = {"fan_alert_hours": 100, "fan_alert_days": 90}
+        
+        reason = filter_alert._get_trigger_reason(False, True, None)
+        
+        assert "No filter reset date recorded" in reason

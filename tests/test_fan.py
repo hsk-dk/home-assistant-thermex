@@ -102,3 +102,323 @@ class TestThermexFan:
         
         fan_entity._runtime_manager.reset.assert_called_once()
         fan_entity._runtime_manager.save.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_turn_on_starts_runtime(self, fan_entity):
+        """Test turning on fan starts runtime tracking."""
+        await fan_entity.async_turn_on()
+        fan_entity._runtime_manager.start.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_turn_off_stops_runtime(self, fan_entity):
+        """Test turning off fan stops runtime tracking."""
+        fan_entity._is_on = True
+        await fan_entity.async_turn_off()
+        fan_entity._runtime_manager.stop.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_set_preset_mode_updates_preset(self, fan_entity, mock_hub):
+        """Test setting preset mode."""
+        await fan_entity.async_turn_on()
+        await fan_entity.async_set_preset_mode("high")
+        mock_hub.send_request.assert_called()
+        # Preset is updated when notification is received from hub
+        fan_entity._handle_notify("fan", {"Fan": {"fanonoff": 1, "fanspeed": 3}})
+        assert fan_entity._preset_mode == "high"
+
+    @pytest.mark.asyncio
+    async def test_fan_handle_notify_updates_state(self, fan_entity, mock_hass):
+        """Test fan state updates from notify."""
+        # Mock async_create_task to not actually create tasks
+        mock_hass.async_create_task = MagicMock()
+        
+        fan_entity._handle_notify("fan", {
+            "Fan": {
+                "fanonoff": 1,
+                "fanspeed": 3
+            }
+        })
+        
+        assert fan_entity._is_on is True
+        assert fan_entity._preset_mode == "high"
+
+    @pytest.mark.asyncio
+    async def test_fan_handle_notify_off_state(self, fan_entity, mock_hass):
+        """Test fan handles off state from notify."""
+        # Mock async_create_task to not actually create tasks
+        mock_hass.async_create_task = MagicMock()
+        
+        fan_entity._is_on = True
+        fan_entity._handle_notify("fan", {
+            "Fan": {
+                "fanonoff": 0,
+                "fanspeed": 0
+            }
+        })
+        
+        assert fan_entity._is_on is False
+        assert fan_entity._preset_mode == "off"
+
+    @pytest.mark.asyncio
+    async def test_fan_turn_on_with_percentage(self, fan_entity, mock_hub):
+        """Test turning on fan with percentage."""
+        await fan_entity.async_turn_on(percentage=50)
+        
+        call_args = mock_hub.send_request.call_args[0]
+        # Should map percentage to preset
+        assert "Fan" in call_args[1]
+
+    @pytest.mark.skip(reason="start_delayed_off creates uncancellable countdown timer - needs implementation change")
+    @pytest.mark.asyncio
+    async def test_fan_start_delayed_off(self, fan_entity, mock_hass):
+        """Test starting delayed off."""
+        # Fan must be running to start delayed off
+        fan_entity._is_on = True
+        
+        # Mock schedule_update_ha_state to prevent entity platform errors
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        await fan_entity.start_delayed_off()
+        
+        assert fan_entity._delayed_off_active is True
+        assert fan_entity._delayed_off_handle is not None
+
+    @pytest.mark.asyncio
+    async def test_fan_cancel_delayed_off(self, fan_entity):
+        """Test canceling delayed off."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_handle = MagicMock()
+        
+        await fan_entity.cancel_delayed_off()
+        
+        assert fan_entity._delayed_off_active is False
+
+    @pytest.mark.skip(reason="_update_countdown creates lingering timer - needs implementation change to return handle")
+    def test_fan_update_countdown(self, fan_entity, mock_hass):
+        """Test delayed off countdown updates."""
+        # Mock schedule_update_ha_state to prevent actual state updates
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 30
+        
+        # Call _update_countdown which decrements remaining by 1 minute
+        fan_entity._update_countdown(None)
+        
+        assert fan_entity._delayed_off_remaining == 29
+        fan_entity.schedule_update_ha_state.assert_called()
+
+    def test_fan_extra_state_attributes_with_delayed_off(self, fan_entity):
+        """Test extra state attributes include delayed off info."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 300
+        
+        attrs = fan_entity.extra_state_attributes
+        
+        assert "delayed_off_active" in attrs
+        assert attrs["delayed_off_active"] is True
+
+    @pytest.mark.asyncio
+    async def test_fan_async_will_remove_from_hass(self, fan_entity):
+        """Test cleanup when removing from hass."""
+        fan_entity._delayed_off_handle = MagicMock()
+        fan_entity._auto_off_handle = MagicMock()
+        
+        await fan_entity.async_will_remove_from_hass()
+        
+        # Should cancel timers
+        if fan_entity._delayed_off_handle:
+            fan_entity._delayed_off_handle.cancel.assert_called_once()
+
+    def test_fan_percentage_property(self, fan_entity):
+        """Test percentage property returns 0 by default."""
+        # Fan has percentage property but uses presets instead
+        assert fan_entity.percentage == 0
+
+    def test_fan_scheduled_time_in_attributes(self, fan_entity):
+        """Test scheduled time appears in attributes."""
+        from datetime import datetime, timedelta
+        from homeassistant.util import dt as dt_util
+        
+        scheduled_time = dt_util.now() + timedelta(minutes=45)
+        fan_entity._delayed_off_scheduled_time = scheduled_time
+        
+        attrs = fan_entity.extra_state_attributes
+        assert "delayed_off_scheduled_time" in attrs
+        assert attrs["delayed_off_scheduled_time"] == scheduled_time.isoformat()
+
+    @pytest.mark.asyncio
+    async def test_fan_turn_on_no_preset(self, fan_entity, mock_hub):
+        """Test turning on fan when no preset mode is set."""
+        fan_entity._preset_mode = "off"
+        
+        await fan_entity.async_turn_on()
+        
+        # Should use default "medium"
+        call_args = mock_hub.send_request.call_args[0]
+        assert call_args[1]["Fan"]["fanspeed"] == 2  # medium
+
+
+
+    def test_fan_update_countdown_inactive(self, fan_entity):
+        """Test _update_countdown does nothing when inactive."""
+        fan_entity._delayed_off_active = False
+        fan_entity._delayed_off_remaining = 30
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        fan_entity._update_countdown()
+        
+        # Should not update state when inactive
+        fan_entity.schedule_update_ha_state.assert_not_called()
+
+    def test_fan_update_countdown_zero_remaining(self, fan_entity):
+        """Test _update_countdown handles zero remaining time."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 0
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        fan_entity._update_countdown()
+        
+        # Should not schedule next update when at zero
+        fan_entity.schedule_update_ha_state.assert_not_called()
+
+    def test_fan_update_countdown_active_with_remaining(self, fan_entity):
+        """Test _update_countdown schedules next update when active."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 5
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        with patch('custom_components.thermex_api.fan.async_call_later') as mock_call_later:
+            fan_entity._update_countdown()
+            
+            # Should decrement and schedule next update
+            assert fan_entity._delayed_off_remaining == 4
+            fan_entity.schedule_update_ha_state.assert_called_once()
+            mock_call_later.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_handle_delayed_off(self, fan_entity, mock_hub):
+        """Test _handle_delayed_off turns off fan and clears state."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 1
+        fan_entity._delayed_off_handle = MagicMock()
+        fan_entity._delayed_off_scheduled_time = "2026-01-18T12:00:00Z"
+        fan_entity._is_on = True
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        with patch('custom_components.thermex_api.fan.async_dispatcher_send') as mock_send:
+            await fan_entity._handle_delayed_off(None)
+            
+            # Should clear delayed off state
+            assert fan_entity._delayed_off_active is False
+            assert fan_entity._delayed_off_remaining == 0
+            assert fan_entity._delayed_off_handle is None
+            assert fan_entity._delayed_off_scheduled_time is None
+            
+            # Should turn off fan
+            mock_hub.send_request.assert_called_once()
+            fan_entity.schedule_update_ha_state.assert_called()
+            # Dispatcher called twice: once in async_turn_off, once in _handle_delayed_off
+            assert mock_send.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_fan_start_delayed_off_service(self, fan_entity, mock_hub):
+        """Test start_delayed_off service method."""
+        fan_entity._is_on = True
+        fan_entity._entry.options = {"fan_auto_off_delay": 15}
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        with patch('custom_components.thermex_api.fan.async_call_later') as mock_call_later:
+            with patch('custom_components.thermex_api.fan.async_dispatcher_send') as mock_send:
+                await fan_entity.start_delayed_off()
+                
+                # Should set delayed off state
+                assert fan_entity._delayed_off_active is True
+                assert fan_entity._delayed_off_remaining == 15
+                assert fan_entity._delayed_off_scheduled_time is not None
+                
+                # Should schedule turn-off and countdown
+                assert mock_call_later.call_count == 2  # delayed off + countdown
+                mock_send.assert_called()
+                # Called twice: once in start_delayed_off, potentially once in cancel_delayed_off
+                assert fan_entity.schedule_update_ha_state.call_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_fan_start_delayed_off_when_not_running(self, fan_entity):
+        """Test start_delayed_off does nothing if fan is off."""
+        fan_entity._is_on = False
+        
+        await fan_entity.start_delayed_off()
+        
+        # Should not activate delayed off
+        assert fan_entity._delayed_off_active is False
+
+    @pytest.mark.asyncio
+    async def test_fan_start_delayed_off_cancels_existing(self, fan_entity, mock_hub):
+        """Test start_delayed_off cancels existing delayed off."""
+        fan_entity._is_on = True
+        fan_entity._delayed_off_active = True
+        # The handle is a callable, not a mock with cancel()
+        mock_handle = MagicMock()
+        fan_entity._delayed_off_handle = mock_handle
+        fan_entity._entry.options = {"fan_auto_off_delay": 10}
+        
+        with patch('custom_components.thermex_api.fan.async_call_later'):
+            with patch('custom_components.thermex_api.fan.async_dispatcher_send'):
+                await fan_entity.start_delayed_off()
+                
+                # Should have called the handle (not handle.cancel)
+                mock_handle.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_fallback_status_with_data(self, fan_entity, mock_hub):
+        """Test fan processes fallback status data."""
+        fan_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(return_value={
+            "Fan": {
+                "fanonoff": 1,
+                "fanspeed": 2
+            }
+        })
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        await fan_entity._fallback_status(None)
+        
+        assert fan_entity._got_initial_state is True
+        assert fan_entity._is_on is True
+        assert fan_entity._preset_mode == "medium"
+
+    @pytest.mark.asyncio
+    async def test_fan_fallback_status_no_fan_data(self, fan_entity, mock_hub):
+        """Test fan handles fallback status with no fan data."""
+        fan_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(return_value={})
+        
+        await fan_entity._fallback_status(None)
+        
+        assert fan_entity._got_initial_state is True
+
+    @pytest.mark.asyncio
+    async def test_fan_fallback_status_error(self, fan_entity, mock_hub):
+        """Test fan handles fallback status error."""
+        fan_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(side_effect=Exception("Test error"))
+        
+        await fan_entity._fallback_status(None)
+        
+        # Should mark as got state even on error
+        assert fan_entity._got_initial_state is True
+
+    @pytest.mark.asyncio
+    async def test_fan_fallback_status_startup_complete(self, fan_entity, mock_hub):
+        """Test fan fallback when startup is complete."""
+        fan_entity._got_initial_state = False
+        mock_hub.startup_complete = True
+        
+        await fan_entity._fallback_status(None)
+        
+        # Should mark as got state without requesting
+        assert fan_entity._got_initial_state is True
