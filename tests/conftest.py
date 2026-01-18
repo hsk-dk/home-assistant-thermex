@@ -1,6 +1,6 @@
 """Fixtures for Thermex API integration tests."""
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 import asyncio
 
 from custom_components.thermex_api.const import DOMAIN
@@ -74,6 +74,7 @@ def mock_config_entry():
     entry.options = {
         "fan_alert_hours": 100,
         "fan_alert_days": 90,
-        "fan_auto_off_delay": 10,
+        "fan_auto_off_delay": 60,
+        "enable_decolight": False,
     }
     return entry
