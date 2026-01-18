@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import ConfigType
 
 from homeassistant.config_entries import ConfigEntry
 

@@ -1,19 +1,15 @@
 """Thermex Fan entity with discrete presets and persistent runtime tracking."""
 import logging
-from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers import entity_platform
-from homeassistant.helpers.storage import Store
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.util.dt import utcnow
 from homeassistant.helpers.event import async_call_later
 
 from .hub import ThermexHub
-from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, RUNTIME_STORAGE_FILE
+from .const import DOMAIN, THERMEX_NOTIFY, FALLBACK_STATUS_TIMEOUT
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -224,7 +220,7 @@ class ThermexFan(FanEntity):
         self._delayed_off_remaining = delay_minutes
         
         # Calculate scheduled time
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         from homeassistant.util import dt as dt_util
         
         self._delayed_off_scheduled_time = dt_util.now() + timedelta(minutes=delay_minutes)

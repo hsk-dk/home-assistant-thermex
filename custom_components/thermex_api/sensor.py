@@ -6,21 +6,15 @@ Creates persistent sensors for:
  - filter_time
 """
 import logging
-from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.storage import Store
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_call_later
 from homeassistant.core import callback
 from homeassistant.util.dt import parse_datetime
 
 from .const import DOMAIN, THERMEX_NOTIFY
-from .hub import ThermexHub
-from .runtime_manager import RuntimeManager  # Ensure this is implemented as discussed
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -221,7 +215,7 @@ class DelayedTurnOffSensor(BaseRuntimeSensor):
                 possible_entity_ids = [
                     fan_entity_id,
                     f"fan.{self._hub.unique_id.replace('_', '')}_fan",
-                    f"fan.thermex_hood_thermex_ventilator",  # From the logs
+                    "fan.thermex_hood_thermex_ventilator",  # From the logs
                 ]
                 
                 _LOGGER.debug("DelayedTurnOffSensor: trying entity IDs: %s", possible_entity_ids)
@@ -259,7 +253,7 @@ class DelayedTurnOffSensor(BaseRuntimeSensor):
                 # Try multiple possible entity IDs
                 possible_entity_ids = [
                     f"fan.{self._hub.unique_id}_fan",
-                    f"fan.thermex_hood_thermex_ventilator",  # From the logs
+                    "fan.thermex_hood_thermex_ventilator",  # From the logs
                 ]
                 
                 for entity_id in possible_entity_ids:

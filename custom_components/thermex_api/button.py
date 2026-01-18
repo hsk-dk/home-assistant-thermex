@@ -3,10 +3,8 @@
 import logging
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.storage import Store
-from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, RUNTIME_STORAGE_FILE
+from .const import DOMAIN, THERMEX_NOTIFY
 from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
 
