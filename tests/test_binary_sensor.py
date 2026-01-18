@@ -121,3 +121,32 @@ class TestThermexFilterAlert:
         assert attrs["days_since_reset"] == 15
         assert attrs["hours_threshold"] == 30
         assert attrs["days_threshold"] == 90
+
+    def test_sensor_device_class(self, filter_alert):
+        """Test sensor has correct device class."""
+        assert filter_alert.device_class == "problem"
+
+    def test_sensor_name(self, filter_alert):
+        """Test sensor name property."""
+        # Entity uses translation key, not name property
+        assert filter_alert._attr_translation_key == "filter_alert"
+
+    @pytest.mark.asyncio
+    async def test_sensor_handles_notify_update(self, filter_alert):
+        """Test sensor updates on notify events."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 40.0
+        filter_alert.schedule_update_ha_state = MagicMock()
+        
+        # Simulate notify event
+        filter_alert._handle_notify("fan", {"Fan": {"fanonoff": 1}})
+        
+        # Should trigger state update
+        filter_alert.schedule_update_ha_state.assert_called_once()
+
+    def test_sensor_high_runtime_no_days(self, filter_alert):
+        """Test sensor triggers on high runtime even without days."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 50.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = None
+        
+        # Should trigger based on runtime alone
+        assert filter_alert.is_on is True

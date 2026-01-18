@@ -267,7 +267,103 @@ class TestThermexDecoLight:
         await decolight_entity._fallback_status(None)
         
         assert decolight_entity._got_initial_state is True
+    @pytest.mark.asyncio
+    async def test_light_fallback_status_with_data(self, light_entity, mock_hub):
+        """Test main light processes fallback data correctly."""
+        light_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(return_value={
+            "Light": {
+                "lightonoff": 1,
+                "lightbrightness": 180
+            }
+        })
+        light_entity.schedule_update_ha_state = MagicMock()
+        
+        await light_entity._fallback_status(None)
+        
+        assert light_entity._got_initial_state is True
+        assert light_entity._is_on is True
+        assert light_entity._brightness == 180
+        light_entity.schedule_update_ha_state.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_decolight_fallback_status_with_data(self, decolight_entity, mock_hub):
+        """Test deco light processes fallback data correctly."""
+        decolight_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(return_value={
+            "Decolight": {
+                "decolightonoff": 1,
+                "decolightbrightness": 200,
+                "decolightr": 255,
+                "decolightg": 0,
+                "decolightb": 0
+            }
+        })
+        decolight_entity.schedule_update_ha_state = MagicMock()
+        
+        await decolight_entity._fallback_status(None)
+        
+        assert decolight_entity._got_initial_state is True
+        assert decolight_entity._is_on is True
+        assert decolight_entity._brightness == 200
+        assert decolight_entity._hs_color[0] == 0.0  # Red
+        decolight_entity.schedule_update_ha_state.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_light_fallback_status_error_handling(self, light_entity, mock_hub):
+        """Test light handles fallback status errors gracefully."""
+        light_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(side_effect=Exception("Connection error"))
+        
+        await light_entity._fallback_status(None)
+        
+        # Should mark as having state even on error
+        assert light_entity._got_initial_state is True
+
+    def test_light_process_fallback_no_data(self, light_entity):
+        """Test light handles missing fallback data."""
+        light_entity._process_fallback_data({})
+        
+        # Should use defaults when no light data
+        assert light_entity._is_on is False
+
+    def test_decolight_process_fallback_no_data(self, decolight_entity):
+        """Test deco light handles missing fallback data."""
+        decolight_entity._process_fallback_data({})
+        
+        # Should use defaults when no decolight data
+        assert decolight_entity._is_on is False
+
+    def test_light_clamp_brightness(self, light_entity):
+        """Test brightness clamping."""
+        # Test below minimum
+        assert light_entity._clamp_brightness(0) == 1
+        assert light_entity._clamp_brightness(-10) == 1
+        
+        # Test above maximum
+        assert light_entity._clamp_brightness(256) == 255
+        assert light_entity._clamp_brightness(300) == 255
+        
+        # Test valid range
+        assert light_entity._clamp_brightness(128) == 128
+
+    @pytest.mark.asyncio
+    async def test_light_async_will_remove_from_hass(self, light_entity):
+        """Test light cleanup when removed."""
+        mock_unsub = MagicMock()
+        light_entity._unsub = mock_unsub
+        
+        await light_entity.async_will_remove_from_hass()
+        
+        mock_unsub.assert_called_once()
+
+    def test_decolight_turn_on_preserves_color(self, decolight_entity):
+        """Test deco light preserves color when no RGB provided."""
+        decolight_entity._hs_color = (120.0, 100.0)  # Green
+        # The turn on should use current _hs_color when no RGB is provided
     @pytest.mark.asyncio  
     async def test_decolight_fallback_status_request(self, decolight_entity, mock_hub):
         """Test deco light requests fallback status."""

@@ -229,3 +229,64 @@ class TestThermexFan:
         # Should cancel timers
         if fan_entity._delayed_off_handle:
             fan_entity._delayed_off_handle.cancel.assert_called_once()
+
+    def test_fan_percentage_property(self, fan_entity):
+        """Test percentage property returns None."""
+        # Fan doesn't support percentage-based speed
+        assert fan_entity.percentage is None
+
+    def test_fan_scheduled_time_in_attributes(self, fan_entity):
+        """Test scheduled time appears in attributes."""
+        from datetime import datetime, timedelta
+        from homeassistant.util import dt as dt_util
+        
+        scheduled_time = dt_util.now() + timedelta(minutes=45)
+        fan_entity._delayed_off_scheduled_time = scheduled_time
+        
+        attrs = fan_entity.extra_state_attributes
+        assert "delayed_off_scheduled_time" in attrs
+        assert attrs["delayed_off_scheduled_time"] == scheduled_time.isoformat()
+
+    @pytest.mark.asyncio
+    async def test_fan_turn_on_no_preset(self, fan_entity, mock_hub):
+        """Test turning on fan when no preset mode is set."""
+        fan_entity._preset_mode = "off"
+        
+        await fan_entity.async_turn_on()
+        
+        # Should use default "medium"
+        call_args = mock_hub.send_request.call_args[0]
+        assert call_args[1]["Fan"]["fanspeed"] == 2  # medium
+
+    @pytest.mark.asyncio
+    async def test_fan_async_added_to_hass(self, fan_entity, mock_hass):
+        """Test fan registers listeners when added to hass."""
+        with patch('homeassistant.helpers.dispatcher.async_dispatcher_connect') as mock_connect:
+            with patch('homeassistant.helpers.event.async_call_later') as mock_call_later:
+                await fan_entity.async_added_to_hass()
+                
+                # Should register dispatcher and fallback timer
+                mock_connect.assert_called_once()
+                mock_call_later.assert_called_once()
+
+    def test_fan_update_countdown_inactive(self, fan_entity):
+        """Test _update_countdown does nothing when inactive."""
+        fan_entity._delayed_off_active = False
+        fan_entity._delayed_off_remaining = 30
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        fan_entity._update_countdown()
+        
+        # Should not update state when inactive
+        fan_entity.schedule_update_ha_state.assert_not_called()
+
+    def test_fan_update_countdown_zero_remaining(self, fan_entity):
+        """Test _update_countdown handles zero remaining time."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 0
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        fan_entity._update_countdown()
+        
+        # Should not schedule next update when at zero
+        fan_entity.schedule_update_ha_state.assert_not_called()
