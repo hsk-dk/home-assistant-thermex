@@ -173,3 +173,65 @@ class TestRuntimeManager:
         # Just verify it doesn't crash
         result = runtime_manager.get_runtime_hours()
         assert isinstance(result, float)
+
+    @pytest.mark.asyncio
+    async def test_load_invalid_runtime_type(self, runtime_manager, mock_store):
+        """Test loading with invalid runtime_hours type."""
+        test_data = {
+            "runtime_hours": "not_a_number",
+            "last_reset": "2026-01-15T10:00:00Z",
+        }
+        mock_store.async_load = AsyncMock(return_value=test_data)
+        
+        await runtime_manager.load()
+        
+        # Should reset to 0.0 due to validation failure
+        assert runtime_manager.get_runtime_hours() == 0.0
+
+    @pytest.mark.asyncio
+    async def test_load_invalid_last_start_type(self, runtime_manager, mock_store):
+        """Test loading with invalid last_start type."""
+        test_data = {
+            "runtime_hours": 5.0,
+            "last_start": "not_a_timestamp",
+        }
+        mock_store.async_load = AsyncMock(return_value=test_data)
+        
+        await runtime_manager.load()
+        
+        # Should load runtime_hours successfully
+        assert runtime_manager.get_runtime_hours() == 5.0
+        # last_start should be ignored
+        assert runtime_manager._data.get("last_start") is None
+
+    @pytest.mark.asyncio
+    async def test_load_invalid_last_reset_type(self, runtime_manager, mock_store):
+        """Test loading with invalid last_reset type."""
+        test_data = {
+            "runtime_hours": 3.0,
+            "last_reset": 12345,  # Should be string, not int
+        }
+        mock_store.async_load = AsyncMock(return_value=test_data)
+        
+        await runtime_manager.load()
+        
+        # Should load runtime_hours successfully
+        assert runtime_manager.get_runtime_hours() == 3.0
+        # last_reset should be ignored
+        assert runtime_manager.get_last_reset() is None
+
+    @pytest.mark.asyncio
+    async def test_load_invalid_last_preset_type(self, runtime_manager, mock_store):
+        """Test loading with invalid last_preset type."""
+        test_data = {
+            "runtime_hours": 2.0,
+            "last_preset": 123,  # Should be string, not int
+        }
+        mock_store.async_load = AsyncMock(return_value=test_data)
+        
+        await runtime_manager.load()
+        
+        # Should load runtime_hours successfully
+        assert runtime_manager.get_runtime_hours() == 2.0
+        # last_preset should be ignored
+        assert runtime_manager._data.get("last_preset") is None

@@ -281,3 +281,41 @@ class TestThermexFan:
         
         # Should not schedule next update when at zero
         fan_entity.schedule_update_ha_state.assert_not_called()
+
+    def test_fan_update_countdown_active_with_remaining(self, fan_entity):
+        """Test _update_countdown schedules next update when active."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 5
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        with patch('custom_components.thermex_api.fan.async_call_later') as mock_call_later:
+            fan_entity._update_countdown()
+            
+            # Should decrement and schedule next update
+            assert fan_entity._delayed_off_remaining == 4
+            fan_entity.schedule_update_ha_state.assert_called_once()
+            mock_call_later.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_handle_delayed_off(self, fan_entity, mock_hub):
+        """Test _handle_delayed_off turns off fan and clears state."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 1
+        fan_entity._delayed_off_handle = MagicMock()
+        fan_entity._delayed_off_scheduled_time = "2026-01-18T12:00:00Z"
+        fan_entity._is_on = True
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        with patch('custom_components.thermex_api.fan.async_dispatcher_send') as mock_send:
+            await fan_entity._handle_delayed_off(None)
+            
+            # Should clear delayed off state
+            assert fan_entity._delayed_off_active is False
+            assert fan_entity._delayed_off_remaining == 0
+            assert fan_entity._delayed_off_handle is None
+            assert fan_entity._delayed_off_scheduled_time is None
+            
+            # Should turn off fan
+            mock_hub.send_request.assert_called_once()
+            fan_entity.schedule_update_ha_state.assert_called()
+            mock_send.assert_called_once()

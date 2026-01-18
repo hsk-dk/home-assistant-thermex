@@ -235,6 +235,53 @@ class TestThermexDecoLight:
         
         assert decolight_entity._hs_color[0] == 0.0  # Red hue
 
+    @pytest.mark.asyncio
+    async def test_light_fallback_status_startup_complete(self, decolight_entity, mock_hub):
+        """Test fallback status when hub startup is complete."""
+        decolight_entity._got_initial_state = False
+        mock_hub.startup_complete = True
+        
+        await decolight_entity._fallback_status(None)
+        
+        # Should mark as got initial state without requesting
+        assert decolight_entity._got_initial_state is True
+
+    @pytest.mark.asyncio
+    async def test_light_fallback_status_error(self, decolight_entity, mock_hub):
+        """Test fallback status handles errors gracefully."""
+        decolight_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(side_effect=Exception("Connection error"))
+        
+        await decolight_entity._fallback_status(None)
+        
+        # Should mark as got initial state even on error
+        assert decolight_entity._got_initial_state is True
+
+    @pytest.mark.asyncio
+    async def test_light_async_will_remove_from_hass(self, decolight_entity):
+        """Test light cleanup when removed."""
+        mock_unsub = MagicMock()
+        decolight_entity._unsub = mock_unsub
+        
+        await decolight_entity.async_will_remove_from_hass()
+        
+        # Should call unsub
+        mock_unsub.assert_called_once()
+
+    def test_light_clamp_brightness(self, decolight_entity):
+        """Test brightness clamping."""
+        # Test minimum
+        assert decolight_entity._clamp_brightness(0) == 1
+        assert decolight_entity._clamp_brightness(-10) == 1
+        
+        # Test maximum
+        assert decolight_entity._clamp_brightness(256) == 255
+        assert decolight_entity._clamp_brightness(300) == 255
+        
+        # Test valid range
+        assert decolight_entity._clamp_brightness(128) == 128
+
     def test_decolight_brightness_state(self, decolight_entity):
         """Test deco light brightness property."""
         decolight_entity._brightness = 128
