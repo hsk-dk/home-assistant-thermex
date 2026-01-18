@@ -68,8 +68,9 @@ class TestRuntimeHoursSensor:
         """Test sensor updates on fan notifications."""
         runtime_sensor._runtime_manager.get_runtime_hours.return_value = 50.0
         
-        # Call the handler directly without checking state
-        runtime_sensor._handle_notify("fan", {"Fan": {"fanspeed": 2}})
+        # Mock async_write_ha_state to avoid platform requirements
+        with patch.object(runtime_sensor, 'async_write_ha_state'):
+            runtime_sensor._handle_notify("fan", {"Fan": {"fanspeed": 2}})
         
         # Verify the value would be updated
         assert runtime_sensor.native_value == 50.0

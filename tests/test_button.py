@@ -62,9 +62,12 @@ class TestResetRuntimeButton:
         coordinator = MagicMock()
         coordinator.async_request_refresh = AsyncMock()
         
+        entry_data = MagicMock()
+        entry_data.coordinator = coordinator
+        
         mock_hass.data = {
             "thermex_api": {
-                "test_entry_id": coordinator
+                "test_entry_id": entry_data
             }
         }
         
@@ -74,6 +77,7 @@ class TestResetRuntimeButton:
         button_entity._runtime_manager.reset.assert_called_once()
         button_entity._runtime_manager.save.assert_called_once()
         mock_dispatch.assert_called_once()
+        coordinator.async_request_refresh.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_button_press_with_no_runtime_manager(self, mock_hub, mock_hass):
