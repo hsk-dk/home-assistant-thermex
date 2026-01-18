@@ -9,11 +9,3 @@ start_delayed_off:
 cancel_delayed_off:
   description: "Cancel delayed turn-off timer for the Thermex fan"
   fields: {}
-
-start_delayed_off_domain:
-  description: "Start delayed turn-off timer for the Thermex fan (domain service)"
-  fields: {}
-
-cancel_delayed_off_domain:
-  description: "Cancel delayed turn-off timer for the Thermex fan (domain service)"
-  fields: {}

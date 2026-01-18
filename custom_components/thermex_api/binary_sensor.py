@@ -3,13 +3,13 @@
 Thermex API binary sensor for filter‐life runtime alert.
 """
 import logging
+from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorEntity, 
     BinarySensorDeviceClass,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.core import callback
 
 from .runtime_manager import RuntimeManager
@@ -71,7 +71,7 @@ class ThermexFilterAlert(BinarySensorEntity):
         return hours_exceeded or days_exceeded
     
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes including dual threshold information."""
         runtime_hours = self._runtime_manager.get_runtime_hours()
         days_since_reset = self._runtime_manager.get_days_since_reset()

@@ -1,4 +1,5 @@
 from homeassistant.helpers.entity import Entity
+from typing import Any
 
 class ThermexDiagnosticsSensor(Entity):
     def __init__(self, coordinator):
@@ -7,12 +8,12 @@ class ThermexDiagnosticsSensor(Entity):
         self._attr_unique_id = "thermex_diagnostics"
 
     @property
-    def state(self):
+    def state(self) -> str:
         # Example: "connected" or "disconnected"
         return "connected" if self._coordinator.api.is_connected else "disconnected"
 
     @property
-    def extra_state_attributes(self):
+    def extra_state_attributes(self) -> dict[str, Any]:
         # Example: Expose error messages and other diagnostics
         return {
             "last_error": self._coordinator.api.last_error,
