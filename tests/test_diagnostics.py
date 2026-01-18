@@ -95,3 +95,47 @@ class TestDiagnostics:
         
         assert result["host"] == "192.168.1.1"
         assert result["unique_id"] == "test_unique_id"
+
+    @pytest.mark.asyncio
+    async def test_diagnostics_with_runtime_manager(self, mock_hass, mock_config_entry):
+        """Test diagnostics includes runtime manager data."""
+        mock_hub = MagicMock()
+        mock_hub._host = "192.168.1.100"
+        mock_hub.unique_id = "test_id"
+        mock_hub.last_status = {"status": "ok"}
+        mock_hub.last_error = None
+        mock_hub.recent_messages = ["msg1", "msg2"]
+        
+        mock_runtime = MagicMock()
+        mock_runtime.get_runtime_hours.return_value = 50.0
+        mock_runtime.get_last_reset.return_value = "2026-01-15T10:00:00Z"
+        mock_runtime.get_days_since_reset.return_value = 3
+        
+        mock_hass.data = {
+            "thermex_api": {
+                mock_config_entry.entry_id: {
+                    "hub": mock_hub,
+                    "runtime_manager": mock_runtime,
+                }
+            }
+        }
+        
+        result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
+        
+        assert "runtime_data" in result
+        assert result["runtime_data"]["runtime_hours"] == 50.0
+        assert result["runtime_data"]["last_reset"] == "2026-01-15T10:00:00Z"
+        assert result["runtime_data"]["days_since_reset"] == 3
+
+    @pytest.mark.asyncio
+    async def test_diagnostics_error_handling(self, mock_hass, mock_config_entry):
+        """Test diagnostics handles errors gracefully."""
+        mock_hass.data = {
+            "thermex_api": {
+                mock_config_entry.entry_id: None
+            }
+        }
+        
+        result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
+        
+        assert "error" in result
