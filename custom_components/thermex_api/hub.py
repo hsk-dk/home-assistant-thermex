@@ -52,7 +52,6 @@ class ThermexHub:
         self._heartbeat_interval = 30  # Send heartbeat every 30 seconds
         self._heartbeat_lock = asyncio.Lock()  # Prevent concurrent heartbeats
         self._last_heartbeat = 0.0  # Track last heartbeat time
-        self._connection_timeout = 60  # seconds
         self._connection_timeout = 120  # Consider connection dead after 2 minutes of no activity
         self._heartbeat_in_progress = False  # Prevent concurrent heartbeats
 
