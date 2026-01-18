@@ -50,7 +50,7 @@ def mock_config_entry():
     entry.entry_id = "test_entry_id"
     entry.data = {
         "host": "192.168.1.100",
-        "port": 20000,
+        "api_key": "test_api_key",
     }
     entry.options = {
         "fan_alert_hours": 100,
