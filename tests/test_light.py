@@ -180,17 +180,26 @@ class TestThermexDecoLight:
         assert decolight_entity.is_on == original_state
     @pytest.mark.asyncio
     async def test_light_async_added_to_hass(self, decolight_entity, mock_hass):
-        """Test deco light added to hass registers listeners."""
-        with patch('homeassistant.helpers.dispatcher.async_dispatcher_connect') as mock_connect:
-            await decolight_entity.async_added_to_hass()
-            assert mock_connect.call_count >= 1
+        """Test deco light added to hass connects dispatcher and schedules fallback."""
+        # Store the fallback timer handle so we can clean it up
+        await decolight_entity.async_added_to_hass()
+        
+        assert decolight_entity._unsub is not None
+        assert decolight_entity._got_initial_state is False
+        
+        # Clean up the fallback timer that was scheduled
+        await decolight_entity.async_will_remove_from_hass()
 
     @pytest.mark.asyncio
     async def test_decolight_async_added_to_hass(self, decolight_entity, mock_hass):
-        """Test deco light added to hass registers listeners."""
-        with patch('homeassistant.helpers.dispatcher.async_dispatcher_connect') as mock_connect:
-            await decolight_entity.async_added_to_hass()
-            assert mock_connect.call_count >= 1
+        """Test deco light creates necessary state on add."""
+        await decolight_entity.async_added_to_hass()
+        
+        assert decolight_entity._got_initial_state is False
+        assert decolight_entity._unsub is not None
+        
+        # Clean up the fallback timer
+        await decolight_entity.async_will_remove_from_hass()
 
     def test_light_handle_notify_preserves_brightness_on_off(self, decolight_entity):
         """Test deco light preserves brightness when turned off."""
@@ -245,11 +254,13 @@ class TestThermexDecoLight:
         assert "Decolight" in call_args[1]
         assert call_args[1]["Decolight"]["decolightonoff"] == 1
 
-    def test_light_min_max_mireds(self, decolight_entity):
-        """Test deco light has correct color temperature range."""
-        # DecoLight doesn't support color temp, so these shouldn't be set
-        assert not hasattr(decolight_entity, 'min_mireds')
-        assert not hasattr(decolight_entity, 'max_mireds')
+    def test_light_color_modes(self, decolight_entity):
+        """Test deco light supports HS color mode."""
+        # DecoLight supports HS color and brightness, not color temp
+        from homeassistant.components.light import ColorMode
+        assert ColorMode.HS in decolight_entity.supported_color_modes
+        assert ColorMode.BRIGHTNESS in decolight_entity.supported_color_modes
+        assert decolight_entity.color_mode == ColorMode.HS
 
     @pytest.mark.asyncio
     async def test_light_fallback_status_request(self, decolight_entity, mock_hub):

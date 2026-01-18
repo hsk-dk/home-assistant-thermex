@@ -171,15 +171,20 @@ class TestThermexFan:
     @pytest.mark.asyncio
     async def test_fan_start_delayed_off(self, fan_entity, mock_hass):
         """Test starting delayed off."""
-        mock_hass.loop.call_later = MagicMock(return_value=MagicMock())
-        
         # Fan must be running to start delayed off
         fan_entity._is_on = True
+        
+        # Mock schedule_update_ha_state to prevent entity platform errors
+        fan_entity.schedule_update_ha_state = MagicMock()
         
         await fan_entity.start_delayed_off()
         
         assert fan_entity._delayed_off_active is True
-        mock_hass.loop.call_later.assert_called()
+        assert fan_entity._delayed_off_handle is not None
+        
+        # Clean up timer
+        if fan_entity._delayed_off_handle:
+            fan_entity._delayed_off_handle.cancel()
 
     @pytest.mark.asyncio
     async def test_fan_cancel_delayed_off(self, fan_entity):
@@ -193,18 +198,19 @@ class TestThermexFan:
 
     def test_fan_update_countdown(self, fan_entity, mock_hass):
         """Test delayed off countdown updates."""
-        fan_entity._delayed_off_active = True
-        fan_entity._delayed_off_remaining = 120
-        mock_hass.loop.call_later = MagicMock(return_value=MagicMock())
-        
-        # Mock schedule_update_ha_state to avoid entity registration issues
+        # Mock schedule_update_ha_state to prevent actual state updates
         fan_entity.schedule_update_ha_state = MagicMock()
         
-        fan_entity._update_countdown()
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 30
         
-        # Should decrease remaining time
-        assert fan_entity._delayed_off_remaining < 120
-        fan_entity.schedule_update_ha_state.assert_called_once()
+        # Call _update_countdown which decrements remaining by 1 minute
+        fan_entity._update_countdown(None)
+        
+        assert fan_entity._delayed_off_remaining == 29
+        fan_entity.schedule_update_ha_state.assert_called()
+        
+        # Note: _update_countdown creates a new timer - in real usage cancel_delayed_off cleans it up
 
     def test_fan_extra_state_attributes_with_delayed_off(self, fan_entity):
         """Test extra state attributes include delayed off info."""
