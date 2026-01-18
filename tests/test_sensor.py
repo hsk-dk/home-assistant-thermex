@@ -88,6 +88,25 @@ class TestRuntimeHoursSensor:
         # Should cancel timer
         mock_timer.assert_called_once()
 
+    def test_sensor_schedule_update(self, runtime_sensor):
+        """Test sensor schedules periodic update."""
+        with patch('custom_components.thermex_api.sensor.async_call_later') as mock_call_later:
+            runtime_sensor._schedule_update()
+            
+            # Should schedule update in 30 seconds
+            mock_call_later.assert_called_once()
+            assert mock_call_later.call_args[0][1] == 30
+
+    @pytest.mark.asyncio
+    async def test_sensor_periodic_update(self, runtime_sensor):
+        """Test sensor periodic update callback."""
+        with patch.object(runtime_sensor, 'async_write_ha_state'):
+            with patch.object(runtime_sensor, '_schedule_update') as mock_schedule:
+                await runtime_sensor._periodic_update(None)
+                
+                # Should write state and reschedule
+                mock_schedule.assert_called_once()
+
 
 class TestLastResetSensor:
     """Test LastResetSensor entity."""
