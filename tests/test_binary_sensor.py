@@ -145,7 +145,7 @@ class TestThermexFilterAlert:
         filter_alert._runtime_manager.get_days_since_reset.return_value = 30
         filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
         
-        reason = filter_alert._get_alert_reason()
+        reason = filter_alert._get_trigger_reason(True, False, 30)
         
         assert "Runtime hours exceeded" in reason
         assert "Days since reset exceeded" not in reason
@@ -156,7 +156,7 @@ class TestThermexFilterAlert:
         filter_alert._runtime_manager.get_days_since_reset.return_value = 100
         filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
         
-        reason = filter_alert._get_alert_reason()
+        reason = filter_alert._get_trigger_reason(False, True, 100)
         
         assert "Days since reset exceeded" in reason
         assert "Runtime hours exceeded" not in reason
@@ -167,7 +167,7 @@ class TestThermexFilterAlert:
         filter_alert._runtime_manager.get_days_since_reset.return_value = 100
         filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
         
-        reason = filter_alert._get_alert_reason()
+        reason = filter_alert._get_trigger_reason(True, True, 100)
         
         assert "Runtime hours exceeded" in reason
         assert "Days since reset exceeded" in reason
@@ -178,6 +178,6 @@ class TestThermexFilterAlert:
         filter_alert._runtime_manager.get_days_since_reset.return_value = None
         filter_alert._options = {"fan_alert_hours": 100, "fan_alert_days": 90}
         
-        reason = filter_alert._get_alert_reason()
+        reason = filter_alert._get_trigger_reason(False, True, None)
         
         assert "No filter reset date recorded" in reason
