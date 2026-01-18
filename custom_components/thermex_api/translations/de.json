@@ -83,5 +83,19 @@
         "name": "Dekorlicht der Dunstabzugshaube"
       }
     }
+  },
+  "services": {
+    "reset_runtime": {
+      "name": "Filterlaufzeit zurücksetzen",
+      "description": "Setzt den Laufzeitzähler der Thermex-Dunstabzugshaube auf Null zurück."
+    },
+    "start_delayed_off": {
+      "name": "Verzögerte Abschaltung starten",
+      "description": "Startet den Timer für die verzögerte Abschaltung der Thermex-Dunstabzugshaube."
+    },
+    "cancel_delayed_off": {
+      "name": "Verzögerte Abschaltung abbrechen",
+      "description": "Bricht den Timer für die verzögerte Abschaltung der Thermex-Dunstabzugshaube ab."
+    }
   }
 }

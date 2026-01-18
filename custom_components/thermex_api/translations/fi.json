@@ -83,5 +83,19 @@
         "name": "Liesituulettimen koristevalo"
       }
     }
+  },
+  "services": {
+    "reset_runtime": {
+      "name": "Nollaa suodattimen käyttöaika",
+      "description": "Nollaa Thermex-liesituulettimen käyttöaikalaskuri."
+    },
+    "start_delayed_off": {
+      "name": "Käynnistä viivästetty sammutus",
+      "description": "Käynnistä viivästetyn sammutuksen ajastin Thermex-liesituulettimelle."
+    },
+    "cancel_delayed_off": {
+      "name": "Peruuta viivästetty sammutus",
+      "description": "Peruuta viivästetyn sammutuksen ajastin Thermex-liesituulettimelle."
+    }
   }
 }

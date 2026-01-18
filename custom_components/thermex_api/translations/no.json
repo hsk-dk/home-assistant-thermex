@@ -83,5 +83,19 @@
         "name": "Dekorlys i kjøkkenhette"
       }
     }
+  },
+  "services": {
+    "reset_runtime": {
+      "name": "Tilbakestill filter driftstid",
+      "description": "Tilbakestill driftstidstelleren for Thermex-hetten til null."
+    },
+    "start_delayed_off": {
+      "name": "Start forsinket avslåing",
+      "description": "Start timer for forsinket avslåing av Thermex-hetten."
+    },
+    "cancel_delayed_off": {
+      "name": "Avbryt forsinket avslåing",
+      "description": "Avbryt timer for forsinket avslåing av Thermex-hetten."
+    }
   }
 }

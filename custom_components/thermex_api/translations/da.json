@@ -39,9 +39,6 @@
       "thermex_sensor_runtime_hours": {
         "name": "Filter driftstimer siden sidste nulstilling"
       },
-      "thermex_sensor_filter_time": {
-        "name": "Filtertid"
-      },
       "thermex_sensor_connection_status": {
         "name": "Forbindelsesstatus"
       },
@@ -85,6 +82,20 @@
       "thermex_decolight": {
         "name": "Enhætte Decolys"
       }
+    }
+  },
+  "services": {
+    "reset_runtime": {
+      "name": "Nulstil filter driftstid",
+      "description": "Nulstil Thermex-emhættens driftstidstæller til nul."
+    },
+    "start_delayed_off": {
+      "name": "Start forsinket slukning",
+      "description": "Start forsinket slukning-timer for Thermex-emhætten."
+    },
+    "cancel_delayed_off": {
+      "name": "Annuller forsinket slukning",
+      "description": "Annuller forsinket slukning-timer for Thermex-emhætten."
     }
   }
 }

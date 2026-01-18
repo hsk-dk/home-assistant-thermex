@@ -83,5 +83,19 @@
         "name": "Hood Deco Light"
       }
     }
+  },
+  "services": {
+    "reset_runtime": {
+      "name": "Reset filter runtime",
+      "description": "Reset the Thermex fan's runtime counter to zero."
+    },
+    "start_delayed_off": {
+      "name": "Start delayed turn-off",
+      "description": "Start delayed turn-off timer for the Thermex fan."
+    },
+    "cancel_delayed_off": {
+      "name": "Cancel delayed turn-off",
+      "description": "Cancel delayed turn-off timer for the Thermex fan."
+    }
   }
 }

@@ -83,5 +83,19 @@
         "name": "Thermex Deco Light"
       }
     }
+  },
+  "services": {
+    "reset_runtime": {
+      "name": "Återställ filter driftstid",
+      "description": "Återställ Thermex-fläktens driftstidsräknare till noll."
+    },
+    "start_delayed_off": {
+      "name": "Starta fördröjd avstängning",
+      "description": "Starta timer för fördröjd avstängning av Thermex-fläkten."
+    },
+    "cancel_delayed_off": {
+      "name": "Avbryt fördröjd avstängning",
+      "description": "Avbryt timer för fördröjd avstängning av Thermex-fläkten."
+    }
   }
 }
