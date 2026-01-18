@@ -163,3 +163,15 @@ class TestDelayedTurnOffButton:
 
         runtime_manager.reset.assert_called_once()
         runtime_manager.save.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_delayed_button_press_service_error(self, mock_hub, mock_hass):
+        """Test delayed button handles service call errors gracefully."""
+        button = DelayedTurnOffButton(mock_hub, "test_entry_id")
+        button.hass = mock_hass
+        
+        # Mock service call to raise error
+        mock_hass.services.async_call = AsyncMock(side_effect=Exception("Service error"))
+        
+        # Should not raise exception
+        await button.async_press()

@@ -138,3 +138,46 @@ class TestThermexFilterAlert:
         
         # Should trigger based on runtime alone
         assert filter_alert.is_on is True
+
+    def test_sensor_alert_reason_hours_only(self, filter_alert):
+        """Test alert reason when only hours threshold exceeded."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 100.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 30
+        filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
+        
+        reason = filter_alert._get_alert_reason()
+        
+        assert "Runtime hours exceeded" in reason
+        assert "Days since reset exceeded" not in reason
+
+    def test_sensor_alert_reason_days_only(self, filter_alert):
+        """Test alert reason when only days threshold exceeded."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 10.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 100
+        filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
+        
+        reason = filter_alert._get_alert_reason()
+        
+        assert "Days since reset exceeded" in reason
+        assert "Runtime hours exceeded" not in reason
+
+    def test_sensor_alert_reason_both(self, filter_alert):
+        """Test alert reason when both thresholds exceeded."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 100.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 100
+        filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
+        
+        reason = filter_alert._get_alert_reason()
+        
+        assert "Runtime hours exceeded" in reason
+        assert "Days since reset exceeded" in reason
+
+    def test_sensor_alert_reason_no_reset_date(self, filter_alert):
+        """Test alert reason when no reset date recorded."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 50.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = None
+        filter_alert._options = {"fan_alert_hours": 100, "fan_alert_days": 90}
+        
+        reason = filter_alert._get_alert_reason()
+        
+        assert "No filter reset date recorded" in reason

@@ -282,6 +282,24 @@ class TestThermexDecoLight:
         # Test valid range
         assert decolight_entity._clamp_brightness(128) == 128
 
+    def test_light_process_fallback_no_light_data(self, decolight_entity):
+        """Test ThermexLight handles missing light data in fallback."""
+        # Create a ThermexLight instance
+        from custom_components.thermex_api.light import ThermexLight
+        light = ThermexLight(decolight_entity._hub)
+        light.hass = decolight_entity.hass
+        
+        # Call with empty dict
+        light._process_fallback_data({})
+        
+        # Should not crash, uses defaults
+
+    def test_decolight_process_fallback_data_empty(self, decolight_entity):
+        """Test DecoLight handles empty fallback data."""
+        decolight_entity._process_fallback_data({})
+        
+        # Should not crash, uses defaults
+
     def test_decolight_brightness_state(self, decolight_entity):
         """Test deco light brightness property."""
         decolight_entity._brightness = 128

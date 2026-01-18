@@ -320,3 +320,102 @@ class TestThermexFan:
             fan_entity.schedule_update_ha_state.assert_called()
             # Dispatcher called twice: once in async_turn_off, once in _handle_delayed_off
             assert mock_send.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_fan_start_delayed_off_service(self, fan_entity, mock_hub):
+        """Test start_delayed_off service method."""
+        fan_entity._is_on = True
+        fan_entity._entry.options = {"fan_auto_off_delay": 15}
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        with patch('custom_components.thermex_api.fan.async_call_later') as mock_call_later:
+            with patch('custom_components.thermex_api.fan.async_dispatcher_send') as mock_send:
+                await fan_entity.start_delayed_off()
+                
+                # Should set delayed off state
+                assert fan_entity._delayed_off_active is True
+                assert fan_entity._delayed_off_remaining == 15
+                assert fan_entity._delayed_off_scheduled_time is not None
+                
+                # Should schedule turn-off and countdown
+                assert mock_call_later.call_count == 2  # delayed off + countdown
+                mock_send.assert_called()
+                fan_entity.schedule_update_ha_state.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_start_delayed_off_when_not_running(self, fan_entity):
+        """Test start_delayed_off does nothing if fan is off."""
+        fan_entity._is_on = False
+        
+        await fan_entity.start_delayed_off()
+        
+        # Should not activate delayed off
+        assert fan_entity._delayed_off_active is False
+
+    @pytest.mark.asyncio
+    async def test_fan_start_delayed_off_cancels_existing(self, fan_entity, mock_hub):
+        """Test start_delayed_off cancels existing delayed off."""
+        fan_entity._is_on = True
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_handle = MagicMock()
+        fan_entity._entry.options = {"fan_auto_off_delay": 10}
+        
+        with patch('custom_components.thermex_api.fan.async_call_later'):
+            with patch('custom_components.thermex_api.fan.async_dispatcher_send'):
+                await fan_entity.start_delayed_off()
+                
+                # Should have cancelled old handle
+                fan_entity._delayed_off_handle.cancel.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_fallback_status_with_data(self, fan_entity, mock_hub):
+        """Test fan processes fallback status data."""
+        fan_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(return_value={
+            "Fan": {
+                "fanonoff": 1,
+                "fanspeed": 2
+            }
+        })
+        fan_entity.schedule_update_ha_state = MagicMock()
+        
+        await fan_entity._fallback_status(None)
+        
+        assert fan_entity._got_initial_state is True
+        assert fan_entity._is_on is True
+        assert fan_entity._preset_mode == "medium"
+
+    @pytest.mark.asyncio
+    async def test_fan_fallback_status_no_fan_data(self, fan_entity, mock_hub):
+        """Test fan handles fallback status with no fan data."""
+        fan_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(return_value={})
+        
+        await fan_entity._fallback_status(None)
+        
+        assert fan_entity._got_initial_state is True
+
+    @pytest.mark.asyncio
+    async def test_fan_fallback_status_error(self, fan_entity, mock_hub):
+        """Test fan handles fallback status error."""
+        fan_entity._got_initial_state = False
+        mock_hub.startup_complete = False
+        mock_hub.request_fallback_status = AsyncMock(side_effect=Exception("Test error"))
+        
+        await fan_entity._fallback_status(None)
+        
+        # Should mark as got state even on error
+        assert fan_entity._got_initial_state is True
+
+    @pytest.mark.asyncio
+    async def test_fan_fallback_status_startup_complete(self, fan_entity, mock_hub):
+        """Test fan fallback when startup is complete."""
+        fan_entity._got_initial_state = False
+        mock_hub.startup_complete = True
+        
+        await fan_entity._fallback_status(None)
+        
+        # Should mark as got state without requesting
+        assert fan_entity._got_initial_state is True
