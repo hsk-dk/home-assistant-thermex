@@ -1,6 +1,7 @@
 """Thermex Fan entity with discrete presets and persistent runtime tracking."""
 import logging
 from datetime import datetime, timedelta
+from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
@@ -22,7 +23,7 @@ _MODE_TO_VALUE = {"off": 0, "low": 1, "medium": 2, "high": 3, "boost": 4}
 _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
 
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up the Thermex fan with runtime storage."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
     hub = entry_data["hub"]
@@ -89,7 +90,7 @@ class ThermexFan(FanEntity):
         return self._preset_mode
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         # Get connection status from hub
         hub_data = self._hub.get_coordinator_data()
         
@@ -123,7 +124,7 @@ class ThermexFan(FanEntity):
         
         return attributes
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Called when entity is added to hass."""
         _LOGGER.info("ThermexFan entity added to hass: %s", self.entity_id)
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
@@ -329,13 +330,13 @@ class ThermexFan(FanEntity):
             {"active": False, "scheduled_time": None},
         )
 
-    async def async_will_remove_from_hass(self):
+    async def async_will_remove_from_hass(self) -> None:
         """Cancel any pending timers when entity is removed."""
         if self._unsub:
             self._unsub()
         await self.cancel_delayed_off()
 
-    async def _handle_auto_off(self, _now):
+    async def _handle_auto_off(self, _now) -> None:
         self._auto_off_handle = None
         _LOGGER.info("Auto turning off fan after timeout")
         await self.async_turn_off()

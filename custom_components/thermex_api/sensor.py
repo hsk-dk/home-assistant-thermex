@@ -7,6 +7,7 @@ Creates persistent sensors for:
 """
 import logging
 from datetime import datetime
+from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -153,7 +154,7 @@ class ConnectionStatusSensor(BaseRuntimeSensor):
             return connection_state
     
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return connection diagnostic information as attributes."""
         hub_data = self._hub.get_coordinator_data()
         
@@ -250,7 +251,7 @@ class DelayedTurnOffSensor(BaseRuntimeSensor):
         return None
         
     @property 
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional delayed turn-off information."""
         if hasattr(self.hass, 'data') and DOMAIN in self.hass.data:
             entry_data = self.hass.data[DOMAIN].get(self._entry_id)

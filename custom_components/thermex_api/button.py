@@ -12,7 +12,7 @@ from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up the Reset Runtime button for Thermex API."""
     #hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
     entry_data = hass.data[DOMAIN][entry.entry_id]

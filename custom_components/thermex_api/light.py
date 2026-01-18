@@ -74,6 +74,7 @@ class ThermexLight(LightEntity):
             self._unsub()
 
     def _handle_notify(self, ntf_type: str, data: dict) -> None:
+        """Handle light notifications from the hub."""
         if ntf_type.lower() != "light":
             _LOGGER.debug("ThermexLight received non-light notify: %s", data)
             return
@@ -192,6 +193,7 @@ class ThermexDecoLight(LightEntity):
             self._unsub()
 
     def _handle_notify(self, ntf_type: str, data: dict) -> None:
+        """Handle decolight notifications from the hub."""
         if ntf_type.lower() != "decolight":
             _LOGGER.debug("ThermexDecoLight received non-decolight notify: %s", data)
             return
