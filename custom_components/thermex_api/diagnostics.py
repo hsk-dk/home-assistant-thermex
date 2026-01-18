@@ -30,18 +30,17 @@ async def async_get_config_entry_diagnostics(
             return {"error": "Hub not found in entry data"}
 
         # Gather diagnostic info with safe attribute access
+        recv_task = getattr(hub, "_recv_task", None)
+        ws = getattr(hub, "_ws", None)
         diagnostics: dict[str, Any] = {
             "host": getattr(hub, "_host", "unknown"),
             "unique_id": getattr(hub, "unique_id", None),
             "connection_state": getattr(hub, "_connection_state", "unknown"),
             "pending_requests": list(hub._pending.keys()) if hasattr(hub, "_pending") else [],
-            "websocket_connected": bool(getattr(hub, "_ws", None) and not hub._ws.closed),
+            "websocket_connected": bool(ws and not ws.closed),
             "last_status": getattr(hub, "last_status", None),
             "has_session": bool(getattr(hub, "_session", None) is not None),
-            "has_recv_task": bool(
-                getattr(hub, "_recv_task", None) is not None 
-                and not hub._recv_task.done()
-            ),
+            "has_recv_task": bool(recv_task is not None and not recv_task.done()),
             "protocol_version": getattr(hub, "_protocol_version", "unknown"),
             "startup_complete": getattr(hub, "_startup_complete", False),
         }
