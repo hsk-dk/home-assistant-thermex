@@ -3,16 +3,14 @@
 import logging
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.storage import Store
-from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, RUNTIME_STORAGE_FILE
+from .const import DOMAIN, THERMEX_NOTIFY
 from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up the Reset Runtime button for Thermex API."""
     #hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
     entry_data = hass.data[DOMAIN][entry.entry_id]

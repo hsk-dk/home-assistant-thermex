@@ -1,18 +1,15 @@
 """Thermex Fan entity with discrete presets and persistent runtime tracking."""
 import logging
-from datetime import datetime, timedelta
+from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers import entity_platform
-from homeassistant.helpers.storage import Store
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.util.dt import utcnow
 from homeassistant.helpers.event import async_call_later
 
 from .hub import ThermexHub
-from .const import DOMAIN, THERMEX_NOTIFY, STORAGE_VERSION, RUNTIME_STORAGE_FILE
+from .const import DOMAIN, THERMEX_NOTIFY, FALLBACK_STATUS_TIMEOUT
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,9 +19,8 @@ _MODE_TO_VALUE = {"off": 0, "low": 1, "medium": 2, "high": 3, "boost": 4}
 _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
 
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up the Thermex fan with runtime storage."""
-    #hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
     entry_data = hass.data[DOMAIN][entry.entry_id]
     hub = entry_data["hub"]
     runtime_manager = entry_data["runtime_manager"]
@@ -47,39 +43,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
         "cancel_delayed_off",
         {},
         "cancel_delayed_off"
-    )
-    
-    # Also register as domain services for easier access
-    async def handle_start_delayed_off(call):
-        """Handle start delayed off service call."""
-        entity_id = call.data.get("entity_id")
-        if entity_id:
-            # Find the fan entity and call its method
-            if entity_id == fan_entity.entity_id:
-                await fan_entity.start_delayed_off()
-        else:
-            # No entity_id specified, call on our fan
-            await fan_entity.start_delayed_off()
-    
-    async def handle_cancel_delayed_off(call):
-        """Handle cancel delayed off service call."""
-        entity_id = call.data.get("entity_id")
-        if entity_id:
-            if entity_id == fan_entity.entity_id:
-                await fan_entity.cancel_delayed_off()
-        else:
-            await fan_entity.cancel_delayed_off()
-    
-    # Register the domain services
-    hass.services.async_register(
-        DOMAIN, 
-        "start_delayed_off_domain", 
-        handle_start_delayed_off
-    )
-    hass.services.async_register(
-        DOMAIN, 
-        "cancel_delayed_off_domain", 
-        handle_cancel_delayed_off
     )
 
 
@@ -123,7 +86,7 @@ class ThermexFan(FanEntity):
         return self._preset_mode
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         # Get connection status from hub
         hub_data = self._hub.get_coordinator_data()
         
@@ -157,13 +120,13 @@ class ThermexFan(FanEntity):
         
         return attributes
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Called when entity is added to hass."""
         _LOGGER.info("ThermexFan entity added to hass: %s", self.entity_id)
         self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("ThermexFan: awaiting initial notify for state")
         # Use a longer timeout and check if startup is complete
-        async_call_later(self.hass, 15, self._fallback_status)
+        async_call_later(self.hass, FALLBACK_STATUS_TIMEOUT, self._fallback_status)
 
     @callback
     def _handle_notify(self, ntf_type: str, data: dict) -> None:
@@ -257,7 +220,7 @@ class ThermexFan(FanEntity):
         self._delayed_off_remaining = delay_minutes
         
         # Calculate scheduled time
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         from homeassistant.util import dt as dt_util
         
         self._delayed_off_scheduled_time = dt_util.now() + timedelta(minutes=delay_minutes)
@@ -363,13 +326,13 @@ class ThermexFan(FanEntity):
             {"active": False, "scheduled_time": None},
         )
 
-    async def async_will_remove_from_hass(self):
+    async def async_will_remove_from_hass(self) -> None:
         """Cancel any pending timers when entity is removed."""
         if self._unsub:
             self._unsub()
         await self.cancel_delayed_off()
 
-    async def _handle_auto_off(self, _now):
+    async def _handle_auto_off(self, _now) -> None:
         self._auto_off_handle = None
         _LOGGER.info("Auto turning off fan after timeout")
         await self.async_turn_off()

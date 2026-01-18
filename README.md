@@ -106,6 +106,42 @@ logger:
     custom_components.thermex_api: debug
 ```
 
+---
+
+## Development
+
+### Running Tests
+
+This integration includes a comprehensive test suite with unit and integration tests.
+
+#### Install Test Dependencies
+```bash
+pip install -r requirements_test.txt
+```
+
+#### Run Tests
+```bash
+# Run all tests
+pytest
+
+# Run with coverage report
+pytest --cov --cov-report=html
+
+# Run specific test file
+pytest tests/test_runtime_manager.py
+```
+
+See [tests/README.md](tests/README.md) for detailed testing documentation.
+
+### CI/CD
+
+The project uses GitHub Actions for automated testing:
+- **Tests**: Run on every push and PR
+- **Coverage**: Automatic coverage reports on PRs
+- **Code Validation**: Ruff and mypy checks
+
+---
+
 ## Contributing
 
 Issues and feature requests are welcome! Please use the [GitHub Issues](https://github.com/hsk-dk/home-assistant-thermex/issues) page.

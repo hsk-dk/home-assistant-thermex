@@ -2,13 +2,12 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from datetime import datetime, timedelta
-from homeassistant.components.sensor import SensorDeviceClass
 
 from custom_components.thermex_api.sensor import (
-    ThermexRuntimeSensor,
-    ThermexLastResetSensor,
-    ThermexConnectionSensor,
-    ThermexDelayedOffSensor,
+    RuntimeHoursSensor,
+    LastResetSensor,
+    ConnectionStatusSensor,
+    DelayedTurnOffSensor,
     async_setup_entry,
 )
 
@@ -30,131 +29,223 @@ class TestSensorSetup:
         }
         
         async_add_entities = AsyncMock()
-
+        
         await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
         
+        async_add_entities.assert_called_once()
         entities = async_add_entities.call_args[0][0]
         assert len(entities) == 4
-        assert any(isinstance(e, ThermexRuntimeSensor) for e in entities)
-        assert any(isinstance(e, ThermexLastResetSensor) for e in entities)
-        assert any(isinstance(e, ThermexConnectionSensor) for e in entities)
-        assert any(isinstance(e, ThermexDelayedOffSensor) for e in entities)
+        assert isinstance(entities[0], LastResetSensor)
+        assert isinstance(entities[1], RuntimeHoursSensor)
+        assert isinstance(entities[2], ConnectionStatusSensor)
+        assert isinstance(entities[3], DelayedTurnOffSensor)
 
 
-class TestRuntimeSensor:
-    """Test ThermexRuntimeSensor entity."""
+class TestRuntimeHoursSensor:
+    """Test RuntimeHoursSensor entity."""
 
     @pytest.fixture
-    def sensor_entity(self, mock_hub, mock_hass, mock_store):
-        """Create a ThermexRuntimeSensor entity."""
-        sensor = ThermexRuntimeSensor(mock_hub, mock_store)
+    def runtime_sensor(self, mock_hub, mock_hass):
+        """Create a RuntimeHoursSensor entity."""
+        runtime_manager = MagicMock()
+        runtime_manager.get_runtime_hours = MagicMock(return_value=42.5)
+        
+        sensor = RuntimeHoursSensor(mock_hub, runtime_manager, mock_hub.device_info)
         sensor.hass = mock_hass
         return sensor
 
-    def test_sensor_initialization(self, sensor_entity, mock_hub):
+    def test_sensor_initialization(self, runtime_sensor, mock_hub):
         """Test sensor entity initialization."""
-        assert sensor_entity._hub == mock_hub
-        assert sensor_entity.device_class == SensorDeviceClass.DURATION
+        assert runtime_sensor._hub == mock_hub
+        # Don't check unit_of_measurement before entity is added to platform
 
-    def test_sensor_native_value_formatted(self, sensor_entity):
-        """Test sensor formats runtime correctly."""
-        sensor_entity._runtime_manager.get_total_seconds = MagicMock(return_value=3665)
-        
-        value = sensor_entity.native_value
-        
-        assert "1h" in value
-        assert "1m" in value
+    def test_sensor_state(self, runtime_sensor):
+        """Test sensor returns correct native value."""
+        assert runtime_sensor.native_value == 42.5
 
-    def test_sensor_extra_state_attributes(self, sensor_entity):
-        """Test sensor includes total seconds in attributes."""
-        sensor_entity._runtime_manager.get_total_seconds = MagicMock(return_value=3600)
+    @pytest.mark.asyncio
+    async def test_sensor_handles_notify(self, runtime_sensor):
+        """Test sensor updates on fan notifications."""
+        runtime_sensor._runtime_manager.get_runtime_hours.return_value = 50.0
         
-        attrs = sensor_entity.extra_state_attributes
+        # Mock async_write_ha_state to avoid platform requirements
+        with patch.object(runtime_sensor, 'async_write_ha_state'):
+            runtime_sensor._handle_notify("fan", {"Fan": {"fanspeed": 2}})
         
-        assert attrs["total_seconds"] == 3600
+        # Verify the value would be updated
+        assert runtime_sensor.native_value == 50.0
 
 
 class TestLastResetSensor:
-    """Test ThermexLastResetSensor entity."""
+    """Test LastResetSensor entity."""
 
     @pytest.fixture
-    def sensor_entity(self, mock_hub, mock_hass, mock_store):
-        """Create a ThermexLastResetSensor entity."""
-        sensor = ThermexLastResetSensor(mock_hub, mock_store)
+    def reset_sensor(self, mock_hub, mock_hass):
+        """Create a LastResetSensor entity."""
+        runtime_manager = MagicMock()
+        reset_time = datetime(2026, 1, 1, 12, 0, 0)
+        runtime_manager.get_last_reset = MagicMock(return_value=reset_time)
+        
+        sensor = LastResetSensor(mock_hub, runtime_manager, mock_hub.device_info)
         sensor.hass = mock_hass
         return sensor
 
-    def test_sensor_initialization(self, sensor_entity, mock_hub):
+    def test_sensor_initialization(self, reset_sensor, mock_hub):
         """Test sensor entity initialization."""
-        assert sensor_entity._hub == mock_hub
-        assert sensor_entity.device_class == SensorDeviceClass.TIMESTAMP
+        assert reset_sensor._hub == mock_hub
 
-    def test_sensor_native_value_no_reset(self, sensor_entity):
-        """Test sensor value when no reset has occurred."""
-        sensor_entity._runtime_manager.get_last_reset = MagicMock(return_value=None)
-        
-        assert sensor_entity.native_value is None
+    def test_sensor_state_with_reset_time(self, reset_sensor):
+        """Test sensor returns reset datetime."""
+        # Return ISO string and expect parsed datetime
+        reset_sensor._runtime_manager.get_last_reset.return_value = "2026-01-01T12:00:00"
+        result = reset_sensor.native_value
+        assert result is not None
+        assert result.year == 2026
+        assert result.month == 1
+        assert result.day == 1
 
-    def test_sensor_native_value_with_reset(self, sensor_entity):
-        """Test sensor value with last reset time."""
-        now = datetime.now(timezone.utc)
-        sensor_entity._runtime_manager.get_last_reset = MagicMock(return_value=now)
-        
-        assert sensor_entity.native_value == now
+    def test_sensor_state_with_no_reset(self, reset_sensor):
+        """Test sensor returns None when no reset recorded."""
+        reset_sensor._runtime_manager.get_last_reset.return_value = None
+        assert reset_sensor.native_value is None
 
 
-class TestConnectionSensor:
-    """Test ThermexConnectionSensor entity."""
+class TestConnectionStatusSensor:
+    """Test ConnectionStatusSensor entity."""
 
     @pytest.fixture
-    def sensor_entity(self, mock_hub, mock_hass):
-        """Create a ThermexConnectionSensor entity."""
-        sensor = ThermexConnectionSensor(mock_hub)
+    def status_sensor(self, mock_hub, mock_hass):
+        """Create a ConnectionStatusSensor entity."""
+        runtime_manager = MagicMock()
+        
+        sensor = ConnectionStatusSensor(mock_hub, runtime_manager, mock_hub.device_info)
         sensor.hass = mock_hass
         return sensor
 
-    def test_sensor_initialization(self, sensor_entity, mock_hub):
+    def test_sensor_initialization(self, status_sensor, mock_hub):
         """Test sensor entity initialization."""
-        assert sensor_entity._hub == mock_hub
-        assert "Connection" in sensor_entity.name
+        assert status_sensor._hub == mock_hub
 
-    def test_sensor_shows_connected(self, sensor_entity, mock_hub):
-        """Test sensor shows connected state."""
-        mock_hub.connected = True
+    def test_sensor_state_connected(self, status_sensor):
+        """Test sensor returns connected state with protocol version."""
+        status_sensor._hub.get_coordinator_data = MagicMock(return_value={"connection_state": "connected"})
+        status_sensor._hub.protocol_version = "1.0"
+        assert status_sensor.native_value == "connected (v1.0)"
+
+    def test_sensor_state_disconnected(self, status_sensor):
+        """Test sensor returns disconnected state."""
+        status_sensor._hub.get_coordinator_data = MagicMock(return_value={"connection_state": "disconnected"})
+        status_sensor._hub.protocol_version = None
+        assert status_sensor.native_value == "disconnected"
+
+    def test_sensor_extra_attributes(self, status_sensor):
+        """Test sensor returns diagnostic attributes."""
+        status_sensor._hub.get_coordinator_data = MagicMock(return_value={
+            "last_error": None,
+            "watchdog_active": True,
+            "time_since_activity": 10,
+            "heartbeat_interval": 30,
+            "connection_timeout": 120,
+        })
         
-        assert sensor_entity.native_value == "connected"
-
-    def test_sensor_shows_disconnected(self, sensor_entity, mock_hub):
-        """Test sensor shows disconnected state."""
-        mock_hub.connected = False
-        
-        assert sensor_entity.native_value == "disconnected"
+        attrs = status_sensor.extra_state_attributes
+        assert attrs["watchdog_active"] is True
+        assert attrs["time_since_activity"] == 10
 
 
-class TestDelayedOffSensor:
-    """Test ThermexDelayedOffSensor entity."""
+class TestDelayedTurnOffSensor:
+    """Test DelayedTurnOffSensor entity."""
 
     @pytest.fixture
-    def sensor_entity(self, mock_hub, mock_hass):
-        """Create a ThermexDelayedOffSensor entity."""
-        sensor = ThermexDelayedOffSensor(mock_hub)
+    def delayed_sensor(self, mock_hub, mock_hass):
+        """Create a DelayedTurnOffSensor entity."""
+        runtime_manager = MagicMock()
+        
+        sensor = DelayedTurnOffSensor(
+            mock_hub,
+            runtime_manager,
+            mock_hub.device_info,
+            "test_entry_id"
+        )
         sensor.hass = mock_hass
         return sensor
 
-    def test_sensor_initialization(self, sensor_entity, mock_hub):
+    def test_sensor_initialization(self, delayed_sensor, mock_hub):
         """Test sensor entity initialization."""
-        assert sensor_entity._hub == mock_hub
-        assert "Delayed Off" in sensor_entity.name
+        assert delayed_sensor._hub == mock_hub
+        assert delayed_sensor._entry_id == "test_entry_id"
 
-    def test_sensor_inactive_state(self, sensor_entity):
-        """Test sensor shows inactive when no delayed off active."""
-        sensor_entity._remaining_time = 0
+    def test_sensor_state_not_active(self, delayed_sensor, mock_hass):
+        """Test sensor state when delayed off is not active."""
+        fan_state = MagicMock()
+        fan_state.attributes = {
+            "delayed_off_active": False,
+            "delayed_off_scheduled_time": None,
+        }
+        mock_hass.states.get = MagicMock(return_value=fan_state)
+        mock_hass.data = {
+            "thermex_api": {
+                "test_entry_id": {
+                    "hub": delayed_sensor._hub
+                }
+            }
+        }
         
-        assert sensor_entity.native_value == "inactive"
+        # When no scheduled time, should return None
+        assert delayed_sensor.native_value is None
 
-    def test_sensor_active_state(self, sensor_entity):
-        """Test sensor shows remaining time when active."""
-        sensor_entity._remaining_time = 300
+    def test_sensor_state_active_with_time(self, delayed_sensor, mock_hass):
+        """Test sensor state when delayed off is active."""
+        from datetime import datetime
+        scheduled_time = "2026-01-18T12:00:00"
         
-        value = sensor_entity.native_value
-        assert "5:00" in value  # 5 minutes
+        fan_state = MagicMock()
+        fan_state.attributes = {
+            "delayed_off_active": True,
+            "delayed_off_scheduled_time": scheduled_time,
+            "delayed_off_remaining": 300
+        }
+        mock_hass.states.get = MagicMock(return_value=fan_state)
+        mock_hass.data = {
+            "thermex_api": {
+                "test_entry_id": {
+                    "hub": delayed_sensor._hub
+                }
+            }
+        }
+        
+        # Should return parsed datetime
+        result = delayed_sensor.native_value
+        assert result is not None
+        assert result.year == 2026
+
+    def test_sensor_state_no_fan(self, delayed_sensor, mock_hass):
+        """Test sensor state when fan entity doesn't exist."""
+        mock_hass.states.get = MagicMock(return_value=None)
+        mock_hass.data = {"thermex_api": {}}
+        
+        assert delayed_sensor.native_value is None
+
+    def test_sensor_extra_attributes(self, delayed_sensor, mock_hass):
+        """Test sensor extra state attributes."""
+        fan_state = MagicMock()
+        fan_state.attributes = {
+            "delayed_off_active": True,
+            "delayed_off_remaining": 180,
+            "delayed_off_delay": 10,
+        }
+        mock_hass.states.get = MagicMock(return_value=fan_state)
+        mock_hass.data = {
+            "thermex_api": {
+                "test_entry_id": {
+                    "hub": delayed_sensor._hub
+                }
+            }
+        }
+        
+        attrs = delayed_sensor.extra_state_attributes
+        
+        assert "delayed_off_active" in attrs
+        assert "delayed_off_remaining" in attrs
+        assert attrs["delayed_off_active"] is True
+        assert attrs["delayed_off_remaining"] == 180

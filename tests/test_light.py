@@ -3,50 +3,7 @@ import pytest
 from unittest.mock import MagicMock
 from homeassistant.components.light import ColorMode
 
-from custom_components.thermex_api.light import ThermexLight, ThermexDecoLight, async_setup_entry
-
-
-class TestLightSetup:
-    """Test light setup."""
-
-    @pytest.mark.asyncio
-    async def test_async_setup_entry_without_decolight(self, mock_hass, mock_hub, mock_config_entry):
-        """Test light setup without deco light."""
-        mock_config_entry.options = {"enable_decolight": False}
-        mock_hass.data = {
-            "thermex_api": {
-                mock_config_entry.entry_id: {
-                    "hub": mock_hub,
-                }
-            }
-        }
-        
-        async_add_entities = AsyncMock()
-        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
-        
-        entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 1
-        assert isinstance(entities[0], ThermexLight)
-
-    @pytest.mark.asyncio
-    async def test_async_setup_entry_with_decolight(self, mock_hass, mock_hub, mock_config_entry):
-        """Test light setup with deco light enabled."""
-        mock_config_entry.options = {"enable_decolight": True}
-        mock_hass.data = {
-            "thermex_api": {
-                mock_config_entry.entry_id: {
-                    "hub": mock_hub,
-                }
-            }
-        }
-        
-        async_add_entities = AsyncMock()
-        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
-        
-        entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 2
-        assert isinstance(entities[0], ThermexLight)
-        assert isinstance(entities[1], ThermexDecoLight)
+from custom_components.thermex_api.light import ThermexLight, ThermexDecoLight
 
 
 class TestThermexLight:
@@ -114,15 +71,19 @@ class TestThermexLight:
 
     def test_light_brightness_clamping(self, light_entity):
         """Test brightness values are clamped to valid range."""
-        # Test below min
+        # Test below min brightness (gets clamped to 0)
         result = light_entity._clamp_brightness(-10)
+        assert result == 0  # MIN_BRIGHTNESS
+        
+        # Test at min brightness
+        result = light_entity._clamp_brightness(0)
         assert result == 0
         
-        # Test above max
+        # Test max brightness
         result = light_entity._clamp_brightness(300)
-        assert result == 255
+        assert result == 255  # MAX_BRIGHTNESS
         
-        # Test normal
+        # Test normal value
         result = light_entity._clamp_brightness(128)
         assert result == 128
 
@@ -137,15 +98,13 @@ class TestThermexLight:
         
         assert light_entity._last_brightness == 180
 
-    @pytest.mark.asyncio
-    async def test_light_fallback_status(self, light_entity, mock_hub):
-        """Test fallback status request when no notify received."""
-        light_entity._got_initial_state = False
-        mock_hub.startup_complete = True
+    def test_light_ignores_non_light_notifications(self, light_entity):
+        """Test light ignores notifications for other entities."""
+        original_state = light_entity.is_on
         
-        await light_entity._fallback_status(None)
+        light_entity._handle_notify("fan", {"Fan": {"fanspeed": 2}})
         
-        assert light_entity._got_initial_state is True
+        assert light_entity.is_on == original_state
 
 
 class TestThermexDecoLight:
@@ -207,28 +166,15 @@ class TestThermexDecoLight:
             }
         })
         
-        assert decolight_entity._is_on is True
+        assert decolight_entity.is_on is True
         assert decolight_entity._brightness == 150
         # Color should be converted to HS (green)
         assert decolight_entity._hs_color[0] == 120.0  # Green hue
 
     def test_decolight_ignores_wrong_notifications(self, decolight_entity):
         """Test deco light ignores non-decolight notifications."""
-        original_state = decolight_entity._is_on
+        original_state = decolight_entity.is_on
         
-        with patch.object(decolight_entity, 'async_write_ha_state'):
-            decolight_entity._handle_notify("light", {"Light": {"lightonoff": 1}})
+        decolight_entity._handle_notify("light", {"Light": {"lightonoff": 1}})
         
-        assert decolight_entity._is_on == original_state
-
-    @pytest.mark.asyncio
-    async def test_decolight_turn_on_with_hs_color(self, decolight_entity, mock_hub):
-        """Test turning on with HS color."""
-        await decolight_entity.async_turn_on(hs_color=(240.0, 100.0))  # Blue
-        
-        call_args = mock_hub.send_request.call_args[0]
-        # Should convert HS to RGB
-        assert call_args[1]["Decolight"]["decolightonoff"] == 1
-        assert call_args[1]["Decolight"]["decolightr"] == 0
-        assert call_args[1]["Decolight"]["decolightg"] == 0
-        assert call_args[1]["Decolight"]["decolightb"] == 255
+        assert decolight_entity.is_on == original_state

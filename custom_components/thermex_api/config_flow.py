@@ -4,7 +4,6 @@ import logging
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .hub import ThermexHub

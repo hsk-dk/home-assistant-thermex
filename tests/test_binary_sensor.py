@@ -1,9 +1,11 @@
 """Tests for binary sensor entities."""
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
-from custom_components.thermex_api.binary_sensor import ThermexFilterAlertSensor, async_setup_entry
+from custom_components.thermex_api.binary_sensor import (
+    ThermexFilterAlert,
+    async_setup_entry,
+)
 
 
 class TestBinarySensorSetup:
@@ -23,63 +25,99 @@ class TestBinarySensorSetup:
         }
         
         async_add_entities = AsyncMock()
-
+        
         await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
         
+        async_add_entities.assert_called_once()
         entities = async_add_entities.call_args[0][0]
         assert len(entities) == 1
-        assert isinstance(entities[0], ThermexFilterAlertSensor)
+        assert isinstance(entities[0], ThermexFilterAlert)
 
 
-class TestFilterAlertSensor:
-    """Test ThermexFilterAlertSensor entity."""
+class TestThermexFilterAlert:
+    """Test ThermexFilterAlert binary sensor."""
 
     @pytest.fixture
-    def sensor_entity(self, mock_hub, mock_hass):
-        """Create a ThermexFilterAlertSensor entity."""
-        sensor = ThermexFilterAlertSensor(mock_hub)
+    def filter_alert(self, mock_hub, mock_hass):
+        """Create a ThermexFilterAlert entity."""
+        runtime_manager = MagicMock()
+        runtime_manager.get_runtime_hours = MagicMock(return_value=10.0)
+        runtime_manager.get_days_since_reset = MagicMock(return_value=5)
+        
+        options = {
+            "fan_alert_hours": 30,
+            "fan_alert_days": 90,
+        }
+        
+        sensor = ThermexFilterAlert(
+            mock_hub,
+            runtime_manager,
+            options,
+            mock_hub.device_info
+        )
         sensor.hass = mock_hass
         return sensor
 
-    def test_sensor_initialization(self, sensor_entity, mock_hub):
+    def test_sensor_initialization(self, filter_alert, mock_hub):
         """Test sensor entity initialization."""
-        assert sensor_entity._hub == mock_hub
-        assert sensor_entity._is_on is False
-        assert sensor_entity.device_class == BinarySensorDeviceClass.PROBLEM
+        assert filter_alert._hub == mock_hub
+        assert filter_alert._options["fan_alert_hours"] == 30
+        assert filter_alert._options["fan_alert_days"] == 90
 
-    def test_sensor_handle_notify_filter_on(self, sensor_entity):
-        """Test sensor updates when filter alert is on."""
-        with patch.object(sensor_entity, 'async_write_ha_state'):
-            sensor_entity._handle_notify("filteralert", {
-                "Filteralert": {"filteralert": 1}
-            })
-            
-            assert sensor_entity.is_on is True
-
-    def test_sensor_handle_notify_filter_off(self, sensor_entity):
-        """Test sensor updates when filter alert is off."""
-        sensor_entity._is_on = True
+    def test_sensor_not_triggered_below_thresholds(self, filter_alert):
+        """Test sensor is off when below both thresholds."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 10.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 5
         
-        with patch.object(sensor_entity, 'async_write_ha_state'):
-            sensor_entity._handle_notify("filteralert", {
-                "Filteralert": {"filteralert": 0}
-            })
-            
-            assert sensor_entity.is_on is False
+        assert filter_alert.is_on is False
 
-    def test_sensor_ignores_wrong_notifications(self, sensor_entity):
-        """Test sensor ignores non-filteralert notifications."""
-        original_state = sensor_entity._is_on
+    def test_sensor_triggered_by_hours_threshold(self, filter_alert):
+        """Test sensor is on when runtime hours exceed threshold."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 35.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 5
         
-        with patch.object(sensor_entity, 'async_write_ha_state'):
-            sensor_entity._handle_notify("fan", {"Fan": {"fanonoff": 1}})
+        assert filter_alert.is_on is True
+
+    def test_sensor_triggered_by_days_threshold(self, filter_alert):
+        """Test sensor is on when days since reset exceed threshold."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 10.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 95
         
-        assert sensor_entity._is_on == original_state
+        assert filter_alert.is_on is True
 
-    def test_sensor_unique_id(self, sensor_entity, mock_hub):
-        """Test sensor unique ID."""
-        assert sensor_entity.unique_id == f"{mock_hub.device_id}_filter_alert"
+    def test_sensor_triggered_by_both_thresholds(self, filter_alert):
+        """Test sensor is on when both thresholds exceeded."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 50.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 100
+        
+        assert filter_alert.is_on is True
 
-    def test_sensor_name(self, sensor_entity):
-        """Test sensor name."""
-        assert "Filter Alert" in sensor_entity.name
+    def test_sensor_with_no_reset_date_low_runtime(self, filter_alert):
+        """Test sensor behavior with no reset date and low runtime."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 2.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = None
+        
+        assert filter_alert.is_on is False
+
+    def test_sensor_with_no_reset_date_high_runtime(self, filter_alert):
+        """Test sensor behavior with no reset date and high runtime."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 10.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = None
+        
+        assert filter_alert.is_on is True
+
+    def test_sensor_extra_state_attributes(self, filter_alert):
+        """Test sensor returns correct extra state attributes."""
+        filter_alert._runtime_manager.get_runtime_hours.return_value = 20.0
+        filter_alert._runtime_manager.get_days_since_reset.return_value = 15
+        
+        attrs = filter_alert.extra_state_attributes
+        
+        assert "runtime_hours" in attrs
+        assert "days_since_reset" in attrs
+        assert "hours_threshold" in attrs
+        assert "days_threshold" in attrs
+        assert attrs["runtime_hours"] == 20.0
+        assert attrs["days_since_reset"] == 15
+        assert attrs["hours_threshold"] == 30
+        assert attrs["days_threshold"] == 90

@@ -1,17 +1,22 @@
 # custom_components/thermex_api/runtime_manager.py
 import logging
 from datetime import datetime
+from typing import Any
+
+from homeassistant.helpers.storage import Store
 from homeassistant.util.dt import utcnow, parse_datetime
 
 _LOGGER = logging.getLogger(__name__)
 
 class RuntimeManager:
-    def __init__(self, store, hub):
+    """Manages persistent runtime tracking for the Thermex fan."""
+    
+    def __init__(self, store: Store, hub: Any) -> None:
         self._store = store
         self._hub = hub
-        self._data = {}
+        self._data: dict[str, Any] = {}
 
-    async def load(self):
+    async def load(self) -> None:
         """Load runtime data from storage with validation."""
         try:
             data = await self._store.async_load()
@@ -77,13 +82,16 @@ class RuntimeManager:
             _LOGGER.error("Failed to load runtime data: %s. Starting fresh.", err)
             self._data = {}
 
-    async def save(self):
+    async def save(self) -> None:
+        """Save runtime data to persistent storage."""
         await self._store.async_save(self._data)
 
-    def start(self):
+    def start(self) -> None:
+        """Mark the start of a runtime session."""
         self._data["last_start"] = utcnow().timestamp()
 
-    def stop(self):
+    def stop(self) -> None:
+        """Mark the end of a runtime session and update total hours."""
         now = utcnow().timestamp()
         last_start = self._data.get("last_start")
         if last_start:
@@ -91,13 +99,14 @@ class RuntimeManager:
             self._data["runtime_hours"] = self._data.get("runtime_hours", 0.0) + run / 3600.0
             self._data["last_start"] = None
 
-    def reset(self):
+    def reset(self) -> None:
+        """Reset the runtime counter to zero."""
         _LOGGER.info("Thermex filter time counter has been reset to 0.")
         self._data["runtime_hours"] = 0.0
         self._data["last_reset"] = utcnow().isoformat()
         self._data["last_start"] = None
 
-    def get_runtime_hours(self):
+    def get_runtime_hours(self) -> float:
         """Get total runtime hours, including current session if fan is running."""
         total_hours = self._data.get("runtime_hours", 0.0)
         
@@ -109,10 +118,11 @@ class RuntimeManager:
             
         return round(total_hours, 2)
 
-    def get_last_reset(self):
+    def get_last_reset(self) -> str | None:
+        """Get the ISO timestamp of the last reset."""
         return self._data.get("last_reset")
 
-    def get_days_since_reset(self):
+    def get_days_since_reset(self) -> int | None:
         """Get number of days since last filter reset."""
         last_reset = self._data.get("last_reset")
         if not last_reset:
@@ -132,12 +142,15 @@ class RuntimeManager:
             _LOGGER.warning("Error calculating days since reset: %s", e)
             return None
 
-    def get_filter_time(self):
+    def get_filter_time(self) -> float:
+        """Get filter time (alias for runtime hours)."""
         # For clarity: filter time is always runtime hours
         return self.get_runtime_hours()
     
-    def get_last_preset(self):
+    def get_last_preset(self) -> str:
+        """Get the last preset mode used."""
         return self._data.get("last_preset", "off")
 
-    def set_last_preset(self, mode):
+    def set_last_preset(self, mode: str) -> None:
+        """Set the last preset mode."""
         self._data["last_preset"] = mode
