@@ -178,3 +178,97 @@ class TestThermexDecoLight:
         decolight_entity._handle_notify("light", {"Light": {"lightonoff": 1}})
         
         assert decolight_entity.is_on == original_state
+    @pytest.mark.asyncio
+    async def test_light_async_added_to_hass(self, light_entity, mock_hass):
+        """Test light added to hass registers listeners."""
+        with patch('homeassistant.helpers.dispatcher.async_dispatcher_connect') as mock_connect:
+            await light_entity.async_added_to_hass()
+            assert mock_connect.call_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_decolight_async_added_to_hass(self, decolight_entity, mock_hass):
+        """Test deco light added to hass registers listeners."""
+        with patch('homeassistant.helpers.dispatcher.async_dispatcher_connect') as mock_connect:
+            await decolight_entity.async_added_to_hass()
+            assert mock_connect.call_count >= 1
+
+    def test_light_handle_notify_preserves_brightness_on_off(self, light_entity):
+        """Test light preserves brightness when turned off."""
+        light_entity._brightness = 200
+        
+        light_entity._handle_notify("light", {
+            "Light": {
+                "lightonoff": 0,
+                "lightbrightness": 200,
+            }
+        })
+        
+        assert light_entity._is_on is False
+        assert light_entity._brightness == 200
+
+    @pytest.mark.asyncio
+    async def test_light_turn_on_uses_last_brightness(self, light_entity, mock_hub):
+        """Test light uses last brightness when turning on."""
+        light_entity._last_brightness = 150
+        
+        await light_entity.async_turn_on()
+        
+        call_args = mock_hub.send_request.call_args[0]
+        assert call_args[1]["Light"]["lightbrightness"] == 150
+
+    def test_decolight_rgb_to_hs_conversion(self, decolight_entity):
+        """Test RGB to HS color conversion."""
+        # Test red
+        decolight_entity._handle_notify("decolight", {
+            "Decolight": {
+                "decolightonoff": 1,
+                "decolightbrightness": 255,
+                "decolightr": 255,
+                "decolightg": 0,
+                "decolightb": 0,
+            }
+        })
+        
+        assert decolight_entity._hs_color[0] == 0.0  # Red hue
+
+    def test_decolight_brightness_state(self, decolight_entity):
+        """Test deco light brightness property."""
+        decolight_entity._brightness = 128
+        assert decolight_entity.brightness == 128
+
+    @pytest.mark.asyncio
+    async def test_decolight_turn_on_default_color(self, decolight_entity, mock_hub):
+        """Test deco light turns on with default color."""
+        await decolight_entity.async_turn_on()
+        
+        call_args = mock_hub.send_request.call_args[0]
+        assert "Decolight" in call_args[1]
+        assert call_args[1]["Decolight"]["decolightonoff"] == 1
+
+    def test_light_min_max_mireds(self, light_entity):
+        """Test light has correct color temperature range."""
+        # ThermexLight doesn't support color temp, so these shouldn't be set
+        assert not hasattr(light_entity, 'min_mireds')
+        assert not hasattr(light_entity, 'max_mireds')
+
+    @pytest.mark.asyncio
+    async def test_light_fallback_status_request(self, light_entity, mock_hub):
+        """Test light requests fallback status."""
+        light_entity._got_initial_state = False
+        mock_hub.startup_complete = True
+        mock_hub.request_fallback_status = AsyncMock()
+        
+        await light_entity._fallback_status(None)
+        
+        assert light_entity._got_initial_state is True
+
+    @pytest.mark.asyncio  
+    async def test_decolight_fallback_status_request(self, decolight_entity, mock_hub):
+        """Test deco light requests fallback status."""
+        decolight_entity._got_initial_state = False
+        mock_hub.startup_complete = True
+        mock_hub.request_fallback_status = AsyncMock()
+        
+        await decolight_entity._fallback_status(None)
+        
+        assert decolight_entity._got_initial_state is True

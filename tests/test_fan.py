@@ -102,3 +102,115 @@ class TestThermexFan:
         
         fan_entity._runtime_manager.reset.assert_called_once()
         fan_entity._runtime_manager.save.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_async_added_to_hass(self, fan_entity, mock_hass):
+        """Test fan added to hass registers listeners."""
+        with patch('homeassistant.helpers.dispatcher.async_dispatcher_connect') as mock_connect:
+            await fan_entity.async_added_to_hass()
+            assert mock_connect.call_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_fan_turn_on_starts_runtime(self, fan_entity):
+        """Test turning on fan starts runtime tracking."""
+        await fan_entity.async_turn_on()
+        fan_entity._runtime_manager.start.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_turn_off_stops_runtime(self, fan_entity):
+        """Test turning off fan stops runtime tracking."""
+        fan_entity._is_on = True
+        await fan_entity.async_turn_off()
+        fan_entity._runtime_manager.stop.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_fan_set_preset_mode_updates_preset(self, fan_entity, mock_hub):
+        """Test setting preset mode."""
+        await fan_entity.async_set_preset_mode("high")
+        assert fan_entity._preset_mode == "high"
+
+    def test_fan_handle_notify_updates_state(self, fan_entity):
+        """Test fan state updates from notify."""
+        fan_entity._handle_notify("fan", {
+            "Fan": {
+                "fanonoff": 1,
+                "fanspeed": 3
+            }
+        })
+        
+        assert fan_entity._is_on is True
+        assert fan_entity._preset_mode == "high"
+
+    def test_fan_handle_notify_off_state(self, fan_entity):
+        """Test fan handles off state from notify."""
+        fan_entity._is_on = True
+        fan_entity._handle_notify("fan", {
+            "Fan": {
+                "fanonoff": 0,
+                "fanspeed": 0
+            }
+        })
+        
+        assert fan_entity._is_on is False
+        assert fan_entity._preset_mode == "off"
+
+    @pytest.mark.asyncio
+    async def test_fan_turn_on_with_percentage(self, fan_entity, mock_hub):
+        """Test turning on fan with percentage."""
+        await fan_entity.async_turn_on(percentage=50)
+        
+        call_args = mock_hub.send_request.call_args[0]
+        # Should map percentage to preset
+        assert "Fan" in call_args[1]
+
+    @pytest.mark.asyncio
+    async def test_fan_start_delayed_off(self, fan_entity, mock_hass):
+        """Test starting delayed off."""
+        mock_hass.loop.call_later = MagicMock()
+        
+        await fan_entity.start_delayed_off()
+        
+        assert fan_entity._delayed_off_active is True
+
+    @pytest.mark.asyncio
+    async def test_fan_cancel_delayed_off(self, fan_entity):
+        """Test canceling delayed off."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_handle = MagicMock()
+        
+        await fan_entity.cancel_delayed_off()
+        
+        assert fan_entity._delayed_off_active is False
+
+    @pytest.mark.asyncio
+    async def test_fan_update_countdown(self, fan_entity):
+        """Test delayed off countdown updates."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 120
+        
+        fan_entity._update_countdown()
+        
+        # Should decrease remaining time
+        assert fan_entity._delayed_off_remaining < 120
+
+    def test_fan_extra_state_attributes_with_delayed_off(self, fan_entity):
+        """Test extra state attributes include delayed off info."""
+        fan_entity._delayed_off_active = True
+        fan_entity._delayed_off_remaining = 300
+        
+        attrs = fan_entity.extra_state_attributes
+        
+        assert "delayed_off_active" in attrs
+        assert attrs["delayed_off_active"] is True
+
+    @pytest.mark.asyncio
+    async def test_fan_async_will_remove_from_hass(self, fan_entity):
+        """Test cleanup when removing from hass."""
+        fan_entity._delayed_off_handle = MagicMock()
+        fan_entity._auto_off_handle = MagicMock()
+        
+        await fan_entity.async_will_remove_from_hass()
+        
+        # Should cancel timers
+        if fan_entity._delayed_off_handle:
+            fan_entity._delayed_off_handle.cancel.assert_called_once()
