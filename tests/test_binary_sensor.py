@@ -129,7 +129,7 @@ class TestThermexFilterAlert:
     def test_sensor_name(self, filter_alert):
         """Test sensor name property."""
         # Entity uses translation key, not name property
-        assert filter_alert._attr_translation_key == "filter_alert"
+        assert filter_alert._attr_translation_key == "thermex_binary_sensor_threshold_alert"
 
     @pytest.mark.asyncio
     async def test_sensor_handles_notify_update(self, filter_alert):

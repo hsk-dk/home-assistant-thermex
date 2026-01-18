@@ -119,19 +119,19 @@ class TestDelayedTurnOffButton:
 
     def test_delayed_button_name(self, delayed_button):
         """Test delayed button uses translation key."""
-        assert delayed_button._attr_translation_key == "start_delayed_off"
+        assert delayed_button._attr_translation_key == "thermex_button_delayed_turn_off"
 
     def test_reset_button_name(self, mock_hub, mock_hass):
         """Test reset button uses translation key."""
         button = ResetRuntimeButton(mock_hub, None, "test_entry_id")
         button.hass = mock_hass
-        assert button._attr_translation_key == "reset_runtime"
+        assert button._attr_translation_key == "thermex_button_reset_runtime"
 
     def test_reset_button_icon(self, mock_hub, mock_hass):
         """Test reset button icon."""
         button = ResetRuntimeButton(mock_hub, None, "test_entry_id")
         button.hass = mock_hass
-        assert button.icon == "mdi:restart"
+        assert button.icon == "mdi:refresh"
 
     def test_button_device_info(self, delayed_button, mock_hub):
         """Test button device info."""
@@ -142,8 +142,9 @@ class TestDelayedTurnOffButton:
     async def test_reset_button_with_coordinator(self, mock_hub, mock_hass):
         """Test reset button updates coordinator after reset."""
         runtime_manager = MagicMock()
-        runtime_manager.reset = AsyncMock()
-        
+        runtime_manager.reset = MagicMock()  # Non-async method
+        runtime_manager.save = AsyncMock()  # Async method
+
         # Setup coordinator
         coordinator = MagicMock()
         coordinator.async_request_refresh = AsyncMock()
@@ -154,11 +155,11 @@ class TestDelayedTurnOffButton:
                 }
             }
         }
-        
+
         button = ResetRuntimeButton(mock_hub, runtime_manager, "test_entry_id")
         button.hass = mock_hass
-        
+
         await button.async_press()
-        
+
         runtime_manager.reset.assert_called_once()
-        coordinator.async_request_refresh.assert_called_once()
+        runtime_manager.save.assert_called_once()

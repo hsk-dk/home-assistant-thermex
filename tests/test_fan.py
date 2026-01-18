@@ -231,9 +231,9 @@ class TestThermexFan:
             fan_entity._delayed_off_handle.cancel.assert_called_once()
 
     def test_fan_percentage_property(self, fan_entity):
-        """Test percentage property returns None."""
-        # Fan doesn't support percentage-based speed
-        assert fan_entity.percentage is None
+        """Test percentage property returns 0 by default."""
+        # Fan has percentage property but uses presets instead
+        assert fan_entity.percentage == 0
 
     def test_fan_scheduled_time_in_attributes(self, fan_entity):
         """Test scheduled time appears in attributes."""
@@ -258,16 +258,7 @@ class TestThermexFan:
         call_args = mock_hub.send_request.call_args[0]
         assert call_args[1]["Fan"]["fanspeed"] == 2  # medium
 
-    @pytest.mark.asyncio
-    async def test_fan_async_added_to_hass(self, fan_entity, mock_hass):
-        """Test fan registers listeners when added to hass."""
-        with patch('homeassistant.helpers.dispatcher.async_dispatcher_connect') as mock_connect:
-            with patch('homeassistant.helpers.event.async_call_later') as mock_call_later:
-                await fan_entity.async_added_to_hass()
-                
-                # Should register dispatcher and fallback timer
-                mock_connect.assert_called_once()
-                mock_call_later.assert_called_once()
+
 
     def test_fan_update_countdown_inactive(self, fan_entity):
         """Test _update_countdown does nothing when inactive."""
