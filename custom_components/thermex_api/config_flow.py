@@ -15,8 +15,13 @@ STEP_USER_DATA_SCHEMA = vol.Schema({
     vol.Required("api_key"): str,
 })
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class ConfigFlow(config_entries.ConfigFlow):
     VERSION = 1
+    DOMAIN = DOMAIN
+    
+    @staticmethod
+    def async_get_options_flow(config_entry):
+        return OptionsFlowHandler(config_entry)
 
     async def async_step_user(self, user_input=None):
         if user_input is None:

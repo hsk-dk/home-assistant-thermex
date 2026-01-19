@@ -225,7 +225,8 @@ class ThermexFan(FanEntity):
         
         self._delayed_off_scheduled_time = dt_util.now() + timedelta(minutes=delay_minutes)
 
-        _LOGGER.info("Starting delayed turn-off: %d minutes (until %s)", delay_minutes, self._delayed_off_scheduled_time.strftime("%H:%M"))
+        scheduled_time_str = self._delayed_off_scheduled_time.strftime("%H:%M") if self._delayed_off_scheduled_time else "unknown"
+        _LOGGER.info("Starting delayed turn-off: %d minutes (until %s)", delay_minutes, scheduled_time_str)
         _LOGGER.debug("Delayed turn-off details: active=%s, remaining=%d, handle=%s", self._delayed_off_active, self._delayed_off_remaining, self._delayed_off_handle is not None)
         
         # Schedule the turn-off
@@ -242,13 +243,14 @@ class ThermexFan(FanEntity):
         
         # Notify other entities about delayed turn-off activation
         from .const import THERMEX_NOTIFY
+        scheduled_iso = self._delayed_off_scheduled_time.isoformat() if self._delayed_off_scheduled_time else None
         async_dispatcher_send(
             self.hass,
             THERMEX_NOTIFY,
             "delayed_turn_off",
             {
                 "active": True, 
-                "scheduled_time": self._delayed_off_scheduled_time.isoformat(),
+                "scheduled_time": scheduled_iso,
                 "remaining": delay_minutes
             },
         )
@@ -259,7 +261,7 @@ class ThermexFan(FanEntity):
             self.hass,
             THERMEX_NOTIFY,
             "delayed_turn_off",
-            {"active": True, "scheduled_time": self._delayed_off_scheduled_time.isoformat()},
+            {"active": True, "scheduled_time": scheduled_iso},
         )
 
     async def cancel_delayed_off(self) -> None:

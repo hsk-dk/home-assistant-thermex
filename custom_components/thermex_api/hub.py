@@ -43,11 +43,12 @@ class ThermexHub:
         self._recv_task: asyncio.Task | None = None
         self._session: aiohttp.ClientSession | None = None
         self._protocol_version: str | None = None
+        self.runtime_manager: Any = None  # Set later in __init__.py
 
         self._connection_state: str = "disconnected"
         self.last_status: dict | None = None
         self.last_error: str | None = None
-        self.recent_messages = collections.deque(maxlen=10)
+        self.recent_messages: collections.deque = collections.deque(maxlen=10)
         self._startup_complete: bool = False
 
         self._reconnect_lock = asyncio.Lock()
@@ -322,6 +323,7 @@ class ThermexHub:
             except Exception as err:
                 _LOGGER.error("ThermexHub: Watchdog loop error: %s", err)
                 await asyncio.sleep(5)  # Wait before retrying
+        return
 
     async def send_request(self, request: str, body: Dict[str, Any]) -> Dict[str, Any]:
         """Send a JSON-RPC request and wait for its matching response, with one retry and reconnect on repeated timeout."""
@@ -346,7 +348,7 @@ class ThermexHub:
 
         # Map to actual RPC request name
         req_type = _REQUEST_MAP.get(key, request)
-        payload = {"Request": req_type}
+        payload: Dict[str, Any] = {"Request": req_type}
         if req_type not in ("Status", "ProtocolVersion"):
             payload["Data"] = body
 
