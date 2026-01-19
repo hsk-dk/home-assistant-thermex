@@ -73,7 +73,7 @@ class TestBrightnessConversion:
         """Test conversion doesn't clamp high values (API should enforce limits)."""
         # Note: We don't clamp in _to_ha_brightness since API should never send >100
         # But mathematically the conversion still works
-        assert _to_ha_brightness(110) == 281  # 110/100*255 = 280.5 -> 281
+        assert _to_ha_brightness(110) == 280  # 110/100*255 = 280.5 -> 280 (banker's rounding)
 
     def test_to_ha_brightness_zero(self):
         """Test conversion of API brightness 0 (technically invalid but handle gracefully)."""

@@ -36,7 +36,8 @@ class TestThermexLight:
         call_args = mock_hub.send_request.call_args[0]
         assert call_args[0] == "Update"
         assert call_args[1]["Light"]["lightonoff"] == 1
-        assert call_args[1]["Light"]["lightbrightness"] == 204
+        # 204 HA brightness -> 80% API brightness
+        assert call_args[1]["Light"]["lightbrightness"] == 80
 
     @pytest.mark.asyncio
     async def test_light_turn_on_with_brightness(self, light_entity, mock_hub):
@@ -44,7 +45,8 @@ class TestThermexLight:
         await light_entity.async_turn_on(brightness=128)
         
         call_args = mock_hub.send_request.call_args[0]
-        assert call_args[1]["Light"]["lightbrightness"] == 128
+        # 128 HA brightness -> 50% API brightness
+        assert call_args[1]["Light"]["lightbrightness"] == 50
 
     @pytest.mark.asyncio
     async def test_light_turn_off(self, light_entity, mock_hub):
@@ -159,7 +161,7 @@ class TestThermexDecoLight:
         decolight_entity._handle_notify("decolight", {
             "Decolight": {
                 "decolightonoff": 1,
-                "decolightbrightness": 150,
+                "decolightbrightness": 100,  # API sends 100% = max
                 "decolightr": 0,
                 "decolightg": 255,
                 "decolightb": 0,
@@ -167,7 +169,8 @@ class TestThermexDecoLight:
         })
         
         assert decolight_entity.is_on is True
-        assert decolight_entity._brightness == 150
+        # 100% API brightness -> 255 HA brightness
+        assert decolight_entity._brightness == 255
         # Color should be converted to HS (green)
         assert decolight_entity._hs_color[0] == 120.0  # Green hue
 
@@ -198,17 +201,18 @@ class TestThermexDecoLight:
 
     def test_light_handle_notify_preserves_brightness_on_off(self, decolight_entity):
         """Test deco light preserves brightness when turned off."""
-        decolight_entity._brightness = 200
+        decolight_entity._brightness = 255  # Start with HA brightness
         
         decolight_entity._handle_notify("decolight", {
             "Decolight": {
                 "decolightonoff": 0,
-                "decolightbrightness": 200,
+                "decolightbrightness": 100,  # API sends 100%
             }
         })
         
         assert decolight_entity._is_on is False
-        assert decolight_entity._brightness == 200
+        # 100% API brightness -> 255 HA brightness
+        assert decolight_entity._brightness == 255
 
     @pytest.mark.asyncio
     async def test_light_turn_on_uses_last_brightness(self, decolight_entity, mock_hub):
@@ -381,7 +385,7 @@ class TestThermexDecoLight:
         mock_hub.request_fallback_status = AsyncMock(return_value={
             "Decolight": {
                 "decolightonoff": 1,
-                "decolightbrightness": 200,
+                "decolightbrightness": 100,  # API sends 100%
                 "decolightr": 255,
                 "decolightg": 0,
                 "decolightb": 0
@@ -393,7 +397,8 @@ class TestThermexDecoLight:
         
         assert decolight_entity._got_initial_state is True
         assert decolight_entity._is_on is True
-        assert decolight_entity._brightness == 200
+        # 100% API brightness -> 255 HA brightness
+        assert decolight_entity._brightness == 255
         assert decolight_entity._hs_color[0] == 0.0  # Red
         decolight_entity.schedule_update_ha_state.assert_called_once()
 
