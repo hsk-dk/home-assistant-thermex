@@ -99,7 +99,7 @@ class DelayedTurnOffButton(ButtonEntity):
             _LOGGER.info("Calling start_delayed_off entity service for: %s", fan_entity_id)
             
             await self.hass.services.async_call(
-                "fan",
+                DOMAIN,  # thermex_api domain, not fan
                 "start_delayed_off",
                 {"entity_id": fan_entity_id},
                 blocking=False
