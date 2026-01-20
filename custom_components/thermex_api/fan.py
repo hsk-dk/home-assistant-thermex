@@ -53,8 +53,10 @@ class ThermexFan(FanEntity):
         FanEntityFeature.PRESET_MODE
         | FanEntityFeature.TURN_ON
         | FanEntityFeature.TURN_OFF
+        | FanEntityFeature.SET_SPEED  # Enable percentage control
     )
     _attr_preset_modes = PRESET_MODES
+    _attr_speed_count = 4  # 4 speeds: low(25%), medium(50%), high(75%), boost(100%)
 
     def __init__(self, hub: ThermexHub, runtime_manager: RuntimeManager, entry):
         self._hub = hub
@@ -84,6 +86,22 @@ class ThermexFan(FanEntity):
     @property
     def preset_mode(self) -> str | None:
         return self._preset_mode
+
+    @property
+    def percentage(self) -> int | None:
+        """Return the current speed percentage."""
+        if not self._is_on or self._preset_mode == "off":
+            return 0
+        # Map preset modes to percentage:
+        # low=25%, medium=50%, high=75%, boost=100%
+        percentage_map = {
+            "off": 0,
+            "low": 25,
+            "medium": 50,
+            "high": 75,
+            "boost": 100,
+        }
+        return percentage_map.get(self._preset_mode, 0)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -168,21 +186,65 @@ class ThermexFan(FanEntity):
         speed = _MODE_TO_VALUE[preset_mode]
         await self._hub.send_request("Update", {"Fan": {"fanonoff": int(speed > 0), "fanspeed": speed}})
 
-    async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs) -> None:
-        if preset_mode:
-            mode = preset_mode
-        elif self._preset_mode and self._preset_mode != "off":
-            mode = self._preset_mode
+    async def async_set_percentage(self, percentage: int) -> None:
+        """Set the fan speed by percentage, mapping to discrete preset modes."""
+        if percentage == 0:
+            await self.async_turn_off()
+            return
+        
+        # Map percentage ranges to preset modes:
+        # 1-25%   -> low
+        # 26-50%  -> medium
+        # 51-75%  -> high
+        # 76-100% -> boost
+        if percentage <= 25:
+            preset = "low"
+        elif percentage <= 50:
+            preset = "medium"
+        elif percentage <= 75:
+            preset = "high"
         else:
-            mode = "medium"
-
-        await self.async_set_preset_mode(mode)
+            preset = "boost"
+        
+        await self.async_set_preset_mode(preset)
         self._runtime_manager.start()
-        self._runtime_manager.set_last_preset(mode)
+        self._runtime_manager.set_last_preset(preset)
         await self._runtime_manager.save()
         self._is_on = True
-        self._preset_mode = mode
+        self._preset_mode = preset
         self.schedule_update_ha_state()
+
+    async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs) -> None:
+        if percentage is not None:
+            # Use percentage control
+            await self.async_set_percentage(percentage)
+        elif preset_mode:
+            mode = preset_mode
+            await self.async_set_preset_mode(mode)
+            self._runtime_manager.start()
+            self._runtime_manager.set_last_preset(mode)
+            await self._runtime_manager.save()
+            self._is_on = True
+            self._preset_mode = mode
+            self.schedule_update_ha_state()
+        elif self._preset_mode and self._preset_mode != "off":
+            mode = self._preset_mode
+            await self.async_set_preset_mode(mode)
+            self._runtime_manager.start()
+            self._runtime_manager.set_last_preset(mode)
+            await self._runtime_manager.save()
+            self._is_on = True
+            self._preset_mode = mode
+            self.schedule_update_ha_state()
+        else:
+            mode = "medium"
+            await self.async_set_preset_mode(mode)
+            self._runtime_manager.start()
+            self._runtime_manager.set_last_preset(mode)
+            await self._runtime_manager.save()
+            self._is_on = True
+            self._preset_mode = mode
+            self.schedule_update_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
         await self.cancel_delayed_off()  # Cancel any delayed turn-off

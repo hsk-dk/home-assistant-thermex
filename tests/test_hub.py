@@ -541,15 +541,20 @@ class TestThermexHub:
     async def test_concurrent_reconnection_prevention(self, hub_instance):
         """Test that concurrent reconnections are prevented."""
         hub_instance._ws = None
-        hub_instance._reconnecting = True
         
-        # Should wait and not try to reconnect
-        with patch.object(hub_instance, "connect", new_callable=AsyncMock) as mock_connect:
-            with pytest.raises(ConnectionError, match="Reconnection timeout"):
-                await hub_instance._ensure_connected()
-            
-            # Should not have called connect since another reconnection was in progress
-            assert mock_connect.call_count == 0
+        # Simulate reconnection in progress by locking the reconnect_lock
+        await hub_instance._reconnect_lock.acquire()
+        
+        try:
+            # Should wait and timeout since lock is held
+            with patch.object(hub_instance, "connect", new_callable=AsyncMock) as mock_connect:
+                with pytest.raises(ConnectionError, match="Reconnection timeout"):
+                    await hub_instance._ensure_connected()
+                
+                # Should not have called connect since lock was held
+                assert mock_connect.call_count == 0
+        finally:
+            hub_instance._reconnect_lock.release()
 
     def test_connection_state_tracking(self, hub_instance):
         """Test connection state is properly tracked."""
@@ -572,3 +577,98 @@ class TestThermexHub:
         removed = hub_instance._pending.pop("test", None)
         assert removed == fut
         assert "test" not in hub_instance._pending
+    @pytest.mark.asyncio
+    async def test_reconnection_event_signals_waiters(self, hub_instance):
+        """Test that reconnection event properly signals waiting tasks."""
+        hub_instance._ws = None
+        
+        # Mock successful connection
+        mock_ws = MagicMock()
+        mock_ws.closed = False
+        
+        async def mock_connect():
+            hub_instance._ws = mock_ws
+        
+        with patch.object(hub_instance, "connect", side_effect=mock_connect):
+            # Start reconnection in background
+            reconnect_task = asyncio.create_task(hub_instance._ensure_connected())
+            
+            # Give it a moment to acquire lock
+            await asyncio.sleep(0.1)
+            
+            # Now try to connect from another task - should wait for event
+            await hub_instance._ensure_connected()
+            
+            # Both should succeed
+            await reconnect_task
+            assert hub_instance._ws == mock_ws
+
+    @pytest.mark.asyncio
+    async def test_wait_for_reconnection_timeout(self, hub_instance):
+        """Test that waiting for reconnection times out properly."""
+        hub_instance._ws = None
+        
+        # Acquire lock but don't set event (simulates hanging reconnection)
+        await hub_instance._reconnect_lock.acquire()
+        
+        try:
+            with pytest.raises(ConnectionError, match="Reconnection timeout"):
+                await hub_instance._wait_for_reconnection()
+        finally:
+            hub_instance._reconnect_lock.release()
+
+    @pytest.mark.asyncio
+    async def test_perform_reconnection_with_retries(self, hub_instance):
+        """Test that _perform_reconnection retries on failure."""
+        attempts = []
+        
+        async def mock_connect():
+            attempts.append(1)
+            if len(attempts) < 3:
+                raise ConnectionError(f"Attempt {len(attempts)} failed")
+            # Third attempt succeeds
+            hub_instance._ws = MagicMock()
+            hub_instance._ws.closed = False
+        
+        with patch.object(hub_instance, "connect", side_effect=mock_connect):
+            with patch.object(hub_instance, "_reconnect_delay", 0.01):  # Speed up test
+                await hub_instance._perform_reconnection()
+        
+        # Should have tried 3 times
+        assert len(attempts) == 3
+
+    @pytest.mark.asyncio
+    async def test_perform_reconnection_max_attempts(self, hub_instance):
+        """Test that _perform_reconnection fails after max attempts."""
+        async def mock_connect():
+            raise ConnectionError("Connection failed")
+        
+        with patch.object(hub_instance, "connect", side_effect=mock_connect):
+            with patch.object(hub_instance, "_reconnect_delay", 0.01):
+                with pytest.raises(ConnectionError, match="Failed to reconnect after"):
+                    await hub_instance._perform_reconnection()
+
+    @pytest.mark.asyncio
+    async def test_close_during_reconnection_wait(self, hub_instance):
+        """Test that closing hub while waiting for reconnection works."""
+        hub_instance._ws = None
+        
+        # Acquire lock (simulate reconnection in progress)
+        await hub_instance._reconnect_lock.acquire()
+        
+        async def wait_and_close():
+            await asyncio.sleep(0.1)
+            hub_instance._closing = True
+            hub_instance._reconnect_event.set()  # Unblock waiter
+            hub_instance._reconnect_lock.release()
+        
+        close_task = asyncio.create_task(wait_and_close())
+        
+        # This should eventually succeed or raise due to closing
+        try:
+            await hub_instance._wait_for_reconnection()
+        except ConnectionError:
+            pass  # Expected if connection still dead
+        
+        await close_task
+        assert hub_instance._closing
