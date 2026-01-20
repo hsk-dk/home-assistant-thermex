@@ -108,14 +108,23 @@ class TestDelayedTurnOffButton:
         assert delayed_button.icon == "mdi:timer-off"
 
     @pytest.mark.asyncio
-    async def test_delayed_button_press_domain_service(self, delayed_button):
+    async def test_delayed_button_press_domain_service(self, delayed_button, mock_hub):
         """Test pressing delayed turn off button calls domain service."""
+        # Mock a fan entity state so button can find it
+        fan_entity_id = f"fan.{mock_hub.unique_id}_fan"
+        mock_fan_state = MagicMock()
+        delayed_button.hass.states.get = MagicMock(side_effect=lambda eid: mock_fan_state if eid == fan_entity_id else None)
+        
         await delayed_button.async_press()
         
-        delayed_button.hass.services.async_call.assert_called()
+        delayed_button.hass.services.async_call.assert_called_once()
         call_args = delayed_button.hass.services.async_call.call_args[0]
         assert call_args[0] == "thermex_api"  # domain
-        assert call_args[1] == "start_delayed_off_domain"  # service
+        assert call_args[1] == "start_delayed_off"  # service
+        
+        # Check service data includes fan entity_id
+        service_data = call_args[2]
+        assert service_data["entity_id"] == fan_entity_id
 
     def test_delayed_button_name(self, delayed_button):
         """Test delayed button uses translation key."""
