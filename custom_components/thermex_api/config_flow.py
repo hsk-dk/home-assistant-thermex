@@ -16,6 +16,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema({
 })
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Thermex API."""
     VERSION = 1
 
     async def async_step_user(self, user_input=None):

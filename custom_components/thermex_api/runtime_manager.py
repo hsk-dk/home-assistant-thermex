@@ -61,19 +61,17 @@ class RuntimeManager:
             
             # Validate last_reset (should be ISO format string or None)
             last_reset = data.get("last_reset")
-            if last_reset is not None:
-                if isinstance(last_reset, str):
-                    validated_data["last_reset"] = last_reset
-                else:
-                    _LOGGER.warning("Invalid last_reset format, ignoring")
+            if last_reset is not None and isinstance(last_reset, str):
+                validated_data["last_reset"] = last_reset
+            elif last_reset is not None:
+                _LOGGER.warning("Invalid last_reset format, ignoring")
             
             # Validate last_preset (should be string or None)
             last_preset = data.get("last_preset")
-            if last_preset is not None:
-                if isinstance(last_preset, str):
-                    validated_data["last_preset"] = last_preset
-                else:
-                    _LOGGER.warning("Invalid last_preset format, ignoring")
+            if last_preset is not None and isinstance(last_preset, str):
+                validated_data["last_preset"] = last_preset
+            elif last_preset is not None:
+                _LOGGER.warning("Invalid last_preset format, ignoring")
             
             self._data = validated_data
             _LOGGER.debug("Runtime data loaded and validated successfully")

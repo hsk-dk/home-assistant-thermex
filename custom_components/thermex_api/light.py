@@ -24,6 +24,16 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+def _to_api_brightness(ha_brightness: int) -> int:
+    """Convert Home Assistant brightness (0-255) to API brightness (1-100)."""
+    if ha_brightness == 0:
+        return 1  # API minimum
+    return max(1, min(100, round(ha_brightness / 255 * 100)))
+
+def _to_ha_brightness(api_brightness: int) -> int:
+    """Convert API brightness (1-100) to Home Assistant brightness (0-255)."""
+    return round(api_brightness / 100 * 255)
+
 async def async_setup_entry(hass, entry, async_add_entities):
     """Setup Thermex main and deco lights."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
@@ -142,10 +152,11 @@ class ThermexLight(ThermexLightBase):
         """Turn on the light."""
         brightness = kwargs.get(ATTR_BRIGHTNESS, self._last_brightness)
         brightness = self._clamp_brightness(brightness)
+        api_brightness = _to_api_brightness(brightness)
         
-        _LOGGER.debug("ThermexLight: Turn on - Brightness: %s", brightness)
+        _LOGGER.debug("ThermexLight: Turn on - HA Brightness: %s, API Brightness: %s", brightness, api_brightness)
         await self._hub.send_request("Update", {
-            "Light": {"lightonoff": 1, "lightbrightness": brightness}
+            "Light": {"lightonoff": 1, "lightbrightness": api_brightness}
         })
         
         self._is_on = True
@@ -157,7 +168,7 @@ class ThermexLight(ThermexLightBase):
     async def async_turn_off(self, **kwargs):
         """Turn off the light."""
         await self._hub.send_request("Update", {
-            "Light": {"lightonoff": 0, "lightbrightness": MIN_BRIGHTNESS}
+            "Light": {"lightonoff": 0, "lightbrightness": 1}
         })
         self._is_on = False
         self._brightness = MIN_BRIGHTNESS
@@ -202,7 +213,8 @@ class ThermexDecoLight(ThermexLightBase):
             return
         
         self._is_on = bool(deco.get("decolightonoff", 0))
-        brightness = self._clamp_brightness(deco.get("decolightbrightness", 0))
+        api_brightness = deco.get("decolightbrightness", 1)
+        brightness = self._clamp_brightness(_to_ha_brightness(api_brightness))
         self._brightness = brightness
         if self._is_on and brightness > 0:
             self._last_brightness = brightness
@@ -244,7 +256,7 @@ class ThermexDecoLight(ThermexLightBase):
     async def async_turn_off(self, **kwargs):
         """Turn off the deco light."""
         await self._hub.send_request("Update", {
-            "Decolight": {"decolightonoff": 0, "decolightbrightness": MIN_BRIGHTNESS}
+            "Decolight": {"decolightonoff": 0, "decolightbrightness": 1}
         })
         self._is_on = False
         self._brightness = MIN_BRIGHTNESS
@@ -258,7 +270,8 @@ class ThermexDecoLight(ThermexLightBase):
             return
             
         self._is_on = bool(deco.get("decolightonoff", 0))
-        brightness = self._clamp_brightness(deco.get("decolightbrightness", 0))
+        api_brightness = deco.get("decolightbrightness", 1)
+        brightness = self._clamp_brightness(_to_ha_brightness(api_brightness))
         self._brightness = brightness
         if self._is_on and brightness > 0:
             self._last_brightness = brightness
