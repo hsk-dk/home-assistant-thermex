@@ -126,7 +126,7 @@ class ThermexHub:
         """Perform the actual reconnection with retries."""
         await self._close_connection()
         
-        _LOGGER.warning("ThermexHub: WebSocket disconnected, attempting to reconnect...")
+        _LOGGER.info("ThermexHub: WebSocket disconnected, attempting to reconnect...")
         for attempt in range(1, MAX_RECONNECT_ATTEMPTS + 1):
             if self._closing:
                 raise ConnectionError("Hub closing during reconnection")
@@ -276,7 +276,7 @@ class ThermexHub:
                 
                 # Check if connection is still alive
                 if not self._ws or self._ws.closed:
-                    _LOGGER.warning("ThermexHub: Watchdog detected closed WebSocket")
+                    _LOGGER.debug("ThermexHub: Watchdog detected closed WebSocket")
                     try:
                         await self._ensure_connected()
                     except Exception as e:
@@ -309,7 +309,7 @@ class ThermexHub:
                             _LOGGER.debug("ThermexHub: Heartbeat successful")
                             self._last_heartbeat = current_time
                         except ConnectionError as err:
-                            _LOGGER.warning("ThermexHub: Heartbeat failed due to connection: %s", err)
+                            _LOGGER.debug("ThermexHub: Heartbeat failed due to connection: %s", err)
                             # Don't immediately reconnect on connection errors - let the next iteration handle it
                         except Exception as err:
                             _LOGGER.warning("ThermexHub: Heartbeat failed: %s", err)
