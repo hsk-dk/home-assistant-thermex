@@ -210,9 +210,7 @@ class ThermexFan(FanEntity):
         self._runtime_manager.start()
         self._runtime_manager.set_last_preset(preset)
         await self._runtime_manager.save()
-        self._is_on = True
-        self._preset_mode = preset
-        self.schedule_update_ha_state()
+        # State will be updated via notify signal from hub
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs) -> None:
         if percentage is not None:
@@ -224,27 +222,21 @@ class ThermexFan(FanEntity):
             self._runtime_manager.start()
             self._runtime_manager.set_last_preset(mode)
             await self._runtime_manager.save()
-            self._is_on = True
-            self._preset_mode = mode
-            self.schedule_update_ha_state()
+            # State will be updated via notify signal from hub
         elif self._preset_mode and self._preset_mode != "off":
             mode = self._preset_mode
             await self.async_set_preset_mode(mode)
             self._runtime_manager.start()
             self._runtime_manager.set_last_preset(mode)
             await self._runtime_manager.save()
-            self._is_on = True
-            self._preset_mode = mode
-            self.schedule_update_ha_state()
+            # State will be updated via notify signal from hub
         else:
             mode = "medium"
             await self.async_set_preset_mode(mode)
             self._runtime_manager.start()
             self._runtime_manager.set_last_preset(mode)
             await self._runtime_manager.save()
-            self._is_on = True
-            self._preset_mode = mode
-            self.schedule_update_ha_state()
+            # State will be updated via notify signal from hub
 
     async def async_turn_off(self, **kwargs) -> None:
         await self.cancel_delayed_off()  # Cancel any delayed turn-off
@@ -252,9 +244,7 @@ class ThermexFan(FanEntity):
         self._runtime_manager.stop()
         self._runtime_manager.set_last_preset("off")
         await self._runtime_manager.save()
-        self._is_on = False
-        self._preset_mode = "off"
-        self.schedule_update_ha_state()
+        # State will be updated via notify signal from hub
 
     async def async_reset(self, **kwargs) -> None:
         self._runtime_manager.reset()
@@ -315,15 +305,6 @@ class ThermexFan(FanEntity):
                 "scheduled_time": scheduled_iso,
                 "remaining": delay_minutes
             },
-        )
-        
-        # Notify other entities about delayed turn-off status change
-        from .const import THERMEX_NOTIFY
-        async_dispatcher_send(
-            self.hass,
-            THERMEX_NOTIFY,
-            "delayed_turn_off",
-            {"active": True, "scheduled_time": scheduled_iso},
         )
 
     async def cancel_delayed_off(self) -> None:
