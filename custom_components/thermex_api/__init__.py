@@ -55,7 +55,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry_data["hub"] = hub
 
     # 3) Initialize & load the shared RuntimeManager
-    store = Store(
+    from homeassistant.helpers.storage import Store
+    store: Store = Store(
         hass,
         STORAGE_VERSION,
         RUNTIME_STORAGE_FILE.format(entry_id=entry.entry_id),

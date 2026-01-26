@@ -415,6 +415,9 @@ class ThermexHub:
                         "ThermexHub: Second timeout for '%s', giving up", request
                     )
                     raise asyncio.TimeoutError(f"Request '{request}' timed out after 2 attempts")
+            
+            # This should never be reached, but satisfies mypy
+            raise RuntimeError(f"Unexpected exit from retry loop for request '{request}'")
 
         finally:
             # Always remove pending entry (in case of success or error)
