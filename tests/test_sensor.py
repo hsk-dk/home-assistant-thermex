@@ -89,13 +89,23 @@ class TestRuntimeHoursSensor:
         mock_timer.assert_called_once()
 
     def test_sensor_schedule_update(self, runtime_sensor):
-        """Test sensor schedules periodic update."""
+        """Test sensor schedules periodic update only when fan is running."""
+        from custom_components.thermex_api.const import RUNTIME_UPDATE_INTERVAL
+        
         with patch('custom_components.thermex_api.sensor.async_call_later') as mock_call_later:
+            # Test when fan is not running - should not schedule
+            runtime_sensor._fan_is_running = False
             runtime_sensor._schedule_update()
+            assert not mock_call_later.called, "Should not schedule when fan is off"
             
-            # Should schedule update in 30 seconds
+            # Reset mock for second test
+            mock_call_later.reset_mock()
+            
+            # Test when fan is running - should schedule
+            runtime_sensor._fan_is_running = True
+            runtime_sensor._schedule_update()
             mock_call_later.assert_called_once()
-            assert mock_call_later.call_args[0][1] == 30
+            assert mock_call_later.call_args[0][1] == RUNTIME_UPDATE_INTERVAL
 
     @pytest.mark.asyncio
     async def test_sensor_periodic_update(self, runtime_sensor):
