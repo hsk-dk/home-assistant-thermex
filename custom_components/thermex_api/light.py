@@ -25,13 +25,31 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 def _to_api_brightness(ha_brightness: int) -> int:
-    """Convert Home Assistant brightness (0-255) to API brightness (1-100)."""
+    """Convert Home Assistant brightness (0-255) to API brightness (1-100).
+    
+    Note: Home Assistant brightness of 0 is mapped to API brightness of 1 (minimum).
+    This is intentional because the API doesn't accept 0 as a valid brightness value.
+    To turn off the light, use the turn_off() method which sets lightonoff=0.
+    
+    Args:
+        ha_brightness: Home Assistant brightness value (0-255)
+        
+    Returns:
+        API brightness value (1-100)
+    """
     if ha_brightness == 0:
-        return 1  # API minimum
+        return 1  # API minimum - API doesn't accept 0
     return max(1, min(100, round(ha_brightness / 255 * 100)))
 
 def _to_ha_brightness(api_brightness: int) -> int:
-    """Convert API brightness (1-100) to Home Assistant brightness (0-255)."""
+    """Convert API brightness (1-100) to Home Assistant brightness (0-255).
+    
+    Args:
+        api_brightness: API brightness value (1-100)
+        
+    Returns:
+        Home Assistant brightness value (0-255)
+    """
     return round(api_brightness / 100 * 255)
 
 async def async_setup_entry(hass, entry, async_add_entities):

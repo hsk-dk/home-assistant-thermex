@@ -12,7 +12,6 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up the Reset Runtime button for Thermex API."""
-    #hub: ThermexHub = hass.data[DOMAIN][entry.entry_id]
     entry_data = hass.data[DOMAIN][entry.entry_id]
     hub = entry_data["hub"]
     runtime_manager = entry_data["runtime_manager"]
@@ -43,7 +42,6 @@ class ResetRuntimeButton(ButtonEntity):
             return
         self._runtime_manager.reset()
         await self._runtime_manager.save()
- #       _LOGGER.info("Thermex runtime/filter time has been reset.")
 
         # Trigger fan + filter sensor updates
         async_dispatcher_send(

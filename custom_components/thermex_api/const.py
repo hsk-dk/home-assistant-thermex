@@ -30,3 +30,8 @@ DEFAULT_BRIGHTNESS = 204  # Default brightness (80% of 255)
 MIN_BRIGHTNESS = 0  # Minimum brightness value
 MAX_BRIGHTNESS = 255  # Maximum brightness value
 FALLBACK_STATUS_TIMEOUT = 15  # Seconds to wait before requesting fallback status
+
+# Runtime tracking settings
+RUNTIME_UPDATE_INTERVAL = 30  # Seconds between runtime sensor updates
+DELAYED_TURNOFF_COUNTDOWN_INTERVAL = 60  # Seconds between countdown updates (1 minute)
+MINIMUM_RUNTIME_FOR_NO_RESET_ALERT = 5  # Minimum runtime hours to trigger alert when no reset date exists

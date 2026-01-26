@@ -9,7 +9,7 @@ from homeassistant.helpers import entity_platform
 from homeassistant.helpers.event import async_call_later
 
 from .hub import ThermexHub
-from .const import DOMAIN, THERMEX_NOTIFY, FALLBACK_STATUS_TIMEOUT
+from .const import DOMAIN, THERMEX_NOTIFY, FALLBACK_STATUS_TIMEOUT, DELAYED_TURNOFF_COUNTDOWN_INTERVAL
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -289,7 +289,7 @@ class ThermexFan(FanEntity):
         _LOGGER.debug("Delayed turn-off scheduled: handle=%s, seconds=%d", self._delayed_off_handle is not None, delay_minutes * 60)
         
         # Start countdown timer (update every minute)
-        async_call_later(self.hass, 60, self._update_countdown)
+        async_call_later(self.hass, DELAYED_TURNOFF_COUNTDOWN_INTERVAL, self._update_countdown)
         
         self.schedule_update_ha_state()
         
@@ -340,7 +340,7 @@ class ThermexFan(FanEntity):
             
             # Schedule next update in 1 minute if still active
             if self._delayed_off_remaining > 0:
-                async_call_later(self.hass, 60, self._update_countdown)
+                async_call_later(self.hass, DELAYED_TURNOFF_COUNTDOWN_INTERVAL, self._update_countdown)
 
     async def _handle_delayed_off(self, _now) -> None:
         """Handle the delayed turn-off event."""

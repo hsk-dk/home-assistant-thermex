@@ -77,6 +77,65 @@ class TestConfigFlow:
         assert result["errors"] == {"base": "cannot_connect"}
 
     @pytest.mark.asyncio
+    async def test_hub_cleanup_on_connection_failure(self, mock_hass):
+        """Test that hub is properly closed even when connection fails."""
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        mock_hass.data = {DOMAIN: {}}
+        
+        # Create mock for hub.close() to verify it's called
+        mock_close = AsyncMock()
+        
+        # Mock failed connection
+        with patch(
+            "custom_components.thermex_api.hub.ThermexHub.connect",
+            side_effect=Exception("Connection failed"),
+        ) as mock_connect, patch(
+            "custom_components.thermex_api.hub.ThermexHub.close",
+            new=mock_close,
+        ):
+            result = await flow.async_step_user(
+                user_input={
+                    CONF_HOST: "192.168.1.100",
+                    "api_key": "test_api_key",
+                }
+            )
+        
+        # Verify hub.close() was called to prevent resource leak
+        assert mock_close.called, "Hub close() should be called even on connection failure"
+        assert result["type"] == FlowResultType.FORM
+        assert result["errors"] == {"base": "cannot_connect"}
+
+    @pytest.mark.asyncio
+    async def test_hub_cleanup_on_success(self, mock_hass, mock_setup_entry):
+        """Test that hub is properly closed even when connection succeeds."""
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        mock_hass.data = {DOMAIN: {}}
+        
+        # Create mock for hub.close() to verify it's called
+        mock_close = AsyncMock()
+        
+        # Mock successful connection
+        with patch(
+            "custom_components.thermex_api.hub.ThermexHub.connect",
+            return_value=None,
+        ) as mock_connect, patch(
+            "custom_components.thermex_api.hub.ThermexHub.close",
+            new=mock_close,
+        ):
+            result = await flow.async_step_user(
+                user_input={
+                    CONF_HOST: "192.168.1.100",
+                    "api_key": "test_api_key",
+                }
+            )
+        
+        # Verify hub.close() was called to clean up temporary hub
+        assert mock_close.called, "Hub close() should be called after successful validation"
+        assert result["type"] == FlowResultType.CREATE_ENTRY
+
+    @pytest.mark.asyncio
     async def test_options_flow(self, mock_config_entry):
         """Test options flow."""
         flow = OptionsFlowHandler(mock_config_entry)
