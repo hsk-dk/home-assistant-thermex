@@ -72,12 +72,12 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
         self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
         self._attr_translation_key = "thermex_sensor_runtime_hours"
         self._update_timer = None
+        self._fan_is_running = False
         
     async def async_added_to_hass(self):
         """Set up the sensor and start periodic updates."""
         await super().async_added_to_hass()
-        # Start periodic updates to track runtime while fan is running
-        self._schedule_update()
+        # Updates will be scheduled when fan starts running
         
     async def async_will_remove_from_hass(self):
         """Clean up when removing sensor."""
@@ -85,21 +85,48 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
         if self._update_timer:
             self._update_timer()
             self._update_timer = None
+    
+    @callback
+    def _handle_notify(self, ntf_type, data):
+        """Handle fan state changes and update scheduling."""
+        if ntf_type.lower() != "fan":
+            return
+        
+        # Check if fan is running
+        fan_data = data.get("Fan", {})
+        fan_speed = fan_data.get("fanspeed", 0)
+        fan_on = bool(fan_data.get("fanonoff", 0)) and fan_speed != 0
+        
+        # Update state
+        self.async_write_ha_state()
+        
+        # Manage periodic updates based on fan state
+        if fan_on and not self._fan_is_running:
+            # Fan just turned on - start periodic updates
+            self._fan_is_running = True
+            self._schedule_update()
+        elif not fan_on and self._fan_is_running:
+            # Fan just turned off - stop periodic updates
+            self._fan_is_running = False
+            if self._update_timer:
+                self._update_timer()
+                self._update_timer = None
             
     def _schedule_update(self):
-        """Schedule the next update."""
+        """Schedule the next update (only when fan is running)."""
         if self._update_timer:
             self._update_timer()
         
-        # Schedule next update
-        self._update_timer = async_call_later(
-            self.hass, RUNTIME_UPDATE_INTERVAL, self._periodic_update
-        )
+        # Only schedule if fan is still running
+        if self._fan_is_running:
+            self._update_timer = async_call_later(
+                self.hass, RUNTIME_UPDATE_INTERVAL, self._periodic_update
+            )
     
     async def _periodic_update(self, _):
         """Periodic update callback to track runtime accumulation."""
         self.async_write_ha_state()
-        # Schedule the next update
+        # Schedule the next update (will check if fan is still running)
         self._schedule_update()
  
     @property
