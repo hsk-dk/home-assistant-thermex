@@ -26,19 +26,28 @@ Install through [HACS](https://hacs.xyz/) by searching for "Thermex Hood Integra
 ### Advanced Features
 - **Delayed Turn-Off**: Manual activation of delayed fan turn-off with configurable timer (1-120 minutes)
 - **Runtime Tracking**: Persistent filter runtime tracking with reset functionality
-- **Diagnostic Sensors**: Connection status, protocol version, and system health monitoring
+- **Dual Filter Alerts**: Monitor both runtime hours (default: 30h) and days since reset (default: 90 days)
+- **Automatic Reconnection**: Built-in watchdog monitors connection and automatically reconnects on failures
+- **Real-time Updates**: Push notifications for all state changes via WebSocket
+- **Diagnostic Support**: Built-in diagnostics for troubleshooting (Settings → Devices → Thermex Hood → Download Diagnostics)
 - **Multi-language Support**: Full localisation in English, Danish, Swedish, Norwegian, Finnish and German
 
 ### Entities Created
 - **Fan Entity**: `fan.thermex_hood` with speed presets and runtime attributes
 - **Light Entities**: Main light and Decolight (if enabled)
-- **Sensors**: Filter runtime, connection status, last reset time
-- **Binary Sensor**: Filter cleaning alert
-- **Buttons**: Reset filter time, Start delayed turn-off
+- **Sensors**: 
+  - Filter runtime hours
+  - Connection status
+  - Last reset time
+  - Delayed turn-off timer status
+- **Binary Sensor**: Filter cleaning alert (hours and days thresholds)
+- **Buttons**: 
+  - Reset filter time
+  - Start delayed turn-off
 
 ### Services Available
-- `thermex_api.reset_runtime`: Reset filter runtime counter
-- `thermex_api.start_delayed_off`: Start delayed turn-off timer
+- `thermex_api.reset_runtime`: Reset filter runtime counter (also available as button entity)
+- `thermex_api.start_delayed_off`: Start delayed turn-off timer (also available as button entity)
 - `thermex_api.cancel_delayed_off`: Cancel active delayed turn-off
 
 ---
@@ -59,12 +68,14 @@ Install through [HACS](https://hacs.xyz/) by searching for "Thermex Hood Integra
 
    ![Enable API](https://github.com/user-attachments/assets/c80412a1-1f13-4f23-b347-01a2cd9c2202)
    ![Set password](https://github.com/user-attachments/assets/2bc877bb-490f-4272-afdf-2f059b35dd1c)
-
-### Integration Setup
-
-1. Set up the integration through the Home Assistant UI
+Add the integration through Home Assistant UI (Settings → Devices & Services → Add Integration → Thermex Hood)
 2. Enter your extractor hood IP address and API password
-3. Configure integration options:
+3. Configure integration options (optional, can be changed later):
+   - **Filter Alert Hours**: Runtime hours threshold for filter cleaning alert (default: 30 hours)
+   - **Filter Alert Days**: Days since last reset threshold for filter alert (default: 90 days)
+   - **Enable Decolight**: Activate ambient lighting controls (if your model supports it)
+   - **Delayed Turn-Off Timer**: Configure automatic turn-off delay (1-120 minutes, default: 10)
+   - **Watchdog Settings**: Heartbeat interval and connection timeout (advanced users only
    - **Filter Alert Hours**: Set filter cleaning interval (default: 30 hours)
    - **Enable Decolight**: Activate ambient lighting controls (if supported)
    - **Delayed Turn-Off Timer**: Configure automatic turn-off delay (1-120 minutes, default: 10)
@@ -74,8 +85,9 @@ Install through [HACS](https://hacs.xyz/) by searching for "Thermex Hood Integra
 
 ## Compatibility
 
-- **Home Assistant**: Version **2025.1.0** or later
-- **Thermex API**: Version **1.1**
+- **Home Assistant**: Version **2024.1.0** or later
+- **Thermex API**: Version **1.1** (WebSocket protocol)
+- **Integration Version**: **3.3.0-beta6** (see [manifest.json](custom_components/thermex_api/manifest.json))
 
 ## Known Supported Models
 
@@ -89,12 +101,15 @@ Install through [HACS](https://hacs.xyz/) by searching for "Thermex Hood Integra
 1. **Connection Failed**: 
    - Verify hood IP address and API password
    - Check network connectivity
-   - Ensure API is enabled in Thermex app
-
-2. **No Initial Status**: 
+   - Connection Drops**: 
+   - Integration includes automatic reconnection (up to 3 attempts)
+   - Entities will become unavailable during disconnection and recover automatically
+   - Check Home Assistant logs for connection issues (set to debug level for details
    - Integration includes a connection watchdog for automatic recovery
-   - Check hood software version (minimum 1.30/1.10 required)
-
+   - Check hood software versionnd days are configured in integration options
+   - Check that runtime tracking is active (fan has been used)
+   - Filter alert triggers when EITHER hours threshold OR days threshold is exceeded
+   - Use button entity or service to reset filter runtime after cleaning
 3. **Filter Alerts Not Working**:
    - Verify filter alert hours are configured in integration options
    - Check that runtime tracking is active (fan has been used)
