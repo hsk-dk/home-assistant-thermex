@@ -62,7 +62,6 @@ class ThermexHub:
         self._heartbeat_lock = asyncio.Lock()  # Prevent concurrent heartbeats
         self._last_heartbeat = 0.0  # Track last heartbeat time
         self._connection_timeout = DEFAULT_CONNECTION_TIMEOUT
-        self._heartbeat_in_progress = False  # Prevent concurrent heartbeats
 
     def configure_watchdog(self, heartbeat_interval: int = 30, connection_timeout: int = 120) -> None:
         """Configure watchdog parameters.
@@ -416,6 +415,9 @@ class ThermexHub:
                         "ThermexHub: Second timeout for '%s', giving up", request
                     )
                     raise asyncio.TimeoutError(f"Request '{request}' timed out after 2 attempts")
+            
+            # This should never be reached, but satisfies mypy
+            raise RuntimeError(f"Unexpected exit from retry loop for request '{request}'")
 
         finally:
             # Always remove pending entry (in case of success or error)

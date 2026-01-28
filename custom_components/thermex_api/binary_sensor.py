@@ -13,7 +13,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.core import callback
 
 from .runtime_manager import RuntimeManager
-from .const import DOMAIN, THERMEX_NOTIFY
+from .const import DOMAIN, THERMEX_NOTIFY, MINIMUM_RUNTIME_FOR_NO_RESET_ALERT
 from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,9 +63,9 @@ class ThermexFilterAlert(BinarySensorEntity):
             days_exceeded = days_since_reset >= days_threshold
         else:
             # No reset date recorded - assume filter needs attention after some runtime
-            # Only trigger days-based alert if we have significant runtime hours (> 5 hours)
+            # Only trigger days-based alert if we have significant runtime hours
             # This prevents false alerts on new installations with no usage
-            days_exceeded = runtime_hours > 5
+            days_exceeded = runtime_hours > MINIMUM_RUNTIME_FOR_NO_RESET_ALERT
         
         # Trigger alert if either condition is met
         return hours_exceeded or days_exceeded

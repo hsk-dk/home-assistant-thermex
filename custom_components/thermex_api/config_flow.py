@@ -15,9 +15,10 @@ STEP_USER_DATA_SCHEMA = vol.Schema({
     vol.Required("api_key"): str,
 })
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class ConfigFlow(config_entries.ConfigFlow):
     """Handle a config flow for Thermex API."""
     VERSION = 1
+    DOMAIN = DOMAIN
 
     async def async_step_user(self, user_input=None):
         if user_input is None:
@@ -39,6 +40,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=STEP_USER_DATA_SCHEMA,
                 errors={"base": "cannot_connect"},
             )
+        finally:
+            # Always close the temporary hub to prevent resource leaks
+            try:
+                await hub.close()
+            except Exception as err:
+                _LOGGER.debug("Error closing temporary hub: %s", err)
 
         return self.async_create_entry(
             title=user_input["host"], data=user_input

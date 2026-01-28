@@ -1,6 +1,7 @@
 """Thermex Fan entity with discrete presets and persistent runtime tracking."""
 import logging
-from typing import Any
+from typing import Any, Optional, Callable
+from datetime import datetime
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
@@ -9,7 +10,7 @@ from homeassistant.helpers import entity_platform
 from homeassistant.helpers.event import async_call_later
 
 from .hub import ThermexHub
-from .const import DOMAIN, THERMEX_NOTIFY, FALLBACK_STATUS_TIMEOUT
+from .const import DOMAIN, THERMEX_NOTIFY, FALLBACK_STATUS_TIMEOUT, DELAYED_TURNOFF_COUNTDOWN_INTERVAL
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,12 +63,12 @@ class ThermexFan(FanEntity):
         self._hub = hub
         self._runtime_manager = runtime_manager
         self._entry = entry
-        self._auto_off_handle = None
-        self._delayed_off_handle = None
+        self._auto_off_handle: Optional[Callable[[], None]] = None
+        self._delayed_off_handle: Optional[Callable[[], None]] = None
         self._delayed_off_active = False
         self._delayed_off_remaining = 0
-        self._delayed_off_scheduled_time = None
-        self._unsub = None
+        self._delayed_off_scheduled_time: Optional[datetime] = None
+        self._unsub: Optional[Callable[[], None]] = None
         self._attr_translation_key = "thermex_fan"
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{hub.unique_id}_fan"
@@ -78,6 +79,7 @@ class ThermexFan(FanEntity):
         self._is_on = False
         self._preset_mode = self._runtime_manager.get_last_preset()
         self._got_initial_state = False
+        self._cached_hub_data: dict[str, Any] = {}  # Cache hub data to avoid repeated calls
 
     @property
     def is_on(self) -> bool:
@@ -105,8 +107,8 @@ class ThermexFan(FanEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        # Get connection status from hub
-        hub_data = self._hub.get_coordinator_data()
+        # Use cached hub data (updated during state changes)
+        hub_data = self._cached_hub_data if self._cached_hub_data else self._hub.get_coordinator_data()
         
         # Get current options from config entry
         current_options = self._entry.options
@@ -180,6 +182,8 @@ class ThermexFan(FanEntity):
         self.hass.async_create_task(self._runtime_manager.save())
 
         self._got_initial_state = True  # Mark that we've received initial state
+        # Update cached hub data to avoid repeated calls in extra_state_attributes
+        self._cached_hub_data = self._hub.get_coordinator_data()
         self.schedule_update_ha_state()
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
@@ -210,9 +214,7 @@ class ThermexFan(FanEntity):
         self._runtime_manager.start()
         self._runtime_manager.set_last_preset(preset)
         await self._runtime_manager.save()
-        self._is_on = True
-        self._preset_mode = preset
-        self.schedule_update_ha_state()
+        # State will be updated via notify signal from hub
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs) -> None:
         if percentage is not None:
@@ -224,27 +226,21 @@ class ThermexFan(FanEntity):
             self._runtime_manager.start()
             self._runtime_manager.set_last_preset(mode)
             await self._runtime_manager.save()
-            self._is_on = True
-            self._preset_mode = mode
-            self.schedule_update_ha_state()
+            # State will be updated via notify signal from hub
         elif self._preset_mode and self._preset_mode != "off":
             mode = self._preset_mode
             await self.async_set_preset_mode(mode)
             self._runtime_manager.start()
             self._runtime_manager.set_last_preset(mode)
             await self._runtime_manager.save()
-            self._is_on = True
-            self._preset_mode = mode
-            self.schedule_update_ha_state()
+            # State will be updated via notify signal from hub
         else:
             mode = "medium"
             await self.async_set_preset_mode(mode)
             self._runtime_manager.start()
             self._runtime_manager.set_last_preset(mode)
             await self._runtime_manager.save()
-            self._is_on = True
-            self._preset_mode = mode
-            self.schedule_update_ha_state()
+            # State will be updated via notify signal from hub
 
     async def async_turn_off(self, **kwargs) -> None:
         await self.cancel_delayed_off()  # Cancel any delayed turn-off
@@ -252,9 +248,7 @@ class ThermexFan(FanEntity):
         self._runtime_manager.stop()
         self._runtime_manager.set_last_preset("off")
         await self._runtime_manager.save()
-        self._is_on = False
-        self._preset_mode = "off"
-        self.schedule_update_ha_state()
+        # State will be updated via notify signal from hub
 
     async def async_reset(self, **kwargs) -> None:
         self._runtime_manager.reset()
@@ -299,7 +293,7 @@ class ThermexFan(FanEntity):
         _LOGGER.debug("Delayed turn-off scheduled: handle=%s, seconds=%d", self._delayed_off_handle is not None, delay_minutes * 60)
         
         # Start countdown timer (update every minute)
-        async_call_later(self.hass, 60, self._update_countdown)
+        async_call_later(self.hass, DELAYED_TURNOFF_COUNTDOWN_INTERVAL, self._update_countdown)
         
         self.schedule_update_ha_state()
         
@@ -315,15 +309,6 @@ class ThermexFan(FanEntity):
                 "scheduled_time": scheduled_iso,
                 "remaining": delay_minutes
             },
-        )
-        
-        # Notify other entities about delayed turn-off status change
-        from .const import THERMEX_NOTIFY
-        async_dispatcher_send(
-            self.hass,
-            THERMEX_NOTIFY,
-            "delayed_turn_off",
-            {"active": True, "scheduled_time": scheduled_iso},
         )
 
     async def cancel_delayed_off(self) -> None:
@@ -359,7 +344,7 @@ class ThermexFan(FanEntity):
             
             # Schedule next update in 1 minute if still active
             if self._delayed_off_remaining > 0:
-                async_call_later(self.hass, 60, self._update_countdown)
+                async_call_later(self.hass, DELAYED_TURNOFF_COUNTDOWN_INTERVAL, self._update_countdown)
 
     async def _handle_delayed_off(self, _now) -> None:
         """Handle the delayed turn-off event."""
