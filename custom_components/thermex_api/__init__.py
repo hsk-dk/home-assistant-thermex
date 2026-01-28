@@ -60,7 +60,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         STORAGE_VERSION,
         RUNTIME_STORAGE_FILE.format(entry_id=entry.entry_id),
     )
-    runtime_manager = RuntimeManager(store, hub)
+    runtime_manager = RuntimeManager(store)
     await runtime_manager.load()
     hub.runtime_manager = runtime_manager
     entry_data["runtime_manager"] = runtime_manager
