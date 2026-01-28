@@ -1,6 +1,7 @@
 """Thermex Fan entity with discrete presets and persistent runtime tracking."""
 import logging
-from typing import Any
+from typing import Any, Optional, Callable
+from datetime import datetime
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
@@ -62,12 +63,12 @@ class ThermexFan(FanEntity):
         self._hub = hub
         self._runtime_manager = runtime_manager
         self._entry = entry
-        self._auto_off_handle = None
-        self._delayed_off_handle = None
+        self._auto_off_handle: Optional[Callable[[], None]] = None
+        self._delayed_off_handle: Optional[Callable[[], None]] = None
         self._delayed_off_active = False
         self._delayed_off_remaining = 0
-        self._delayed_off_scheduled_time = None
-        self._unsub = None
+        self._delayed_off_scheduled_time: Optional[datetime] = None
+        self._unsub: Optional[Callable[[], None]] = None
         self._attr_translation_key = "thermex_fan"
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{hub.unique_id}_fan"
@@ -78,7 +79,7 @@ class ThermexFan(FanEntity):
         self._is_on = False
         self._preset_mode = self._runtime_manager.get_last_preset()
         self._got_initial_state = False
-        self._cached_hub_data = {}  # Cache hub data to avoid repeated calls
+        self._cached_hub_data: dict[str, Any] = {}  # Cache hub data to avoid repeated calls
 
     @property
     def is_on(self) -> bool:

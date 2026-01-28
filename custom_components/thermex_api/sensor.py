@@ -64,7 +64,7 @@ class BaseRuntimeSensor(SensorEntity):
 
 class RuntimeHoursSensor(BaseRuntimeSensor):
     """Sensor for the cumulative runtime hours of the Thermex fan."""
-    _attr_unit_of_measurement = "h"
+    _attr_unit_of_measurement = "h"  # type: ignore[assignment]
     _attr_state_class = "measurement"
 
     def __init__(self, hub, runtime_manager, device_info):
