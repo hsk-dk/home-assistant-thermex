@@ -22,8 +22,12 @@ STORAGE_VERSION = 1
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Thermex filter‐alert binary sensor."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub: ThermexHub = entry_data["hub"]
-    runtime_manager: RuntimeManager = entry_data["runtime_manager"]
+    hub: ThermexHub = entry_data.get("hub")
+    runtime_manager: RuntimeManager = entry_data.get("runtime_manager")
+    
+    if not hub or not runtime_manager:
+        _LOGGER.error("Missing hub or runtime_manager in entry data")
+        return
 
     device_info = hub.device_info
 

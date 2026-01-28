@@ -23,8 +23,12 @@ STORAGE_VERSION = 1
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up persistent runtime-tracking sensors for the Thermex fan."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub = entry_data["hub"]
-    runtime_manager = entry_data["runtime_manager"]
+    hub = entry_data.get("hub")
+    runtime_manager = entry_data.get("runtime_manager")
+    
+    if not hub or not runtime_manager:
+        _LOGGER.error("Missing hub or runtime_manager in entry data")
+        return
 
     device_info = hub.device_info
 
