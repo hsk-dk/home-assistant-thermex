@@ -14,7 +14,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.core import callback
 from homeassistant.util.dt import parse_datetime
 
-from .const import DOMAIN, THERMEX_NOTIFY
+from .const import DOMAIN, THERMEX_NOTIFY, RUNTIME_UPDATE_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
     async def async_added_to_hass(self):
         """Set up the sensor and start periodic updates."""
         await super().async_added_to_hass()
-        # Start periodic updates (every 30 seconds) to track runtime while fan is running
+        # Start periodic updates to track runtime while fan is running
         self._schedule_update()
         
     async def async_will_remove_from_hass(self):
@@ -91,9 +91,9 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
         if self._update_timer:
             self._update_timer()
         
-        # Schedule next update in 30 seconds
+        # Schedule next update
         self._update_timer = async_call_later(
-            self.hass, 30, self._periodic_update
+            self.hass, RUNTIME_UPDATE_INTERVAL, self._periodic_update
         )
     
     async def _periodic_update(self, _):
