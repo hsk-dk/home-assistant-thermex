@@ -78,6 +78,7 @@ class ThermexFan(FanEntity):
         self._is_on = False
         self._preset_mode = self._runtime_manager.get_last_preset()
         self._got_initial_state = False
+        self._cached_hub_data = {}  # Cache hub data to avoid repeated calls
 
     @property
     def is_on(self) -> bool:
@@ -105,8 +106,8 @@ class ThermexFan(FanEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        # Get connection status from hub
-        hub_data = self._hub.get_coordinator_data()
+        # Use cached hub data (updated during state changes)
+        hub_data = self._cached_hub_data if self._cached_hub_data else self._hub.get_coordinator_data()
         
         # Get current options from config entry
         current_options = self._entry.options
@@ -180,6 +181,8 @@ class ThermexFan(FanEntity):
         self.hass.async_create_task(self._runtime_manager.save())
 
         self._got_initial_state = True  # Mark that we've received initial state
+        # Update cached hub data to avoid repeated calls in extra_state_attributes
+        self._cached_hub_data = self._hub.get_coordinator_data()
         self.schedule_update_ha_state()
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
