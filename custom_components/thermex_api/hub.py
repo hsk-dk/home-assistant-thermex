@@ -231,29 +231,45 @@ class ThermexHub:
             async for msg in self._ws:
                 # Update activity timestamp whenever we receive a message
                 self._last_activity = asyncio.get_event_loop().time()
-                
-                self.recent_messages.append(msg.data if hasattr(msg, 'data') else str(msg))
+
+                self.recent_messages.append(msg.data if hasattr(msg, "data") else str(msg))
                 if msg.type == WSMsgType.TEXT:
                     try:
                         payload = json.loads(msg.data)
+
                         if "Response" in payload:
                             key = payload["Response"].lower()
                             fut = self._pending.pop(key, None)
                             if fut and not fut.done():
                                 fut.set_result(payload)
+
                             if payload["Response"] == "Status":
                                 self.last_status = payload
+
+                                data = payload.get("Data", {}) or {}
+                                for ntf_type, section in data.items():
+                                    _LOGGER.debug("Status update dispatch: %s=%s", ntf_type, section)
+                                    async_dispatcher_send(
+                                        self._hass,
+                                        THERMEX_NOTIFY,
+                                        ntf_type,
+                                        {ntf_type: section},
+                                    )
+
                         elif "Notify" in payload:
                             ntf = payload["Notify"]
                             data = payload.get("Data", {}) or {}
                             _LOGGER.debug("Received Notify '%s': %s", ntf, data)
                             async_dispatcher_send(self._hass, THERMEX_NOTIFY, ntf, data)
+
                     except Exception as err:
                         self.last_error = f"Error parsing message: {err}"
+
                 elif msg.type == WSMsgType.ERROR:
                     self.last_error = f"WebSocket error: {msg.data}"
                     _LOGGER.error("WebSocket error: %s", msg.data)
                     break
+
         except Exception as err:
             self._connection_state = "disconnected"
             self.last_error = f"Receive loop error: {err}"

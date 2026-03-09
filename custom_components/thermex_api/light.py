@@ -160,10 +160,14 @@ class ThermexLight(ThermexLightBase):
             self._got_initial_state = True
             
         self._is_on = bool(light.get("lightonoff", 0))
-        brightness = self._clamp_brightness(light.get("lightbrightness", 0))
+
+        api_brightness = light.get("lightbrightness", 1)
+        brightness = self._clamp_brightness(_to_ha_brightness(api_brightness))
+
         self._brightness = brightness
         if self._is_on and brightness > 0:
             self._last_brightness = brightness
+
         self.schedule_update_ha_state()
 
     async def async_turn_on(self, **kwargs):
@@ -200,7 +204,10 @@ class ThermexLight(ThermexLightBase):
             return
             
         self._is_on = bool(light.get("lightonoff", 0))
-        brightness = self._clamp_brightness(light.get("lightbrightness", 0))
+
+        api_brightness = light.get("lightbrightness", 1)
+        brightness = self._clamp_brightness(_to_ha_brightness(api_brightness))
+
         self._brightness = brightness
         if self._is_on and brightness > 0:
             self._last_brightness = brightness
