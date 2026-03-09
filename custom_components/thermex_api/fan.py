@@ -188,7 +188,16 @@ class ThermexFan(FanEntity):
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         speed = _MODE_TO_VALUE[preset_mode]
-        await self._hub.send_request("Update", {"Fan": {"fanonoff": int(speed > 0), "fanspeed": speed}})
+
+        await self._hub.send_request(
+            "Update",
+            {"Fan": {"fanonoff": int(speed > 0), "fanspeed": speed}},
+        )
+
+        # ← LEGG TIL DETTE
+        self._is_on = speed > 0
+        self._preset_mode = preset_mode
+        self.schedule_update_ha_state()
 
     async def async_set_percentage(self, percentage: int) -> None:
         """Set the fan speed by percentage, mapping to discrete preset modes."""
