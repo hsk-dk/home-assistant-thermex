@@ -64,7 +64,7 @@ class TestThermexLight:
         light_entity._handle_notify("light", {
             "Light": {
                 "lightonoff": 1,
-                "lightbrightness": 150,
+                "lightbrightness": 59,  # API value (1-100); 59% -> 150 HA brightness
             }
         })
         
@@ -94,11 +94,11 @@ class TestThermexLight:
         light_entity._handle_notify("light", {
             "Light": {
                 "lightonoff": 1,
-                "lightbrightness": 180,
+                "lightbrightness": 71,  # API value (1-100); 71% -> 181 HA brightness
             }
         })
         
-        assert light_entity._last_brightness == 180
+        assert light_entity._last_brightness == 181
 
     def test_light_ignores_non_light_notifications(self, light_entity):
         """Test light ignores notifications for other entities."""
