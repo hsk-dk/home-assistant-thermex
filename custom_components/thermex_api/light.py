@@ -55,7 +55,12 @@ def _to_ha_brightness(api_brightness: int) -> int:
 async def async_setup_entry(hass, entry, async_add_entities):
     """Setup Thermex main and deco lights."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub: ThermexHub = entry_data["hub"]
+    hub: ThermexHub = entry_data.get("hub")
+    
+    if not hub:
+        _LOGGER.error("Missing hub in entry data")
+        return
+    
     enable_decolight = entry.options.get("enable_decolight", False)
     entities: list[LightEntity] = [ThermexLight(hub)]
     if enable_decolight:

@@ -10,9 +10,9 @@ class TestRuntimeManager:
     """Test RuntimeManager functionality."""
 
     @pytest.fixture
-    def runtime_manager(self, mock_store, mock_hub):
+    def runtime_manager(self, mock_store):
         """Create a RuntimeManager instance."""
-        return RuntimeManager(mock_store, mock_hub)
+        return RuntimeManager(mock_store)
 
     @pytest.mark.asyncio
     async def test_load_empty_store(self, runtime_manager, mock_store):

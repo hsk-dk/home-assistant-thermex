@@ -11,9 +11,8 @@ _LOGGER = logging.getLogger(__name__)
 class RuntimeManager:
     """Manages persistent runtime tracking for the Thermex fan."""
     
-    def __init__(self, store: Store, hub: Any) -> None:
+    def __init__(self, store: Store) -> None:
         self._store = store
-        self._hub = hub
         self._data: dict[str, Any] = {}
 
     async def load(self) -> None:

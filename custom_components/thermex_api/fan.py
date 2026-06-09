@@ -23,8 +23,12 @@ _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up the Thermex fan with runtime storage."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub = entry_data["hub"]
-    runtime_manager = entry_data["runtime_manager"]
+    hub = entry_data.get("hub")
+    runtime_manager = entry_data.get("runtime_manager")
+    
+    if not hub or not runtime_manager:
+        _LOGGER.error("Missing hub or runtime_manager in entry data")
+        return
     fan_entity = ThermexFan(hub, runtime_manager, entry)
     async_add_entities([fan_entity], update_before_add=True)
 

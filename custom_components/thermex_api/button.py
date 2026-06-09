@@ -13,8 +13,12 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up the Reset Runtime button for Thermex API."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub = entry_data["hub"]
-    runtime_manager = entry_data["runtime_manager"]
+    hub = entry_data.get("hub")
+    runtime_manager = entry_data.get("runtime_manager")
+    
+    if not hub or not runtime_manager:
+        _LOGGER.error("Missing hub or runtime_manager in entry data")
+        return
     async_add_entities([
         ResetRuntimeButton(hub, runtime_manager, entry.entry_id),
         DelayedTurnOffButton(hub, entry.entry_id),
