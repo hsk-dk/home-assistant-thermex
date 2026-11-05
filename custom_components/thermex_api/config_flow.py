@@ -1,12 +1,15 @@
 """Config and options flow for Thermex API."""
 import logging
+import uuid
 from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_DEVICE_ID, CONF_HOST
 from homeassistant.core import callback
+from homeassistant.helpers.typing import UNDEFINED
 
 from .const import DOMAIN
 from .hub import ThermexAuthError, ThermexHub
@@ -39,7 +42,7 @@ async def _async_validate_connection(hass, host: str, api_key: str) -> str | Non
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Handle a config flow for Thermex API."""
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(self, user_input=None):
         if user_input is None:
@@ -47,9 +50,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                 step_id="user", data_schema=STEP_USER_DATA_SCHEMA
             )
 
-        # One config entry per hood
-        await self.async_set_unique_id(user_input["host"])
-        self._abort_if_unique_id_configured()
+        # One config entry per hood. The hood has no serial/MAC we can read, so
+        # duplicates are detected by address, and a generated id (not the IP)
+        # identifies the device and its entities from now on.
+        self._async_abort_entries_match({CONF_HOST: user_input["host"]})
+        device_id = f"thermex_{uuid.uuid4().hex[:12]}"
+        await self.async_set_unique_id(device_id)
 
         error = await _async_validate_connection(
             self.hass, user_input["host"], user_input["api_key"]
@@ -62,7 +68,41 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             )
 
         return self.async_create_entry(
-            title=user_input["host"], data=user_input
+            title=user_input["host"],
+            data={**user_input, CONF_DEVICE_ID: device_id},
+        )
+
+    async def async_step_reconfigure(self, user_input=None):
+        """Change the host and/or API password of an existing hood."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            host = user_input["host"]
+            if any(
+                other.entry_id != entry.entry_id and other.data.get("host") == host
+                for other in self._async_current_entries()
+            ):
+                errors["base"] = "host_in_use"
+            else:
+                error = await _async_validate_connection(
+                    self.hass, host, user_input["api_key"]
+                )
+                if error:
+                    errors["base"] = error
+                else:
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        title=host if entry.title == entry.data["host"] else UNDEFINED,
+                        data_updates={"host": host, "api_key": user_input["api_key"]},
+                    )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                STEP_USER_DATA_SCHEMA, user_input or entry.data
+            ),
+            errors=errors,
         )
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]):

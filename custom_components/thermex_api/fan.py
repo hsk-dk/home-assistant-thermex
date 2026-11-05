@@ -77,6 +77,7 @@ class ThermexFan(ThermexEntity, FanEntity):
         self._delayed_off_remaining = 0
         self._delayed_off_scheduled_time: datetime | None = None
         self._attr_translation_key = "thermex_fan"
+        self._attr_name = None  # main entity: named after the device
         self._attr_unique_id = f"{hub.unique_id}_fan"
         self._attr_icon = "mdi:fan"
 

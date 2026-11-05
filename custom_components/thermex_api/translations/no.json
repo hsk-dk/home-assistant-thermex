@@ -15,15 +15,25 @@
         "data": {
           "api_key": "API-passord"
         }
+      },
+      "reconfigure": {
+        "title": "Rekonfigurer Thermex-hette",
+        "description": "Endre IP-adressen eller API-passordet for denne hetten.",
+        "data": {
+          "host": "IP-adresse for hetten",
+          "api_key": "API-passord"
+        }
       }
     },
     "error": {
       "cannot_connect": "Kan ikke koble til. Kontroller IP-adresse og passord.",
-      "invalid_auth": "Ugyldig API-passord."
+      "invalid_auth": "Ugyldig API-passord.",
+      "host_in_use": "Denne IP-adressen brukes allerede av en annen Thermex-hette."
     },
     "abort": {
       "already_configured": "Denne Thermex-hetten er allerede konfigurert.",
-      "reauth_successful": "Ny autentisering var vellykket."
+      "reauth_successful": "Ny autentisering var vellykket.",
+      "reconfigure_successful": "Rekonfigureringen var vellykket."
     }
   },
   "options": {

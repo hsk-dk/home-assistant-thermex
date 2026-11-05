@@ -80,6 +80,13 @@ Add the integration through Home Assistant UI (Settings → Devices & Services �
    - **Enable Decolight**: Activate ambient lighting controls (if supported)
    - **Delayed Turn-Off Timer**: Configure automatic turn-off delay (1-120 minutes, default: 10)
 
+### Changing the IP address or password
+
+If the hood gets a new IP address (or you change the API password in the Thermex app), use
+**Settings → Devices & Services → Thermex Hood → ⋮ → Reconfigure**. Entities, history and
+automations are kept: they are identified by an internal ID, not by the IP address. If the hood
+rejects the stored password, Home Assistant also offers a re-authentication prompt.
+
 
 ---
 

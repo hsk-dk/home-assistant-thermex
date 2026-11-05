@@ -13,13 +13,13 @@ class TestConfigFlow:
 
     @pytest.mark.asyncio
     async def test_duplicate_host_aborts(self, mock_hass):
-        """The same hood cannot be added twice."""
+        """The same hood (address) cannot be added twice."""
         from homeassistant.data_entry_flow import AbortFlow
 
         flow = ConfigFlow()
         flow.hass = mock_hass
         flow.async_set_unique_id = AsyncMock()
-        flow._abort_if_unique_id_configured = MagicMock(side_effect=AbortFlow("already_configured"))
+        flow._async_abort_entries_match = MagicMock(side_effect=AbortFlow("already_configured"))
 
         with patch("custom_components.thermex_api.hub.ThermexHub.connect") as connect:
             with pytest.raises(AbortFlow):
@@ -27,8 +27,28 @@ class TestConfigFlow:
                     user_input={CONF_HOST: "192.168.1.100", "api_key": "k"}
                 )
 
-        flow.async_set_unique_id.assert_awaited_once_with("192.168.1.100")
+        flow._async_abort_entries_match.assert_called_once_with({CONF_HOST: "192.168.1.100"})
         connect.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_new_entry_gets_generated_id_not_the_ip(self, mock_hass):
+        import re
+
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        flow.async_set_unique_id = AsyncMock()
+        flow._async_abort_entries_match = MagicMock()
+
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect", return_value=None):
+            result = await flow.async_step_user(
+                user_input={CONF_HOST: "192.168.1.100", "api_key": "k"}
+            )
+
+        device_id = result["data"]["device_id"]
+        assert re.fullmatch(r"thermex_[0-9a-f]{12}", device_id)
+        assert "192" not in device_id
+        flow.async_set_unique_id.assert_awaited_once_with(device_id)
+        assert result["data"]["host"] == "192.168.1.100"
 
     @pytest.fixture
     def mock_setup_entry(self):
@@ -266,3 +286,74 @@ def test_options_flow_reloads_entry_automatically():
 
     assert issubclass(OptionsFlowHandler, OptionsFlowWithReload)
     assert isinstance(ConfigFlow.async_get_options_flow(MagicMock()), OptionsFlowHandler)
+
+
+class TestReconfigureFlow:
+    @pytest.fixture
+    def flow(self, mock_hass, mock_config_entry):
+        mock_config_entry.title = "192.168.1.100"
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        flow._get_reconfigure_entry = MagicMock(return_value=mock_config_entry)
+        flow._async_current_entries = MagicMock(return_value=[mock_config_entry])
+        flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+        return flow
+
+    @pytest.mark.asyncio
+    async def test_form_is_prefilled(self, flow):
+        result = await flow.async_step_reconfigure()
+
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "reconfigure"
+
+    @pytest.mark.asyncio
+    async def test_new_host_updates_entry_and_title(self, flow, mock_config_entry):
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect", return_value=None):
+            result = await flow.async_step_reconfigure(
+                user_input={"host": "192.168.1.200", "api_key": "new"}
+            )
+
+        assert result == {"type": "abort"}
+        args, kwargs = flow.async_update_reload_and_abort.call_args
+        assert args[0] is mock_config_entry
+        assert kwargs["data_updates"] == {"host": "192.168.1.200", "api_key": "new"}
+        assert kwargs["title"] == "192.168.1.200"  # title followed the old host
+
+    @pytest.mark.asyncio
+    async def test_custom_title_is_kept(self, flow, mock_config_entry):
+        from homeassistant.helpers.typing import UNDEFINED
+
+        mock_config_entry.title = "Kitchen hood"
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect", return_value=None):
+            await flow.async_step_reconfigure(user_input={"host": "192.168.1.200", "api_key": "k"})
+
+        assert flow.async_update_reload_and_abort.call_args.kwargs["title"] is UNDEFINED
+
+    @pytest.mark.asyncio
+    async def test_same_host_is_allowed_for_a_password_change(self, flow):
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect", return_value=None):
+            await flow.async_step_reconfigure(user_input={"host": "192.168.1.100", "api_key": "new"})
+
+        flow.async_update_reload_and_abort.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_host_used_by_another_entry_is_rejected(self, flow, mock_config_entry):
+        other = MagicMock(entry_id="other", data={"host": "192.168.1.201"})
+        flow._async_current_entries = MagicMock(return_value=[mock_config_entry, other])
+
+        result = await flow.async_step_reconfigure(
+            user_input={"host": "192.168.1.201", "api_key": "k"}
+        )
+
+        assert result["errors"] == {"base": "host_in_use"}
+        flow.async_update_reload_and_abort.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_unreachable_host_shows_error(self, flow):
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect", side_effect=OSError("x")):
+            result = await flow.async_step_reconfigure(
+                user_input={"host": "192.168.1.250", "api_key": "k"}
+            )
+
+        assert result["errors"] == {"base": "cannot_connect"}
+        flow.async_update_reload_and_abort.assert_not_called()
