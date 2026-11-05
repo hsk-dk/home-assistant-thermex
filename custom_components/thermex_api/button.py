@@ -1,6 +1,7 @@
 # File: custom_components/thermex_api/button.py
 
 import logging
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 

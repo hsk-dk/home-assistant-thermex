@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from homeassistant.helpers.storage import Store
-from homeassistant.util.dt import utcnow, parse_datetime
+from homeassistant.util.dt import parse_datetime, utcnow
 
 _LOGGER = logging.getLogger(__name__)
 

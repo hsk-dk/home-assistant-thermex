@@ -5,9 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.core import HomeAssistant
-
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .hub import ThermexHub
@@ -66,5 +65,5 @@ async def async_get_config_entry_diagnostics(
         return diagnostics
     
     except Exception as err:
-        _LOGGER.exception("Error generating diagnostics: %s", err)
+        _LOGGER.exception("Error generating diagnostics")
         return {"error": f"Failed to generate diagnostics: {err}"}

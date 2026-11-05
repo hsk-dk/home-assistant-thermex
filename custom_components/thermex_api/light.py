@@ -1,26 +1,29 @@
 # File: custom_components/thermex_api/light.py
 
 import logging
+from typing import ClassVar
+
 from homeassistant.components.light import (
-    LightEntity,
     ATTR_BRIGHTNESS,
+    ATTR_HS_COLOR,
     ATTR_RGB_COLOR,
     ColorMode,
+    LightEntity,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.util.color import color_RGB_to_hs, color_hs_to_RGB
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util.color import color_hs_to_RGB, color_RGB_to_hs
 
-from .hub import ThermexHub
 from .const import (
-    DOMAIN,
-    THERMEX_NOTIFY,
     DEFAULT_BRIGHTNESS,
-    MIN_BRIGHTNESS,
-    MAX_BRIGHTNESS,
+    DOMAIN,
     FALLBACK_STATUS_TIMEOUT,
+    MAX_BRIGHTNESS,
+    MIN_BRIGHTNESS,
+    THERMEX_NOTIFY,
 )
+from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -143,7 +146,7 @@ class ThermexLightBase(LightEntity):
 
 class ThermexLight(ThermexLightBase):
     """Main light entity for Thermex hood."""
-    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+    _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.BRIGHTNESS}
     _attr_color_mode = ColorMode.BRIGHTNESS
 
     def __init__(self, hub: ThermexHub):
@@ -220,7 +223,8 @@ class ThermexLight(ThermexLightBase):
 
 class ThermexDecoLight(ThermexLightBase):
     """Deco light entity for Thermex hood."""
-    _attr_supported_color_modes = {ColorMode.HS, ColorMode.BRIGHTNESS}
+    # HS already implies brightness support; HA rejects HS combined with BRIGHTNESS
+    _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.HS}
     _attr_color_mode = ColorMode.HS
 
     def __init__(self, hub: ThermexHub):
@@ -262,14 +266,17 @@ class ThermexDecoLight(ThermexLightBase):
         brightness = self._clamp_brightness(brightness)
         
         rgb = kwargs.get(ATTR_RGB_COLOR)
+        hs = kwargs.get(ATTR_HS_COLOR)
         if rgb:
             r, g, b = rgb
+        elif hs:
+            r, g, b = color_hs_to_RGB(*hs)
         else:
             r, g, b = color_hs_to_RGB(*self._hs_color)
         
         payload = {
             "decolightonoff": 1,
-            "decolightbrightness": brightness,
+            "decolightbrightness": _to_api_brightness(brightness),
             "decolightr": r,
             "decolightg": g,
             "decolightb": b,
