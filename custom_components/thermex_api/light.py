@@ -180,24 +180,17 @@ class ThermexLight(ThermexLightBase):
         api_brightness = _to_api_brightness(brightness)
         
         _LOGGER.debug("ThermexLight: Turn on - HA Brightness: %s, API Brightness: %s", brightness, api_brightness)
-        await self._hub.send_request("Update", {
+        # State is updated from the Status read-back the hub dispatches: the
+        # hood may clamp or rewrite what we sent.
+        await self._hub.send_update({
             "Light": {"lightonoff": 1, "lightbrightness": api_brightness}
         })
-        
-        self._is_on = True
-        self._brightness = brightness
-        if brightness > 0:
-            self._last_brightness = brightness
-        self.schedule_update_ha_state()
 
     async def async_turn_off(self, **kwargs):
         """Turn off the light."""
-        await self._hub.send_request("Update", {
+        await self._hub.send_update({
             "Light": {"lightonoff": 0, "lightbrightness": 1}
         })
-        self._is_on = False
-        self._brightness = MIN_BRIGHTNESS
-        self.schedule_update_ha_state()
 
     def _process_fallback_data(self, data: dict):
         """Process fallback status data for main light."""
@@ -230,6 +223,14 @@ class ThermexDecoLight(ThermexLightBase):
     def hs_color(self) -> tuple[float, float]:
         return self._hs_color
 
+    def _remember_color(self, deco: dict) -> None:
+        """Keep the last real colour: the hood reports 0,0,0 while it is off."""
+        r = deco.get("decolightr", 0)
+        g = deco.get("decolightg", 0)
+        b = deco.get("decolightb", 0)
+        if self._is_on and (r or g or b):
+            self._hs_color = color_RGB_to_hs(r, g, b)
+
     def _handle_notify(self, ntf_type: str, data: dict) -> None:
         """Handle decolight notifications from the hub."""
         if ntf_type.lower() != "decolight":
@@ -248,10 +249,7 @@ class ThermexDecoLight(ThermexLightBase):
         if self._is_on and brightness > 0:
             self._last_brightness = brightness
         
-        r = deco.get("decolightr", 0)
-        g = deco.get("decolightg", 0)
-        b = deco.get("decolightb", 0)
-        self._hs_color = color_RGB_to_hs(r, g, b)
+        self._remember_color(deco)
         self._got_initial_state = True
         self.schedule_update_ha_state()
 
@@ -276,23 +274,13 @@ class ThermexDecoLight(ThermexLightBase):
             "decolightg": g,
             "decolightb": b,
         }
-        await self._hub.send_request("Update", {"Decolight": payload})
-        
-        self._is_on = True
-        self._brightness = brightness
-        if brightness > 0:
-            self._last_brightness = brightness
-        self._hs_color = color_RGB_to_hs(r, g, b)
-        self.schedule_update_ha_state()
+        await self._hub.send_update({"Decolight": payload})
 
     async def async_turn_off(self, **kwargs):
         """Turn off the deco light."""
-        await self._hub.send_request("Update", {
+        await self._hub.send_update({
             "Decolight": {"decolightonoff": 0, "decolightbrightness": 1}
         })
-        self._is_on = False
-        self._brightness = MIN_BRIGHTNESS
-        self.schedule_update_ha_state()
 
     def _process_fallback_data(self, data: dict):
         """Process fallback status data for deco light."""
@@ -308,7 +296,4 @@ class ThermexDecoLight(ThermexLightBase):
         if self._is_on and brightness > 0:
             self._last_brightness = brightness
         
-        r = deco.get("decolightr", 0)
-        g = deco.get("decolightg", 0)
-        b = deco.get("decolightb", 0)
-        self._hs_color = color_RGB_to_hs(r, g, b)
+        self._remember_color(deco)

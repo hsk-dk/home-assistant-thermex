@@ -36,3 +36,6 @@ Thumbs.db
 *.db-wal
 *.log
 CODE_REVIEW_IMPROVEMENTS.md
+
+# Local-only hood probe script (talks to a real device)
+tools/probe_hood.py

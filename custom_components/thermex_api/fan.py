@@ -168,27 +168,35 @@ class ThermexFan(FanEntity):
         new_on = bool(fan.get("fanonoff", 0)) and new_speed != 0
         new_mode = _VALUE_TO_MODE.get(new_speed, "off")
 
+        # Only touch storage when something actually changed: every 30 s
+        # heartbeat delivers a full Status and must not rewrite the file.
+        changed = False
+
         # turned on?
         if new_on and not self._is_on:
             self._runtime_manager.start()
-            self.hass.async_create_task(self._runtime_manager.save())
+            changed = True
 
         # turned off?
         if not new_on and self._is_on:
             self._runtime_manager.stop()
-            self.hass.async_create_task(self._runtime_manager.save())
+            changed = True
 
         # always record last_reset on first on
         if new_on and self._runtime_manager.get_last_reset() is None:
             self._runtime_manager.reset()
-            self.hass.async_create_task(self._runtime_manager.save())
+            changed = True
+
+        if new_mode != self._runtime_manager.get_last_preset():
+            self._runtime_manager.set_last_preset(new_mode)
+            changed = True
 
         # update local state
         self._is_on = new_on
         self._preset_mode = new_mode
-        self._runtime_manager.set_last_preset(new_mode)
 
-        self.hass.async_create_task(self._runtime_manager.save())
+        if changed:
+            self.hass.async_create_task(self._runtime_manager.save())
 
         self._got_initial_state = True  # Mark that we've received initial state
         # Update cached hub data to avoid repeated calls in extra_state_attributes
@@ -198,22 +206,18 @@ class ThermexFan(FanEntity):
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         speed = _MODE_TO_VALUE[preset_mode]
 
-        await self._hub.send_request(
-            "Update",
+        # The state (and runtime tracking) is updated from the Status read-back
+        # that send_update triggers, see _handle_notify.
+        await self._hub.send_update(
             {"Fan": {"fanonoff": int(speed > 0), "fanspeed": speed}},
         )
-
-        # ← LEGG TIL DETTE
-        self._is_on = speed > 0
-        self._preset_mode = preset_mode
-        self.schedule_update_ha_state()
 
     async def async_set_percentage(self, percentage: int) -> None:
         """Set the fan speed by percentage, mapping to discrete preset modes."""
         if percentage == 0:
             await self.async_turn_off()
             return
-        
+
         # Map percentage ranges to preset modes:
         # 1-25%   -> low
         # 26-50%  -> medium
@@ -227,46 +231,22 @@ class ThermexFan(FanEntity):
             preset = "high"
         else:
             preset = "boost"
-        
+
         await self.async_set_preset_mode(preset)
-        self._runtime_manager.start()
-        self._runtime_manager.set_last_preset(preset)
-        await self._runtime_manager.save()
-        # State will be updated via notify signal from hub
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs) -> None:
         if percentage is not None:
-            # Use percentage control
             await self.async_set_percentage(percentage)
         elif preset_mode:
-            mode = preset_mode
-            await self.async_set_preset_mode(mode)
-            self._runtime_manager.start()
-            self._runtime_manager.set_last_preset(mode)
-            await self._runtime_manager.save()
-            # State will be updated via notify signal from hub
+            await self.async_set_preset_mode(preset_mode)
         elif self._preset_mode and self._preset_mode != "off":
-            mode = self._preset_mode
-            await self.async_set_preset_mode(mode)
-            self._runtime_manager.start()
-            self._runtime_manager.set_last_preset(mode)
-            await self._runtime_manager.save()
-            # State will be updated via notify signal from hub
+            await self.async_set_preset_mode(self._preset_mode)
         else:
-            mode = "medium"
-            await self.async_set_preset_mode(mode)
-            self._runtime_manager.start()
-            self._runtime_manager.set_last_preset(mode)
-            await self._runtime_manager.save()
-            # State will be updated via notify signal from hub
+            await self.async_set_preset_mode("medium")
 
     async def async_turn_off(self, **kwargs) -> None:
         await self.cancel_delayed_off()  # Cancel any delayed turn-off
         await self.async_set_preset_mode("off")
-        self._runtime_manager.stop()
-        self._runtime_manager.set_last_preset("off")
-        await self._runtime_manager.save()
-        # State will be updated via notify signal from hub
 
     async def async_reset(self, **kwargs) -> None:
         self._runtime_manager.reset()

@@ -18,6 +18,7 @@ def mock_hub():
         "model": "Test Model",
     }
     hub.send_request = AsyncMock()
+    hub.send_update = AsyncMock()
     hub.get_coordinator_data = MagicMock(return_value={
         "connection_state": "connected",
         "last_error": None,

@@ -783,3 +783,74 @@ class TestThermexHubAuth:
         callback.assert_called_once()
         with pytest.raises(ThermexAuthError):
             await hub._ensure_connected()  # and no further attempts later
+
+
+class TestThermexHubUpdates:
+    """send_update checks the status code and reads the state back."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        return ThermexHub(hass, "192.168.1.100", "pw", "entry")
+
+    @pytest.mark.asyncio
+    async def test_update_ok_reads_status_back(self, hub):
+        calls = []
+
+        async def fake_send(request, body):
+            calls.append(request)
+            return {"Status": 200}
+
+        hub.send_request = fake_send
+        await hub.send_update({"Light": {"lightonoff": 1, "lightbrightness": 50}})
+
+        assert calls == ["Update", "status"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [400, 401, 500])
+    async def test_update_error_status_raises(self, hub, status):
+        from custom_components.thermex_api.hub import ThermexRequestError
+
+        calls = []
+
+        async def fake_send(request, body):
+            calls.append(request)
+            return {"Status": status}
+
+        hub.send_request = fake_send
+        with pytest.raises(ThermexRequestError):
+            await hub.send_update({"Light": {"lightonoff": 1}})
+
+        assert calls == ["Update"]  # no read-back after a rejected update
+
+    @pytest.mark.asyncio
+    async def test_readback_failure_is_not_fatal(self, hub):
+        async def fake_send(request, body):
+            if request == "status":
+                raise TimeoutError
+            return {"Status": 200}
+
+        hub.send_request = fake_send
+        resp = await hub.send_update({"Light": {"lightonoff": 1}})
+
+        assert resp == {"Status": 200}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status,expected", [(401, "auth"), (400, "conn"), (500, "conn")])
+    async def test_only_401_is_an_auth_error(self, hub, status, expected):
+        ws = MagicMock()
+        ws.closed = False
+        ws.close = AsyncMock()
+        ws.send_json = AsyncMock()
+        ws.receive = AsyncMock(return_value=MagicMock(
+            type=WSMsgType.TEXT, data=json.dumps({"Response": "Authenticate", "Status": status})
+        ))
+        session = MagicMock()
+        session.ws_connect = AsyncMock(return_value=ws)
+
+        with patch("custom_components.thermex_api.hub.async_get_clientsession", return_value=session):
+            with pytest.raises(ConnectionError) as exc:
+                await hub.connect()
+
+        assert isinstance(exc.value, ThermexAuthError) == (expected == "auth")
