@@ -672,3 +672,71 @@ class TestThermexHub:
         
         await close_task
         assert hub_instance._closing
+
+class TestThermexHubLifecycle:
+    """Regression tests for connection cleanup and request queueing."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        return ThermexHub(hass, "192.168.1.100", "pw", "entry")
+
+    @pytest.mark.asyncio
+    async def test_failed_connect_closes_session(self, hub):
+        """If authentication fails, no websocket/session may be left open."""
+        ws = MagicMock()
+        ws.closed = False
+        ws.close = AsyncMock()
+        ws.send_json = AsyncMock()
+        ws.receive = AsyncMock(return_value=MagicMock(type=WSMsgType.CLOSED))
+        session = MagicMock()
+        session.ws_connect = AsyncMock(return_value=ws)
+        session.close = AsyncMock()
+
+        with patch("custom_components.thermex_api.hub.aiohttp.ClientSession", return_value=session):
+            with pytest.raises(ConnectionError):
+                await hub.connect()
+
+        ws.close.assert_awaited()
+        session.close.assert_awaited()
+        assert hub._ws is None
+        assert hub._session is None
+
+    @pytest.mark.asyncio
+    async def test_same_type_requests_are_serialized(self, hub):
+        """Two concurrent requests of one type must not overlap (replies are matched by name)."""
+        active = 0
+        max_active = 0
+
+        async def fake_send(request, body):
+            nonlocal active, max_active
+            active += 1
+            max_active = max(max_active, active)
+            await asyncio.sleep(0.01)
+            active -= 1
+            return {"Status": 200}
+
+        hub._send_request = fake_send
+        await asyncio.gather(
+            hub.send_request("Update", {"Light": {}}),
+            hub.send_request("Update", {"Fan": {}}),
+        )
+        assert max_active == 1
+
+    @pytest.mark.asyncio
+    async def test_different_type_requests_run_concurrently(self, hub):
+        """Requests of different types are not blocked by each other."""
+        started = []
+
+        async def fake_send(request, body):
+            started.append(request)
+            await asyncio.sleep(0.01)
+            return {"Status": 200}
+
+        hub._send_request = fake_send
+        await asyncio.gather(
+            hub.send_request("Update", {}),
+            hub.send_request("Status", {}),
+        )
+        assert sorted(started) == ["Status", "Update"]

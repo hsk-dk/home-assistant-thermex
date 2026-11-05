@@ -16,6 +16,8 @@ from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
 
+PLATFORMS = ["light", "fan", "sensor", "binary_sensor", "button"]
+
 
 async def async_create_coordinator(hass: HomeAssistant, hub: ThermexHub) -> DataUpdateCoordinator:
     async def async_update_data():
@@ -49,26 +51,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Failed to connect to Thermex at %s: %s", host, err)
         raise ConfigEntryNotReady from err
 
-    # 2) Prepare per-entry storage in hass.data
-    hass.data.setdefault(DOMAIN, {})
-    entry_data: dict = {}
-    entry_data["hub"] = hub
+    # Anything below can fail; never leave the websocket open if setup aborts
+    try:
+        # 2) Prepare per-entry storage in hass.data
+        hass.data.setdefault(DOMAIN, {})
+        entry_data: dict = {}
+        entry_data["hub"] = hub
 
-    # 3) Initialize & load the shared RuntimeManager
-    store: Store = Store(
-        hass,
-        STORAGE_VERSION,
-        RUNTIME_STORAGE_FILE.format(entry_id=entry.entry_id),
-    )
-    runtime_manager = RuntimeManager(store)
-    await runtime_manager.load()
-    hub.runtime_manager = runtime_manager
-    entry_data["runtime_manager"] = runtime_manager
+        # 3) Initialize & load the shared RuntimeManager
+        store: Store = Store(
+            hass,
+            STORAGE_VERSION,
+            RUNTIME_STORAGE_FILE.format(entry_id=entry.entry_id),
+        )
+        runtime_manager = RuntimeManager(store)
+        await runtime_manager.load()
+        hub.runtime_manager = runtime_manager
+        entry_data["runtime_manager"] = runtime_manager
 
-    # 4) Create & refresh the coordinator
-    coordinator = await async_create_coordinator(hass, hub)
-    await coordinator.async_config_entry_first_refresh()
-    entry_data["coordinator"] = coordinator
+        # 4) Create & refresh the coordinator
+        coordinator = await async_create_coordinator(hass, hub)
+        await coordinator.async_config_entry_first_refresh()
+        entry_data["coordinator"] = coordinator
+    except BaseException:
+        await hub.close()
+        raise
 
     # 5) Save entry_data back into hass.data
     hass.data[DOMAIN][entry.entry_id] = entry_data
@@ -79,10 +86,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     # 7) Forward setup to all platforms
-    await hass.config_entries.async_forward_entry_setups(
-        entry,
-        ["light", "fan", "sensor", "binary_sensor", "button"],
-    )
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except BaseException:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        await hub.close()
+        raise
     return True
 
 
@@ -94,11 +103,9 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry and clean up the hub."""
-    unload_ok = await hass.config_entries.async_unload_platforms(
-        entry, ["light", "fan", "sensor", "binary_sensor", "button"]
-    )
-    # Drop our per-entry dict (hub, coordinator, runtime_manager)
-    hass.data[DOMAIN].pop(entry.entry_id, None)
-    # Also remove the global coordinator key - OBS must be remove at some point
-    hass.data[DOMAIN].pop("coordinator", None)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        entry_data = hass.data[DOMAIN].pop(entry.entry_id, None)
+        if entry_data and (hub := entry_data.get("hub")):
+            await hub.close()
     return unload_ok

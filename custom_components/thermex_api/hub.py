@@ -39,6 +39,8 @@ class ThermexHub:
         self._api_key = api_key
         self.unique_id = f"thermex_{host.replace('.', '_')}"
         self._pending: dict[str, asyncio.Future] = {}
+        # Responses are matched by name only, so allow one in-flight request per type
+        self._request_locks: dict[str, asyncio.Lock] = {}
         self._ws_lock = asyncio.Lock()
         self._ws: ClientWebSocketResponse | None = None
         self._recv_task: asyncio.Task | None = None
@@ -162,9 +164,29 @@ class ThermexHub:
             self._session = None
 
     async def connect(self) -> None:
+        """Connect and authenticate; leaves no open resources on failure."""
+        try:
+            await self._connect()
+        except BaseException:
+            await self._close_connection()
+            raise
+
+    async def _cancel_recv_task(self) -> None:
+        """Cancel a previous receive loop so reconnects never leave two running."""
+        task = self._recv_task
+        self._recv_task = None
+        if task and not task.done() and task is not asyncio.current_task():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    async def _connect(self) -> None:
         # Initialize activity timer and reset startup flag
         self._last_activity = asyncio.get_event_loop().time()
         self._startup_complete = False
+        await self._cancel_recv_task()
         
         try:
             self._session = aiohttp.ClientSession()
@@ -199,8 +221,14 @@ class ThermexHub:
             raise ConnectionError(f"Authentication failed: {data}")
         _LOGGER.debug("Authenticated successfully with Thermex (status=200)")
 
-        self._recv_task = asyncio.create_task(self._recv_loop())
-        self._watchdog_task = asyncio.create_task(self._watchdog_loop())
+        self._recv_task = self._hass.async_create_background_task(
+            self._recv_loop(), f"{DOMAIN}_recv_{self._entry_id}"
+        )
+        # Reconnects call connect() again (even from the watchdog itself): keep one watchdog
+        if self._watchdog_task is None or self._watchdog_task.done():
+            self._watchdog_task = self._hass.async_create_background_task(
+                self._watchdog_loop(), f"{DOMAIN}_watchdog_{self._entry_id}"
+            )
 
         try:
             proto_resp = await self.send_request("protocolversion", {})
@@ -225,7 +253,9 @@ class ThermexHub:
             _LOGGER.error("ProtocolVersion request failed: %s", err)
             self.last_error = f"ProtocolVersion request failed: {err}"
         await asyncio.sleep(0.1)
-        asyncio.create_task(self._dispatch_initial_status())
+        self._hass.async_create_background_task(
+            self._dispatch_initial_status(), f"{DOMAIN}_initial_status_{self._entry_id}"
+        )
 
     async def _recv_loop(self) -> None:
         assert self._ws is not None
@@ -340,11 +370,22 @@ class ThermexHub:
                 await asyncio.sleep(5)  # Wait before retrying
 
     async def send_request(self, request: str, body: dict[str, Any]) -> dict[str, Any]:
-        """Send a JSON-RPC request and wait for its matching response, with one retry and reconnect on repeated timeout."""
-        # Don't send requests if we're closing
+        """Send a request and wait for its matching response.
+
+        Responses carry no request id and are matched by name, so concurrent
+        requests of the same type are queued instead of overwriting each other.
+        """
         if self._closing:
             raise ConnectionError("Hub is closing")
-            
+        lock = self._request_locks.setdefault(request.lower(), asyncio.Lock())
+        async with lock:
+            return await self._send_request(request, body)
+
+    async def _send_request(self, request: str, body: dict[str, Any]) -> dict[str, Any]:
+        """Send a request and wait for its response, with one retry on timeout."""
+        if self._closing:
+            raise ConnectionError("Hub is closing")
+
         # Ensure websocket is open (and reconnect if not)
         # If we can't connect, ConnectionError propagates and nothing is sent
         await self._ensure_connected()
