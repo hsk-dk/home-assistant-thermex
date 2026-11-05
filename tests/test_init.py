@@ -1,10 +1,10 @@
 """Tests for __init__ setup functions."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
-from custom_components.thermex_api import async_setup_entry, async_unload_entry, async_create_coordinator
+from custom_components.thermex_api import async_setup_entry, async_unload_entry
+from custom_components.thermex_api.hub import ThermexAuthError
 
 
 class TestInit:
@@ -17,120 +17,109 @@ class TestInit:
         integration.version = "1.0.0"
         return integration
 
-    @pytest.mark.asyncio
-    async def test_async_setup_entry_success(self, mock_hass, mock_config_entry, mock_integration):
-        """Test successful setup entry."""
-        mock_hub = MagicMock()
-        mock_hub.connect = AsyncMock()
-        mock_hub.close = AsyncMock()
-        mock_hub.get_coordinator_data = MagicMock(return_value={})
-        
-        mock_runtime_manager = MagicMock()
-        mock_runtime_manager.load = AsyncMock()
+    @pytest.fixture
+    def mock_hub(self):
+        hub = MagicMock()
+        hub.connect = AsyncMock()
+        hub.close = AsyncMock()
+        return hub
 
-        mock_coordinator = MagicMock()
-        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
-        
-        with patch('custom_components.thermex_api.async_get_integration', return_value=mock_integration):
-            with patch('custom_components.thermex_api.ThermexHub', return_value=mock_hub):
-                with patch('custom_components.thermex_api.RuntimeManager', return_value=mock_runtime_manager):
-                    with patch('custom_components.thermex_api.Store'), patch(
-                        'custom_components.thermex_api.async_create_coordinator',
-                        new_callable=AsyncMock,
-                        return_value=mock_coordinator,
-                    ):
-                        with patch.object(mock_hass.config_entries, 'async_forward_entry_setups', new_callable=AsyncMock):
-                            result = await async_setup_entry(mock_hass, mock_config_entry)
-                            
-                            assert result is True
-                            mock_hub.connect.assert_called_once()
-                            mock_runtime_manager.load.assert_called_once()
+    @pytest.fixture
+    def mock_runtime_manager(self):
+        rm = MagicMock()
+        rm.load = AsyncMock()
+        return rm
+
+    @pytest.fixture
+    def setup_patches(self, mock_integration, mock_hub, mock_runtime_manager):
+        """Patch everything async_setup_entry builds."""
+        with patch('custom_components.thermex_api.async_get_integration', return_value=mock_integration), \
+             patch('custom_components.thermex_api.ThermexHub', return_value=mock_hub), \
+             patch('custom_components.thermex_api.RuntimeManager', return_value=mock_runtime_manager), \
+             patch('custom_components.thermex_api.Store'):
+            yield
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry_connection_failure(self, mock_hass, mock_config_entry, mock_integration):
-        """Test setup entry fails on connection error."""
-        mock_hub = MagicMock()
+    async def test_async_setup_entry_success(
+        self, mock_hass, mock_config_entry, setup_patches, mock_hub, mock_runtime_manager
+    ):
+        """Successful setup stores hub + runtime manager in entry.runtime_data."""
+        mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
+
+        result = await async_setup_entry(mock_hass, mock_config_entry)
+
+        assert result is True
+        mock_hub.connect.assert_called_once()
+        mock_runtime_manager.load.assert_called_once()
+        assert mock_config_entry.runtime_data.hub is mock_hub
+        assert mock_config_entry.runtime_data.runtime_manager is mock_runtime_manager
+        assert mock_hub.runtime_manager is mock_runtime_manager
+        mock_hass.config_entries.async_forward_entry_setups.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_connection_failure(
+        self, mock_hass, mock_config_entry, setup_patches, mock_hub
+    ):
+        """Connection errors make the entry retry later."""
         mock_hub.connect = AsyncMock(side_effect=Exception("Connection failed"))
-        
-        with patch('custom_components.thermex_api.async_get_integration', return_value=mock_integration):
-            with patch('custom_components.thermex_api.ThermexHub', return_value=mock_hub):
-                with pytest.raises(ConfigEntryNotReady):
-                    await async_setup_entry(mock_hass, mock_config_entry)
+
+        with pytest.raises(ConfigEntryNotReady):
+            await async_setup_entry(mock_hass, mock_config_entry)
 
     @pytest.mark.asyncio
-    async def test_async_unload_entry_success(self, mock_hass, mock_config_entry):
-        """Test successful unload entry."""
-        mock_hub = MagicMock()
-        mock_hub.close = AsyncMock()
-        
-        mock_hass.data = {
-            "thermex_api": {
-                mock_config_entry.entry_id: {
-                    "hub": mock_hub,
-                }
-            }
-        }
-        
+    async def test_async_setup_entry_auth_failure_starts_reauth(
+        self, mock_hass, mock_config_entry, setup_patches, mock_hub
+    ):
+        """A rejected password raises ConfigEntryAuthFailed (HA starts reauth)."""
+        mock_hub.connect = AsyncMock(side_effect=ThermexAuthError("bad password"))
+
+        with pytest.raises(ConfigEntryAuthFailed):
+            await async_setup_entry(mock_hass, mock_config_entry)
+
+    @pytest.mark.asyncio
+    async def test_async_setup_entry_closes_hub_if_platform_setup_fails(
+        self, mock_hass, mock_config_entry, setup_patches, mock_hub
+    ):
+        """Never leave the websocket open if setup aborts after connecting."""
+        mock_hass.config_entries.async_forward_entry_setups = AsyncMock(
+            side_effect=RuntimeError("platform exploded")
+        )
+
+        with pytest.raises(RuntimeError):
+            await async_setup_entry(mock_hass, mock_config_entry)
+
+        mock_hub.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_hub_auth_failure_callback_starts_reauth(
+        self, mock_hass, mock_config_entry, setup_patches, mock_hub
+    ):
+        """If the hood rejects the password later, reauth is started for the entry."""
+        mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
+        await async_setup_entry(mock_hass, mock_config_entry)
+
+        mock_hub.on_auth_failure()
+
+        mock_config_entry.async_start_reauth.assert_called_once_with(mock_hass)
+
+    @pytest.mark.asyncio
+    async def test_async_unload_entry_success(self, mock_hass, mock_config_entry, mock_hub):
+        """Unloading closes the hub connection."""
+        mock_config_entry.runtime_data = MagicMock(hub=mock_hub)
+
         with patch.object(mock_hass.config_entries, 'async_unload_platforms', new_callable=AsyncMock, return_value=True):
             result = await async_unload_entry(mock_hass, mock_config_entry)
-            
-            assert result is True
-            # Verify entry data was removed and the hub connection closed
-            assert mock_config_entry.entry_id not in mock_hass.data["thermex_api"]
-            mock_hub.close.assert_awaited_once()
+
+        assert result is True
+        mock_hub.close.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_async_unload_entry_failure_keeps_hub(self, mock_hass, mock_config_entry):
-        """A failed platform unload must not close the hub or drop entry data."""
-        mock_hub = MagicMock()
-        mock_hub.close = AsyncMock()
-        mock_hass.data = {
-            "thermex_api": {mock_config_entry.entry_id: {"hub": mock_hub}}
-        }
+    async def test_async_unload_entry_failure_keeps_hub(self, mock_hass, mock_config_entry, mock_hub):
+        """A failed platform unload must not close the hub."""
+        mock_config_entry.runtime_data = MagicMock(hub=mock_hub)
 
         with patch.object(mock_hass.config_entries, 'async_unload_platforms', new_callable=AsyncMock, return_value=False):
             result = await async_unload_entry(mock_hass, mock_config_entry)
 
         assert result is False
         mock_hub.close.assert_not_called()
-        assert mock_config_entry.entry_id in mock_hass.data["thermex_api"]
-
-    @pytest.mark.asyncio
-    async def test_async_create_coordinator(self, mock_hass):
-        """Test coordinator creation passes the expected name and interval."""
-        mock_hub = MagicMock()
-        mock_hub.get_coordinator_data = MagicMock(return_value={"test": "data"})
-
-        with patch('custom_components.thermex_api.DataUpdateCoordinator') as mock_cls:
-            coordinator = await async_create_coordinator(mock_hass, mock_hub)
-
-        assert coordinator is mock_cls.return_value
-        kwargs = mock_cls.call_args.kwargs
-        assert kwargs["name"] == "thermex_coordinator"
-        assert kwargs["update_interval"].total_seconds() == 30
-
-    @pytest.mark.asyncio
-    async def test_coordinator_update_method(self, mock_hass):
-        """Test coordinator update method returns the hub's data."""
-        mock_hub = MagicMock()
-        mock_hub.get_coordinator_data = MagicMock(return_value={"test": "data"})
-
-        with patch('custom_components.thermex_api.DataUpdateCoordinator') as mock_cls:
-            await async_create_coordinator(mock_hass, mock_hub)
-
-        data = await mock_cls.call_args.kwargs["update_method"]()
-
-        assert data == {"test": "data"}
-        mock_hub.get_coordinator_data.assert_called()
-
-    @pytest.mark.asyncio
-    async def test_coordinator_update_method_wraps_errors(self, mock_hass):
-        """Errors from the hub surface as UpdateFailed."""
-        mock_hub = MagicMock()
-        mock_hub.get_coordinator_data = MagicMock(side_effect=RuntimeError("boom"))
-
-        with patch('custom_components.thermex_api.DataUpdateCoordinator') as mock_cls:
-            await async_create_coordinator(mock_hass, mock_hub)
-
-        with pytest.raises(UpdateFailed):
-            await mock_cls.call_args.kwargs["update_method"]()

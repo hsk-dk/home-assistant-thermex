@@ -17,12 +17,12 @@ from homeassistant.util.color import color_hs_to_RGB, color_RGB_to_hs
 
 from .const import (
     DEFAULT_BRIGHTNESS,
-    DOMAIN,
     FALLBACK_STATUS_TIMEOUT,
     MAX_BRIGHTNESS,
     MIN_BRIGHTNESS,
     THERMEX_NOTIFY,
 )
+from .data import ThermexConfigEntry
 from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,14 +55,9 @@ def _to_ha_brightness(api_brightness: int) -> int:
     """
     return round(api_brightness / 100 * 255)
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
     """Setup Thermex main and deco lights."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub: ThermexHub = entry_data.get("hub")
-    
-    if not hub:
-        _LOGGER.error("Missing hub in entry data")
-        return
+    hub = entry.runtime_data.hub
     
     enable_decolight = entry.options.get("enable_decolight", False)
     entities: list[LightEntity] = [ThermexLight(hub)]

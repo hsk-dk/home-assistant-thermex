@@ -8,13 +8,22 @@
           "host": "Liesituulettimen IP-osoite",
           "api_key": "API-salasana"
         }
+      },
+      "reauth_confirm": {
+        "title": "Todenna Thermex-liesituuletin uudelleen",
+        "description": "API-salasana laitteelle {host} hylättiin. Anna nykyinen API-salasana.",
+        "data": {
+          "api_key": "API-salasana"
+        }
       }
     },
     "error": {
-      "cannot_connect": "Yhteyttä ei voida muodostaa. Tarkista IP-osoite ja salasana."
+      "cannot_connect": "Yhteyttä ei voida muodostaa. Tarkista IP-osoite ja salasana.",
+      "invalid_auth": "Virheellinen API-salasana."
     },
     "abort": {
-      "already_configured": "Tämä Thermex-liesituuletin on jo määritetty."
+      "already_configured": "Tämä Thermex-liesituuletin on jo määritetty.",
+      "reauth_successful": "Uudelleentodennus onnistui."
     }
   },
   "options": {

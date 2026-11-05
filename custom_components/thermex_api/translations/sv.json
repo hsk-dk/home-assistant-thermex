@@ -8,13 +8,22 @@
           "host": "Köksfläktens IP address",
           "api_key": "API lösenord"
         }
+      },
+      "reauth_confirm": {
+        "title": "Autentisera Thermex-fläkten igen",
+        "description": "API-lösenordet för {host} avvisades. Ange det aktuella API-lösenordet.",
+        "data": {
+          "api_key": "API lösenord"
+        }
       }
     },
     "error": {
-      "cannot_connect": "Kan inte ansluta. Kolla IP och lösenord."
+      "cannot_connect": "Kan inte ansluta. Kolla IP och lösenord.",
+      "invalid_auth": "Ogiltigt API-lösenord."
     },
     "abort": {
-      "already_configured": "Den här köksfläkten är redan konfigurerad."
+      "already_configured": "Den här köksfläkten är redan konfigurerad.",
+      "reauth_successful": "Ominloggningen lyckades."
     }
   },
   "options": {

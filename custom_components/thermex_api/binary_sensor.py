@@ -12,20 +12,14 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
-from .const import DOMAIN, MINIMUM_RUNTIME_FOR_NO_RESET_ALERT, THERMEX_NOTIFY
-from .hub import ThermexHub
-from .runtime_manager import RuntimeManager
+from .const import MINIMUM_RUNTIME_FOR_NO_RESET_ALERT, THERMEX_NOTIFY
+from .data import ThermexConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
     """Set up the Thermex filter‐alert binary sensor."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub: ThermexHub = entry_data.get("hub")
-    runtime_manager: RuntimeManager = entry_data.get("runtime_manager")
-    
-    if not hub or not runtime_manager:
-        _LOGGER.error("Missing hub or runtime_manager in entry data")
-        return
+    hub = entry.runtime_data.hub
+    runtime_manager = entry.runtime_data.runtime_manager
 
     device_info = hub.device_info
 

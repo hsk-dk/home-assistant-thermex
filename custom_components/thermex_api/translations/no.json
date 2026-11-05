@@ -8,13 +8,22 @@
           "host": "IP-adresse for hetten",
           "api_key": "API-passord"
         }
+      },
+      "reauth_confirm": {
+        "title": "Autentiser Thermex-hette på nytt",
+        "description": "API-passordet for {host} ble avvist. Skriv inn gjeldende API-passord.",
+        "data": {
+          "api_key": "API-passord"
+        }
       }
     },
     "error": {
-      "cannot_connect": "Kan ikke koble til. Kontroller IP-adresse og passord."
+      "cannot_connect": "Kan ikke koble til. Kontroller IP-adresse og passord.",
+      "invalid_auth": "Ugyldig API-passord."
     },
     "abort": {
-      "already_configured": "Denne Thermex-hetten er allerede konfigurert."
+      "already_configured": "Denne Thermex-hetten er allerede konfigurert.",
+      "reauth_successful": "Ny autentisering var vellykket."
     }
   },
   "options": {

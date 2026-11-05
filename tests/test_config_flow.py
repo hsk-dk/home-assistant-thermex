@@ -191,3 +191,65 @@ class TestConfigFlow:
         assert result["type"] == FlowResultType.CREATE_ENTRY
         assert result["data"]["fan_alert_hours"] == 120
         assert result["data"]["enable_decolight"] is True
+
+
+class TestReauthFlow:
+    """Reauthentication and error mapping."""
+
+    @pytest.mark.asyncio
+    async def test_invalid_password_shows_invalid_auth(self, mock_hass):
+        from custom_components.thermex_api.hub import ThermexAuthError
+
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
+
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect", side_effect=ThermexAuthError("x")):
+            result = await flow.async_step_user(
+                user_input={CONF_HOST: "192.168.1.100", "api_key": "wrong"}
+            )
+
+        assert result["type"] == FlowResultType.FORM
+        assert result["errors"] == {"base": "invalid_auth"}
+
+    @pytest.mark.asyncio
+    async def test_reauth_updates_password(self, mock_hass, mock_config_entry):
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        flow._get_reauth_entry = MagicMock(return_value=mock_config_entry)
+        flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect", return_value=None):
+            result = await flow.async_step_reauth_confirm(user_input={"api_key": "new_key"})
+
+        assert result == {"type": "abort"}
+        flow.async_update_reload_and_abort.assert_called_once_with(
+            mock_config_entry, data_updates={"api_key": "new_key"}
+        )
+
+    @pytest.mark.asyncio
+    async def test_reauth_wrong_password_shows_error(self, mock_hass, mock_config_entry):
+        from custom_components.thermex_api.hub import ThermexAuthError
+
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        flow._get_reauth_entry = MagicMock(return_value=mock_config_entry)
+
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect", side_effect=ThermexAuthError("x")):
+            result = await flow.async_step_reauth_confirm(user_input={"api_key": "still_wrong"})
+
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "reauth_confirm"
+        assert result["errors"] == {"base": "invalid_auth"}
+
+    @pytest.mark.asyncio
+    async def test_reauth_form_shown_first(self, mock_hass, mock_config_entry):
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        flow._get_reauth_entry = MagicMock(return_value=mock_config_entry)
+
+        result = await flow.async_step_reauth({"host": "x"})
+
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "reauth_confirm"
