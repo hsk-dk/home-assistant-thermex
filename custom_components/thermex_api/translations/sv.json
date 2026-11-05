@@ -59,7 +59,13 @@
         "name": "Filter driftstimmar sedan senaste nollställning"
       },
       "thermex_sensor_connection_status": {
-        "name": "Anslutningsstatus"
+        "name": "Anslutningsstatus",
+        "state": {
+          "connected": "Ansluten",
+          "disconnected": "Frånkopplad",
+          "error": "Fel",
+          "closed": "Stängd"
+        }
       },
       "thermex_sensor_delayed_turn_off": {
         "name": "Fördröjd avstängning tid"

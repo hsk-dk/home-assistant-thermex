@@ -1,5 +1,6 @@
 """Tests for button entities."""
 import pytest
+from homeassistant.const import EntityCategory
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from custom_components.thermex_api.button import (
@@ -54,7 +55,7 @@ class TestResetRuntimeButton:
         """Test button entity initialization."""
         assert button_entity._hub == mock_hub
         assert button_entity._entry_id == "test_entry_id"
-        assert button_entity.icon == "mdi:refresh"
+        assert button_entity.entity_category == EntityCategory.CONFIG
 
     @pytest.mark.asyncio
     async def test_button_press_resets_runtime(self, button_entity):
@@ -92,7 +93,7 @@ class TestDelayedTurnOffButton:
         """Test delayed button entity initialization."""
         assert delayed_button._hub == mock_hub
         assert delayed_button._entry_id == "test_entry_id"
-        assert delayed_button.icon == "mdi:timer-off"
+        assert delayed_button.entity_category is None  # an action, not a setting
 
     @pytest.mark.asyncio
     async def test_delayed_button_press_domain_service(self, delayed_button, mock_hub, monkeypatch):
@@ -132,11 +133,11 @@ class TestDelayedTurnOffButton:
         button.hass = mock_hass
         assert button._attr_translation_key == "thermex_button_reset_runtime"
 
-    def test_reset_button_icon(self, mock_hub, mock_hass):
-        """Test reset button icon."""
+    def test_reset_button_icon_comes_from_icons_json(self, mock_hub, mock_hass):
+        """Icons are defined in icons.json by translation key, not in code."""
         button = ResetRuntimeButton(mock_hub, None, "test_entry_id")
-        button.hass = mock_hass
-        assert button.icon == "mdi:refresh"
+        assert button.icon is None
+        assert button._attr_translation_key == "thermex_button_reset_runtime"
 
     def test_button_device_info(self, delayed_button, mock_hub):
         """Test button device info."""

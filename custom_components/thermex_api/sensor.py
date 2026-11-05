@@ -8,7 +8,12 @@ Creates persistent sensors for:
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
+from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
@@ -20,6 +25,10 @@ from .entity import ThermexEntity
 from .entity_lookup import find_fan_entity_id
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 0
+
+CONNECTION_STATES = ["connected", "disconnected", "error", "closed"]
 
 async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
     """Set up persistent runtime-tracking sensors for the Thermex fan."""
@@ -54,8 +63,10 @@ class BaseRuntimeSensor(ThermexEntity, SensorEntity):
 
 class RuntimeHoursSensor(BaseRuntimeSensor):
     """Sensor for the cumulative runtime hours of the Thermex fan."""
-    _attr_unit_of_measurement = "h"  # type: ignore[assignment]
-    _attr_state_class = "measurement"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING  # a drop = the filter was reset
+    _attr_suggested_display_precision = 1
 
     def __init__(self, hub, runtime_manager):
         super().__init__(hub, runtime_manager)
@@ -128,6 +139,7 @@ class LastResetSensor(BaseRuntimeSensor):
     """Timestamp when the runtime counter was last reset."""
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _requires_connection = False  # stored locally
 
     def __init__(self, hub, runtime_manager):
@@ -144,45 +156,36 @@ class LastResetSensor(BaseRuntimeSensor):
 
 
 class ConnectionStatusSensor(BaseRuntimeSensor):
-    """Sensor to display connection status and diagnostic information."""
+    """Connection state of the hood (diagnostic)."""
 
-    _attr_icon = "mdi:connection"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = CONNECTION_STATES
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+    _requires_connection = False  # it exists to show that the hood is offline
 
     def __init__(self, hub, runtime_manager):
         super().__init__(hub, runtime_manager)
         self._attr_unique_id = f"{hub.unique_id}_connection_status"
         self._attr_translation_key = "thermex_sensor_connection_status"
-     
+
     @property
     def native_value(self):
-        """Return the connection state with protocol version as the sensor value."""
-        hub_data = self._hub.get_coordinator_data()
-        connection_state = hub_data.get("connection_state", "unknown")
-        protocol_version = self._hub.protocol_version
-        
-        if connection_state == "connected" and protocol_version:
-            return f"connected (v{protocol_version})"
-        else:
-            return connection_state
-    
+        """Return the connection state."""
+        state = self._hub.get_coordinator_data().get("connection_state", "disconnected")
+        return state if state in CONNECTION_STATES else "disconnected"
+
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return connection diagnostic information as attributes."""
-        hub_data = self._hub.get_coordinator_data()
-        
+        """Only slowly changing details; the old counters changed on every update."""
         return {
-            "last_error": hub_data.get("last_error"),
-            "watchdog_active": hub_data.get("watchdog_active", False),
-            "time_since_activity": hub_data.get("time_since_activity", 0),
-            "heartbeat_interval": hub_data.get("heartbeat_interval", 30),
-            "connection_timeout": hub_data.get("connection_timeout", 120),
+            "last_error": self._hub.last_error,
             "protocol_version": self._hub.protocol_version,
         }
-    
+
     @callback
     def _handle_notify(self, ntf_type, data):
         """Update on any notification to refresh connection status."""
-        # Update connection status on any activity
         self.async_write_ha_state()
 
 

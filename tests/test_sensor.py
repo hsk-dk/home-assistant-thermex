@@ -172,7 +172,7 @@ class TestConnectionStatusSensor:
         """Test sensor returns connected state with protocol version."""
         status_sensor._hub.get_coordinator_data = MagicMock(return_value={"connection_state": "connected"})
         status_sensor._hub.protocol_version = "1.0"
-        assert status_sensor.native_value == "connected (v1.0)"
+        assert status_sensor.native_value == "connected"  # version is an attribute now
 
     def test_sensor_state_disconnected(self, status_sensor):
         """Test sensor returns disconnected state."""
@@ -181,18 +181,51 @@ class TestConnectionStatusSensor:
         assert status_sensor.native_value == "disconnected"
 
     def test_sensor_extra_attributes(self, status_sensor):
-        """Test sensor returns diagnostic attributes."""
-        status_sensor._hub.get_coordinator_data = MagicMock(return_value={
-            "last_error": None,
-            "watchdog_active": True,
-            "time_since_activity": 10,
-            "heartbeat_interval": 30,
-            "connection_timeout": 120,
-        })
-        
+        """Only slowly changing details; counters that changed on every update are gone."""
+        status_sensor._hub.last_error = "boom"
+        status_sensor._hub.protocol_version = "1.1"
+
         attrs = status_sensor.extra_state_attributes
-        assert attrs["watchdog_active"] is True
-        assert attrs["time_since_activity"] == 10
+
+        assert attrs == {"last_error": "boom", "protocol_version": "1.1"}
+
+    def test_sensor_is_a_disabled_diagnostic_enum(self, status_sensor):
+        from homeassistant.components.sensor import SensorDeviceClass
+        from homeassistant.const import EntityCategory
+
+        assert status_sensor.device_class == SensorDeviceClass.ENUM
+        assert set(status_sensor.options) == {"connected", "disconnected", "error", "closed"}
+        assert status_sensor.entity_category == EntityCategory.DIAGNOSTIC
+        assert status_sensor.entity_registry_enabled_default is False
+
+    def test_unknown_state_is_reported_as_disconnected(self, status_sensor):
+        status_sensor._hub.get_coordinator_data = MagicMock(return_value={"connection_state": "weird"})
+        assert status_sensor.native_value == "disconnected"
+
+    def test_stays_available_while_the_hood_is_offline(self, status_sensor):
+        status_sensor._hub.available = False
+        assert status_sensor.available is True
+
+
+class TestSensorModelling:
+    def test_runtime_sensor_uses_duration_hours_and_total_increasing(self, mock_hub):
+        from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+        from homeassistant.const import UnitOfTime
+
+        sensor = RuntimeHoursSensor(mock_hub, MagicMock())
+
+        assert sensor.device_class == SensorDeviceClass.DURATION
+        assert sensor.native_unit_of_measurement == UnitOfTime.HOURS
+        assert sensor.state_class == SensorStateClass.TOTAL_INCREASING
+
+    def test_last_reset_is_diagnostic_and_local(self, mock_hub):
+        from homeassistant.const import EntityCategory
+
+        sensor = LastResetSensor(mock_hub, MagicMock())
+        mock_hub.available = False
+
+        assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+        assert sensor.available is True
 
 
 class TestDelayedTurnOffSensor:

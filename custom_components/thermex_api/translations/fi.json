@@ -59,7 +59,13 @@
         "name": "Rasvasuodattimen käyttöaika viimeisimmästä nollauksesta"
       },
       "thermex_sensor_connection_status": {
-        "name": "Yhteyden tila"
+        "name": "Yhteyden tila",
+        "state": {
+          "connected": "Yhdistetty",
+          "disconnected": "Yhteys katkaistu",
+          "error": "Virhe",
+          "closed": "Suljettu"
+        }
       },
       "thermex_sensor_delayed_turn_off": {
         "name": "Viivästetyn sammutuksen aika"
