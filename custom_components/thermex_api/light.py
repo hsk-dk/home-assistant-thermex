@@ -5,6 +5,7 @@ from homeassistant.components.light import (
     LightEntity,
     ATTR_BRIGHTNESS,
     ATTR_RGB_COLOR,
+    ATTR_HS_COLOR,
     ColorMode,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -220,7 +221,8 @@ class ThermexLight(ThermexLightBase):
 
 class ThermexDecoLight(ThermexLightBase):
     """Deco light entity for Thermex hood."""
-    _attr_supported_color_modes = {ColorMode.HS, ColorMode.BRIGHTNESS}
+    # HS already implies brightness support; HA rejects HS combined with BRIGHTNESS
+    _attr_supported_color_modes = {ColorMode.HS}
     _attr_color_mode = ColorMode.HS
 
     def __init__(self, hub: ThermexHub):
@@ -262,14 +264,17 @@ class ThermexDecoLight(ThermexLightBase):
         brightness = self._clamp_brightness(brightness)
         
         rgb = kwargs.get(ATTR_RGB_COLOR)
+        hs = kwargs.get(ATTR_HS_COLOR)
         if rgb:
             r, g, b = rgb
+        elif hs:
+            r, g, b = color_hs_to_RGB(*hs)
         else:
             r, g, b = color_hs_to_RGB(*self._hs_color)
         
         payload = {
             "decolightonoff": 1,
-            "decolightbrightness": brightness,
+            "decolightbrightness": _to_api_brightness(brightness),
             "decolightr": r,
             "decolightg": g,
             "decolightb": b,

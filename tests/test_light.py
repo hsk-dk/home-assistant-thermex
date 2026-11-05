@@ -128,7 +128,7 @@ class TestThermexDecoLight:
     def test_decolight_color_modes(self, decolight_entity):
         """Test deco light supports HS and brightness modes."""
         assert ColorMode.HS in decolight_entity.supported_color_modes
-        assert ColorMode.BRIGHTNESS in decolight_entity.supported_color_modes
+        assert ColorMode.BRIGHTNESS not in decolight_entity.supported_color_modes
         assert decolight_entity.color_mode == ColorMode.HS
 
     @pytest.mark.asyncio
@@ -141,7 +141,7 @@ class TestThermexDecoLight:
         
         call_args = mock_hub.send_request.call_args[0]
         assert call_args[1]["Decolight"]["decolightonoff"] == 1
-        assert call_args[1]["Decolight"]["decolightbrightness"] == 200
+        assert call_args[1]["Decolight"]["decolightbrightness"] == 78  # 200/255 -> API %
         assert call_args[1]["Decolight"]["decolightr"] == 255
         assert call_args[1]["Decolight"]["decolightg"] == 0
         assert call_args[1]["Decolight"]["decolightb"] == 0
@@ -222,7 +222,7 @@ class TestThermexDecoLight:
         await decolight_entity.async_turn_on()
         
         call_args = mock_hub.send_request.call_args[0]
-        assert call_args[1]["Decolight"]["decolightbrightness"] == 150
+        assert call_args[1]["Decolight"]["decolightbrightness"] == 59  # 150/255 -> API %
 
     def test_decolight_rgb_to_hs_conversion(self, decolight_entity):
         """Test RGB to HS color conversion."""
@@ -363,7 +363,7 @@ class TestThermexDecoLight:
         # DecoLight supports HS color and brightness, not color temp
         from homeassistant.components.light import ColorMode
         assert ColorMode.HS in decolight_entity.supported_color_modes
-        assert ColorMode.BRIGHTNESS in decolight_entity.supported_color_modes
+        assert ColorMode.BRIGHTNESS not in decolight_entity.supported_color_modes
         assert decolight_entity.color_mode == ColorMode.HS
 
     @pytest.mark.asyncio
