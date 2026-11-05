@@ -1,28 +1,30 @@
 import asyncio
-import logging
-from typing import Any, Dict
 import collections
 import json
+import logging
+from typing import Any
+
 import aiohttp
-from aiohttp import WSMsgType, ClientWebSocketResponse
+from aiohttp import ClientWebSocketResponse, WSMsgType
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
+
 from .const import (
-    DOMAIN,
-    THERMEX_NOTIFY,
-    DEFAULT_PORT,
-    WEBSOCKET_PATH,
-    DEFAULT_HEARTBEAT_INTERVAL,
     DEFAULT_CONNECTION_TIMEOUT,
+    DEFAULT_HEARTBEAT_INTERVAL,
+    DEFAULT_PORT,
     DEFAULT_RECONNECT_DELAY,
+    DOMAIN,
     MAX_RECONNECT_ATTEMPTS,
+    THERMEX_NOTIFY,
+    WEBSOCKET_PATH,
     WEBSOCKET_REQUEST_TIMEOUT,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-_REQUEST_MAP: Dict[str, str] = {
+_REQUEST_MAP: dict[str, str] = {
     "authenticate":    "Authenticate",
     "update":          "Update",
     "status":          "Status",
@@ -36,7 +38,7 @@ class ThermexHub:
         self._host = host
         self._api_key = api_key
         self.unique_id = f"thermex_{host.replace('.', '_')}"
-        self._pending: Dict[str, asyncio.Future] = {}
+        self._pending: dict[str, asyncio.Future] = {}
         self._ws_lock = asyncio.Lock()
         self._ws: ClientWebSocketResponse | None = None
         self._recv_task: asyncio.Task | None = None
@@ -118,7 +120,7 @@ class ThermexHub:
                 return
             # Reconnection completed but connection still dead
             raise ConnectionError("Reconnection completed but connection failed")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise ConnectionError("Reconnection timeout - waited 10 seconds")
     
     async def _perform_reconnection(self) -> None:
@@ -217,7 +219,7 @@ class ThermexHub:
                 _LOGGER.debug("Parsed protocol version: %s", self._protocol_version)
             else:
                 _LOGGER.error("ProtocolVersion returned non-200 status: %s", proto_resp)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _LOGGER.debug("No ProtocolVersion response within timeout, skipping negotiation")
         except Exception as err:
             _LOGGER.error("ProtocolVersion request failed: %s", err)
@@ -336,20 +338,16 @@ class ThermexHub:
             except Exception as err:
                 _LOGGER.error("ThermexHub: Watchdog loop error: %s", err)
                 await asyncio.sleep(5)  # Wait before retrying
-        return
 
-    async def send_request(self, request: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    async def send_request(self, request: str, body: dict[str, Any]) -> dict[str, Any]:
         """Send a JSON-RPC request and wait for its matching response, with one retry and reconnect on repeated timeout."""
         # Don't send requests if we're closing
         if self._closing:
             raise ConnectionError("Hub is closing")
             
         # Ensure websocket is open (and reconnect if not)
-        try:
-            await self._ensure_connected()
-        except ConnectionError:
-            # If we can't connect, don't try to send the request
-            raise
+        # If we can't connect, ConnectionError propagates and nothing is sent
+        await self._ensure_connected()
 
         # Prepare future and track it by lowercase key
         loop = asyncio.get_running_loop()
@@ -361,7 +359,7 @@ class ThermexHub:
 
         # Map to actual RPC request name
         req_type = _REQUEST_MAP.get(key, request)
-        payload: Dict[str, Any] = {"Request": req_type}
+        payload: dict[str, Any] = {"Request": req_type}
         if req_type not in ("Status", "ProtocolVersion"):
             payload["Data"] = body
 
@@ -390,7 +388,7 @@ class ThermexHub:
                 try:
                     # Wait for matching response
                     return await asyncio.wait_for(fut, timeout=WEBSOCKET_REQUEST_TIMEOUT)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Timeout: either retry or give up (don't cascade reconnections)
                     _LOGGER.debug(
                         "ThermexHub: Timeout waiting for '%s' response (attempt %d/2)",
@@ -430,7 +428,7 @@ class ThermexHub:
                     _LOGGER.warning(
                         "ThermexHub: Second timeout for '%s', giving up", request
                     )
-                    raise asyncio.TimeoutError(f"Request '{request}' timed out after 2 attempts")
+                    raise TimeoutError(f"Request '{request}' timed out after 2 attempts")
             
             # This should never be reached, but satisfies mypy
             raise RuntimeError(f"Unexpected exit from retry loop for request '{request}'")

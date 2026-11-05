@@ -1,27 +1,29 @@
 # File: custom_components/thermex_api/light.py
 
 import logging
+from typing import ClassVar
+
 from homeassistant.components.light import (
-    LightEntity,
     ATTR_BRIGHTNESS,
-    ATTR_RGB_COLOR,
     ATTR_HS_COLOR,
+    ATTR_RGB_COLOR,
     ColorMode,
+    LightEntity,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.util.color import color_RGB_to_hs, color_hs_to_RGB
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util.color import color_hs_to_RGB, color_RGB_to_hs
 
-from .hub import ThermexHub
 from .const import (
-    DOMAIN,
-    THERMEX_NOTIFY,
     DEFAULT_BRIGHTNESS,
-    MIN_BRIGHTNESS,
-    MAX_BRIGHTNESS,
+    DOMAIN,
     FALLBACK_STATUS_TIMEOUT,
+    MAX_BRIGHTNESS,
+    MIN_BRIGHTNESS,
+    THERMEX_NOTIFY,
 )
+from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -144,7 +146,7 @@ class ThermexLightBase(LightEntity):
 
 class ThermexLight(ThermexLightBase):
     """Main light entity for Thermex hood."""
-    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+    _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.BRIGHTNESS}
     _attr_color_mode = ColorMode.BRIGHTNESS
 
     def __init__(self, hub: ThermexHub):
@@ -222,7 +224,7 @@ class ThermexLight(ThermexLightBase):
 class ThermexDecoLight(ThermexLightBase):
     """Deco light entity for Thermex hood."""
     # HS already implies brightness support; HA rejects HS combined with BRIGHTNESS
-    _attr_supported_color_modes = {ColorMode.HS}
+    _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.HS}
     _attr_color_mode = ColorMode.HS
 
     def __init__(self, hub: ThermexHub):

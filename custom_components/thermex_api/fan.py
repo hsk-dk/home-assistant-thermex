@@ -1,16 +1,25 @@
 """Thermex Fan entity with discrete presets and persistent runtime tracking."""
 import logging
-from typing import Any, Optional, Callable
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers import entity_platform
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.event import async_call_later
 
+from .const import (
+    DELAYED_TURNOFF_COUNTDOWN_INTERVAL,
+    DOMAIN,
+    FALLBACK_STATUS_TIMEOUT,
+    THERMEX_NOTIFY,
+)
 from .hub import ThermexHub
-from .const import DOMAIN, THERMEX_NOTIFY, FALLBACK_STATUS_TIMEOUT, DELAYED_TURNOFF_COUNTDOWN_INTERVAL
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,12 +76,12 @@ class ThermexFan(FanEntity):
         self._hub = hub
         self._runtime_manager = runtime_manager
         self._entry = entry
-        self._auto_off_handle: Optional[Callable[[], None]] = None
-        self._delayed_off_handle: Optional[Callable[[], None]] = None
+        self._auto_off_handle: Callable[[], None] | None = None
+        self._delayed_off_handle: Callable[[], None] | None = None
         self._delayed_off_active = False
         self._delayed_off_remaining = 0
-        self._delayed_off_scheduled_time: Optional[datetime] = None
-        self._unsub: Optional[Callable[[], None]] = None
+        self._delayed_off_scheduled_time: datetime | None = None
+        self._unsub: Callable[[], None] | None = None
         self._attr_translation_key = "thermex_fan"
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{hub.unique_id}_fan"
@@ -112,7 +121,7 @@ class ThermexFan(FanEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         # Use cached hub data (updated during state changes)
-        hub_data = self._cached_hub_data if self._cached_hub_data else self._hub.get_coordinator_data()
+        hub_data = self._cached_hub_data or self._hub.get_coordinator_data()
         
         # Get current options from config entry
         current_options = self._entry.options
@@ -290,6 +299,7 @@ class ThermexFan(FanEntity):
         
         # Calculate scheduled time
         from datetime import timedelta
+
         from homeassistant.util import dt as dt_util
         
         self._delayed_off_scheduled_time = dt_util.now() + timedelta(minutes=delay_minutes)

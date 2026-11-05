@@ -1,0 +1,15 @@
+target-version = "py312"
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "BLE", "TRY", "RUF", "PLR1711", "FURB"]
+ignore = [
+  "BLE001",  # the websocket hub intentionally survives unexpected errors
+  "TRY003",
+  "TRY300",
+  "TRY400",
+  "RUF001",
+  "RUF002",
+  "RUF003",
+  "RUF006",  # fire-and-forget recv task is intentional; revisit separately
+  "FURB162",  # unsafe: "Z" handling is needed on older Python versions
+]
