@@ -1,5 +1,7 @@
-from homeassistant.helpers.entity import Entity
 from typing import Any
+
+from homeassistant.helpers.entity import Entity
+
 
 class ThermexDiagnosticsSensor(Entity):
     def __init__(self, coordinator):

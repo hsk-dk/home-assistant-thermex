@@ -6,15 +6,15 @@ import logging
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
-    BinarySensorEntity, 
     BinarySensorDeviceClass,
+    BinarySensorEntity,
 )
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.core import callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
-from .runtime_manager import RuntimeManager
-from .const import DOMAIN, THERMEX_NOTIFY, MINIMUM_RUNTIME_FOR_NO_RESET_ALERT
+from .const import DOMAIN, MINIMUM_RUNTIME_FOR_NO_RESET_ALERT, THERMEX_NOTIFY
 from .hub import ThermexHub
+from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1

@@ -8,13 +8,13 @@ Creates persistent sensors for:
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_call_later
-from homeassistant.core import callback
 from homeassistant.util.dt import parse_datetime
 
-from .const import DOMAIN, THERMEX_NOTIFY, RUNTIME_UPDATE_INTERVAL
+from .const import DOMAIN, RUNTIME_UPDATE_INTERVAL, THERMEX_NOTIFY
 
 _LOGGER = logging.getLogger(__name__)
 
