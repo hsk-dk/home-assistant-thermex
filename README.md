@@ -37,7 +37,7 @@ Install through [HACS](https://hacs.xyz/) by searching for "Thermex Hood Integra
 - **Light Entities**: Main light and Decolight (if enabled)
 - **Sensors**: 
   - Filter runtime hours
-  - Connection status
+  - Connection status (diagnostic, disabled by default)
   - Last reset time
   - Delayed turn-off timer status
 - **Binary Sensor**: Filter cleaning alert (hours and days thresholds)

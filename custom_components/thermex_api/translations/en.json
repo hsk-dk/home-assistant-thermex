@@ -59,7 +59,13 @@
         "name": "Grease filter runtime since last reset"
       },
       "thermex_sensor_connection_status": {
-        "name": "Connection Status"
+        "name": "Connection Status",
+        "state": {
+          "connected": "Connected",
+          "disconnected": "Disconnected",
+          "error": "Error",
+          "closed": "Closed"
+        }
       },
       "thermex_sensor_delayed_turn_off": {
         "name": "Delayed Turn-Off Time"

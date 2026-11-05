@@ -11,6 +11,10 @@ from homeassistant.helpers.dispatcher import (
     async_dispatcher_send,
 )
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util.percentage import (
+    ordered_list_item_to_percentage,
+    percentage_to_ordered_list_item,
+)
 
 from .const import (
     DELAYED_TURNOFF_COUNTDOWN_INTERVAL,
@@ -23,7 +27,12 @@ from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
 
-PRESET_MODES = ["off", "low", "medium", "high", "boost"]
+PARALLEL_UPDATES = 1
+
+# The four levels of the hood (the remote shows the same four). "off" is not a
+# preset. They are also the fan's speeds (25/50/75/100 %): the presets are kept
+# on purpose so existing automations and the familiar names keep working.
+PRESET_MODES = ["low", "medium", "high", "boost"]
 _MODE_TO_VALUE = {"off": 0, "low": 1, "medium": 2, "high": 3, "boost": 4}
 _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
 
@@ -65,6 +74,11 @@ class ThermexFan(ThermexEntity, FanEntity):
     )
     _attr_preset_modes = PRESET_MODES
     _attr_speed_count = 4  # 4 speeds: low(25%), medium(50%), high(75%), boost(100%)
+    # Slow or noisy values: keep them in the state but out of the recorder
+    _unrecorded_attributes = frozenset({
+        "runtime_hours", "filter_time", "last_reset", "threshold", "alert",
+        "delayed_off_remaining", "delayed_off_scheduled_time",
+    })
 
     def __init__(self, hub: ThermexHub, runtime_manager: RuntimeManager, entry):
         super().__init__(hub)
@@ -79,13 +93,14 @@ class ThermexFan(ThermexEntity, FanEntity):
         self._attr_translation_key = "thermex_fan"
         self._attr_name = None  # main entity: named after the device
         self._attr_unique_id = f"{hub.unique_id}_fan"
-        self._attr_icon = "mdi:fan"
 
         # State
         self._is_on = False
         self._preset_mode = self._runtime_manager.get_last_preset()
+        # What "turn on" without arguments switches to (the last level in use)
+        last = self._preset_mode
+        self._last_active_preset = last if last in PRESET_MODES else "medium"
         self._got_initial_state = False
-        self._cached_hub_data: dict[str, Any] = {}  # Cache hub data to avoid repeated calls
 
     @property
     def is_on(self) -> bool:
@@ -93,28 +108,20 @@ class ThermexFan(ThermexEntity, FanEntity):
 
     @property
     def preset_mode(self) -> str | None:
+        """The active level, or None when the fan is off."""
+        if not self._is_on or self._preset_mode not in PRESET_MODES:
+            return None
         return self._preset_mode
 
     @property
     def percentage(self) -> int | None:
-        """Return the current speed percentage."""
-        if not self._is_on or self._preset_mode == "off":
+        """Return the current speed percentage (0 when off)."""
+        if self.preset_mode is None:
             return 0
-        # Map preset modes to percentage:
-        # low=25%, medium=50%, high=75%, boost=100%
-        percentage_map = {
-            "off": 0,
-            "low": 25,
-            "medium": 50,
-            "high": 75,
-            "boost": 100,
-        }
-        return percentage_map.get(self._preset_mode, 0)
+        return ordered_list_item_to_percentage(PRESET_MODES, self._preset_mode)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        # Use cached hub data (updated during state changes)
-        hub_data = self._cached_hub_data or self._hub.get_coordinator_data()
         
         # Get current options from config entry
         current_options = self._entry.options
@@ -123,17 +130,8 @@ class ThermexFan(ThermexEntity, FanEntity):
             "runtime_hours": self._runtime_manager.get_runtime_hours(),
             "filter_time": self._runtime_manager.get_filter_time(),
             "last_reset": self._runtime_manager.get_last_reset() or "never",
-            "last_preset": self._runtime_manager.get_last_preset(),
             "threshold": current_options.get("fan_alert_hours", 30),
             "alert": self._runtime_manager.get_runtime_hours() >= current_options.get("fan_alert_hours", 30),
-            "is_on": self._is_on,
-            # Connection status attributes
-            "connection_state": hub_data.get("connection_state", "unknown"),
-            "last_error": hub_data.get("last_error"),
-            "watchdog_active": hub_data.get("watchdog_active", False),
-            "time_since_activity": hub_data.get("time_since_activity", 0),
-            "heartbeat_interval": hub_data.get("heartbeat_interval", 30),
-            "connection_timeout": hub_data.get("connection_timeout", 120),
             # Delayed turn-off attributes
             "delayed_off_active": self._delayed_off_active,
             "delayed_off_remaining": self._delayed_off_remaining,
@@ -192,13 +190,13 @@ class ThermexFan(ThermexEntity, FanEntity):
         # update local state
         self._is_on = new_on
         self._preset_mode = new_mode
+        if new_on and new_mode in PRESET_MODES:
+            self._last_active_preset = new_mode
 
         if changed:
             self.hass.async_create_task(self._runtime_manager.save())
 
         self._got_initial_state = True  # Mark that we've received initial state
-        # Update cached hub data to avoid repeated calls in extra_state_attributes
-        self._cached_hub_data = self._hub.get_coordinator_data()
         self.schedule_update_ha_state()
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
@@ -221,14 +219,7 @@ class ThermexFan(ThermexEntity, FanEntity):
         # 26-50%  -> medium
         # 51-75%  -> high
         # 76-100% -> boost
-        if percentage <= 25:
-            preset = "low"
-        elif percentage <= 50:
-            preset = "medium"
-        elif percentage <= 75:
-            preset = "high"
-        else:
-            preset = "boost"
+        preset = percentage_to_ordered_list_item(PRESET_MODES, percentage)
 
         await self.async_set_preset_mode(preset)
 
@@ -237,10 +228,8 @@ class ThermexFan(ThermexEntity, FanEntity):
             await self.async_set_percentage(percentage)
         elif preset_mode:
             await self.async_set_preset_mode(preset_mode)
-        elif self._preset_mode and self._preset_mode != "off":
-            await self.async_set_preset_mode(self._preset_mode)
         else:
-            await self.async_set_preset_mode("medium")
+            await self.async_set_preset_mode(self._last_active_preset)
 
     async def async_turn_off(self, **kwargs) -> None:
         await self.cancel_delayed_off()  # Cancel any delayed turn-off

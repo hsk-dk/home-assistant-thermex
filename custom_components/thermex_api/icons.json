@@ -1,0 +1,28 @@
+{
+  "entity": {
+    "button": {
+      "thermex_button_reset_runtime": {
+        "default": "mdi:refresh"
+      },
+      "thermex_button_delayed_turn_off": {
+        "default": "mdi:timer-off"
+      }
+    },
+    "sensor": {
+      "thermex_sensor_connection_status": {
+        "default": "mdi:connection"
+      }
+    }
+  },
+  "services": {
+    "reset_runtime": {
+      "service": "mdi:refresh"
+    },
+    "start_delayed_off": {
+      "service": "mdi:timer-outline"
+    },
+    "cancel_delayed_off": {
+      "service": "mdi:timer-off-outline"
+    }
+  }
+}

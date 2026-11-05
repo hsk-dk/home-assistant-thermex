@@ -33,7 +33,7 @@ class TestThermexFan:
 
     def test_fan_preset_modes(self, fan_entity):
         """Test fan has correct preset modes."""
-        assert "off" in fan_entity.preset_modes
+        assert "off" not in fan_entity.preset_modes  # off is not a preset
         assert "low" in fan_entity.preset_modes
         assert "medium" in fan_entity.preset_modes
         assert "high" in fan_entity.preset_modes
@@ -519,3 +519,72 @@ def test_fan_is_the_main_entity_of_the_device(mock_hub, mock_config_entry):
     fan = ThermexFan(mock_hub, runtime_manager, mock_config_entry)
 
     assert fan.name is None
+
+
+class TestFanLevels:
+    """Presets are the hood's four levels and always match the speed."""
+
+    @pytest.fixture
+    def fan(self, mock_hub, mock_config_entry, mock_hass):
+        runtime_manager = MagicMock()
+        runtime_manager.get_last_preset = MagicMock(return_value="off")
+        runtime_manager.get_last_reset = MagicMock(return_value="x")
+        runtime_manager.get_runtime_hours = MagicMock(return_value=1.0)
+        runtime_manager.get_filter_time = MagicMock(return_value=1.0)
+        runtime_manager.save = AsyncMock()
+        entity = ThermexFan(mock_hub, runtime_manager, mock_config_entry)
+        entity.hass = MagicMock()
+        entity.hass.async_create_task = MagicMock(side_effect=lambda coro: coro.close())
+        entity.schedule_update_ha_state = MagicMock()
+        return entity
+
+    def test_preset_none_and_percentage_zero_when_off(self, fan):
+        assert fan.preset_mode is None
+        assert fan.percentage == 0
+
+    @pytest.mark.parametrize("speed,preset,pct", [(1, "low", 25), (2, "medium", 50), (3, "high", 75), (4, "boost", 100)])
+    def test_levels_map_to_presets_and_percentages(self, fan, speed, preset, pct):
+        fan._handle_notify("fan", {"Fan": {"fanonoff": 1, "fanspeed": speed}})
+
+        assert fan.preset_mode == preset
+        assert fan.percentage == pct
+
+    def test_stale_speed_while_off_is_not_reported_as_preset(self, fan):
+        fan._handle_notify("fan", {"Fan": {"fanonoff": 0, "fanspeed": 3}})
+
+        assert fan.is_on is False
+        assert fan.preset_mode is None
+        assert fan.percentage == 0
+
+    @pytest.mark.parametrize("pct,speed", [(1, 1), (25, 1), (26, 2), (50, 2), (51, 3), (75, 3), (76, 4), (100, 4)])
+    @pytest.mark.asyncio
+    async def test_set_percentage_uses_the_matching_level(self, fan, mock_hub, pct, speed):
+        await fan.async_set_percentage(pct)
+
+        assert mock_hub.send_update.call_args[0][0]["Fan"] == {"fanonoff": 1, "fanspeed": speed}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_returns_to_the_last_level_in_use(self, fan, mock_hub):
+        fan._handle_notify("fan", {"Fan": {"fanonoff": 1, "fanspeed": 3}})
+        fan._handle_notify("fan", {"Fan": {"fanonoff": 0, "fanspeed": 0}})
+
+        await fan.async_turn_on()
+
+        assert mock_hub.send_update.call_args[0][0]["Fan"]["fanspeed"] == 3
+
+    @pytest.mark.asyncio
+    async def test_turn_on_defaults_to_medium(self, fan, mock_hub):
+        await fan.async_turn_on()
+
+        assert mock_hub.send_update.call_args[0][0]["Fan"]["fanspeed"] == 2
+
+    def test_attributes_no_longer_carry_connection_noise(self, fan):
+        attrs = fan.extra_state_attributes
+
+        for key in ("connection_state", "last_error", "watchdog_active", "time_since_activity",
+                    "heartbeat_interval", "connection_timeout", "is_on", "last_preset"):
+            assert key not in attrs
+        assert "runtime_hours" in attrs and "delayed_off_active" in attrs
+
+    def test_slow_attributes_are_not_recorded(self, fan):
+        assert {"runtime_hours", "delayed_off_remaining"} <= fan._unrecorded_attributes

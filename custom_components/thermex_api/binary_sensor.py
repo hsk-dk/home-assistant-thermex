@@ -16,6 +16,8 @@ from .data import ThermexConfigEntry
 from .entity import ThermexEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 0
 async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
     """Set up the Thermex filter‐alert binary sensor."""
     hub = entry.runtime_data.hub
@@ -80,8 +82,6 @@ class ThermexFilterAlert(ThermexEntity, BinarySensorEntity):
             # No reset date recorded - trigger if significant runtime
             days_exceeded = runtime_hours > MINIMUM_RUNTIME_FOR_NO_RESET_ALERT
         
-        # Get hub data for connection status
-        hub_data = self._hub.get_coordinator_data()
         
         return {
             "runtime_hours": runtime_hours,
@@ -92,10 +92,6 @@ class ThermexFilterAlert(ThermexEntity, BinarySensorEntity):
             "days_exceeded": days_exceeded,
             "last_reset": self._runtime_manager.get_last_reset() or "never",
             "trigger_reason": self._get_trigger_reason(hours_exceeded, days_exceeded, days_since_reset),
-            # Connection status attributes
-            "connection_state": hub_data.get("connection_state", "unknown"),
-            "watchdog_active": hub_data.get("watchdog_active", False),
-            "time_since_activity": hub_data.get("time_since_activity", 0),
         }
     
     def _get_trigger_reason(self, hours_exceeded: bool, days_exceeded: bool, days_since_reset) -> str:

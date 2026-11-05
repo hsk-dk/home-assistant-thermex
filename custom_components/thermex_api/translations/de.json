@@ -59,7 +59,13 @@
         "name": "Betriebszeit des Fettfilters seit letzter Rücksetzung"
       },
       "thermex_sensor_connection_status": {
-        "name": "Verbindungsstatus"
+        "name": "Verbindungsstatus",
+        "state": {
+          "connected": "Verbunden",
+          "disconnected": "Getrennt",
+          "error": "Fehler",
+          "closed": "Geschlossen"
+        }
       },
       "thermex_sensor_delayed_turn_off": {
         "name": "Zeit bis zur verzögerten Abschaltung"

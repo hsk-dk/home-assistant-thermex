@@ -3,6 +3,7 @@
 import logging
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import DOMAIN
@@ -13,6 +14,8 @@ from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 1
 
 async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities) -> None:
     """Set up the Reset Runtime button for Thermex API."""
@@ -27,6 +30,7 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
 class ResetRuntimeButton(ThermexEntity, ButtonEntity):
     """Button that resets the fan runtime (filter usage) counter."""
 
+    _attr_entity_category = EntityCategory.CONFIG  # maintenance of the filter counter
     _requires_connection = False  # only resets the locally stored counter
 
     def __init__(self, hub: ThermexHub, runtime_manager: RuntimeManager, entry_id: str):
@@ -36,7 +40,6 @@ class ResetRuntimeButton(ThermexEntity, ButtonEntity):
 
         self._attr_unique_id = f"{hub.unique_id}_reset_runtime"
         self._attr_translation_key = "thermex_button_reset_runtime"
-        self._attr_icon = "mdi:refresh"
 
     async def async_press(self) -> None:
         """Handle the button press: reset runtime and filter time."""
@@ -64,7 +67,6 @@ class DelayedTurnOffButton(ThermexEntity, ButtonEntity):
 
         self._attr_unique_id = f"{hub.unique_id}_delayed_turn_off"
         self._attr_translation_key = "thermex_button_delayed_turn_off"
-        self._attr_icon = "mdi:timer-off"
 
     async def async_press(self) -> None:
         """Handle the button press: start delayed turn-off for the fan."""

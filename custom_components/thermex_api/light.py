@@ -25,6 +25,8 @@ from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
 
+PARALLEL_UPDATES = 1
+
 def _to_api_brightness(ha_brightness: int) -> int:
     """Convert Home Assistant brightness (0-255) to API brightness (1-100).
     
