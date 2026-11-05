@@ -8,6 +8,7 @@ from typing import Any
 import aiohttp
 from aiohttp import ClientWebSocketResponse, WSMsgType
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
@@ -35,6 +36,10 @@ _REQUEST_MAP: dict[str, str] = {
 
 class ThermexAuthError(ConnectionError):
     """The hood rejected the API password."""
+
+
+class ThermexRequestError(HomeAssistantError):
+    """The hood answered an Update with an error status."""
 
 
 class ThermexHub:
@@ -232,7 +237,11 @@ class ThermexHub:
             _LOGGER.error("Authentication rejected: %s", data)
             self._connection_state = "error"
             self.last_error = f"Authentication failed: {data}"
-            raise ThermexAuthError(f"Authentication failed: {data}")
+            # Only 401 (unauthorized) means the password is wrong; 400/500 are
+            # protocol or device errors and must not start a reauth prompt.
+            if data.get("Response") == "Authenticate" and data.get("Status") == 401:
+                raise ThermexAuthError(f"Authentication failed: {data}")
+            raise ConnectionError(f"Authentication failed: {data}")
         _LOGGER.debug("Authenticated successfully with Thermex (status=200)")
 
         self._recv_task = self._hass.async_create_background_task(
@@ -491,6 +500,27 @@ class ThermexHub:
         finally:
             # Always remove pending entry (in case of success or error)
             self._pending.pop(key, None)
+    async def send_update(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Send an Update, require a 200 reply, then read the real state back.
+
+        The hood answers 200 even when it clamped or rewrote a value (e.g.
+        brightness 255 becomes 100, 0 turns the light off), so the entities must
+        not assume their command was applied as sent. The Status read-back is
+        dispatched to the entities by the receive loop.
+        """
+        resp = await self.send_request("Update", body)
+        status = resp.get("Status")
+        if status != 200:
+            raise ThermexRequestError(
+                f"Thermex hood rejected the update (status {status}): {body}"
+            )
+        try:
+            await self.send_request("status", {})
+        except Exception as err:
+            # Not fatal: the 30 s heartbeat will refresh the state anyway
+            _LOGGER.debug("Status read-back after update failed: %s", err)
+        return resp
+
     async def _dispatch_initial_status(self) -> None:
         try:
             resp = await self.send_request("status", {})

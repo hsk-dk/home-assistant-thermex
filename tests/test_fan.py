@@ -44,19 +44,18 @@ class TestThermexFan:
         """Test turning on fan with default preset."""
         await fan_entity.async_turn_on()
         
-        mock_hub.send_request.assert_called_once()
-        call_args = mock_hub.send_request.call_args[0]
-        assert call_args[0] == "Update"
-        assert call_args[1]["Fan"]["fanspeed"] == 2  # medium is default
+        mock_hub.send_update.assert_called_once()
+        call_args = mock_hub.send_update.call_args[0]
+        assert call_args[0]["Fan"]["fanspeed"] == 2  # medium is default
 
     @pytest.mark.asyncio
     async def test_fan_turn_on_with_preset(self, fan_entity, mock_hub):
         """Test turning on fan with specific preset."""
         await fan_entity.async_turn_on(preset_mode="boost")
         
-        mock_hub.send_request.assert_called_once()
-        call_args = mock_hub.send_request.call_args[0]
-        assert call_args[1]["Fan"]["fanspeed"] == 4  # boost
+        mock_hub.send_update.assert_called_once()
+        call_args = mock_hub.send_update.call_args[0]
+        assert call_args[0]["Fan"]["fanspeed"] == 4  # boost
 
     @pytest.mark.asyncio
     async def test_fan_turn_off(self, fan_entity, mock_hub):
@@ -66,18 +65,18 @@ class TestThermexFan:
         
         await fan_entity.async_turn_off()
         
-        mock_hub.send_request.assert_called_once()
-        call_args = mock_hub.send_request.call_args[0]
-        assert call_args[1]["Fan"]["fanspeed"] == 0
+        mock_hub.send_update.assert_called_once()
+        call_args = mock_hub.send_update.call_args[0]
+        assert call_args[0]["Fan"]["fanspeed"] == 0
 
     @pytest.mark.asyncio
     async def test_fan_set_preset_mode(self, fan_entity, mock_hub):
         """Test setting fan preset mode."""
         await fan_entity.async_set_preset_mode("low")
         
-        mock_hub.send_request.assert_called_once()
-        call_args = mock_hub.send_request.call_args[0]
-        assert call_args[1]["Fan"]["fanspeed"] == 1  # low
+        mock_hub.send_update.assert_called_once()
+        call_args = mock_hub.send_update.call_args[0]
+        assert call_args[0]["Fan"]["fanspeed"] == 1  # low
 
     def test_fan_handle_notify_ignores_wrong_type(self, fan_entity):
         """Test fan ignores non-fan notifications."""
@@ -105,23 +104,54 @@ class TestThermexFan:
 
     @pytest.mark.asyncio
     async def test_fan_turn_on_starts_runtime(self, fan_entity):
-        """Test turning on fan starts runtime tracking."""
+        """Runtime tracking starts when the hood reports the fan running."""
         await fan_entity.async_turn_on()
+        # Commands never start tracking themselves: the Status read-back does
+        fan_entity._runtime_manager.start.assert_not_called()
+
+        fan_entity._handle_notify("fan", {"Fan": {"fanonoff": 1, "fanspeed": 2}})
+
         fan_entity._runtime_manager.start.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_fan_turn_off_stops_runtime(self, fan_entity):
-        """Test turning off fan stops runtime tracking."""
+        """Runtime tracking stops when the hood reports the fan off."""
         fan_entity._is_on = True
         await fan_entity.async_turn_off()
+        fan_entity._runtime_manager.stop.assert_not_called()
+
+        fan_entity._handle_notify("fan", {"Fan": {"fanonoff": 0, "fanspeed": 0}})
+
         fan_entity._runtime_manager.stop.assert_called_once()
+
+    def test_heartbeat_status_does_not_rewrite_storage(self, fan_entity):
+        """An unchanged Status (every 30 s heartbeat) must not save the runtime file."""
+        fan_entity.hass.async_create_task = MagicMock()
+        fan_entity._runtime_manager.get_last_reset = MagicMock(return_value="2026-01-01T00:00:00+00:00")
+        fan_entity._runtime_manager.get_last_preset = MagicMock(return_value="off")
+        fan_entity.schedule_update_ha_state = MagicMock()
+
+        fan_entity._handle_notify("fan", {"Fan": {"fanonoff": 0, "fanspeed": 0}})
+        fan_entity._handle_notify("fan", {"Fan": {"fanonoff": 0, "fanspeed": 0}})
+
+        fan_entity.hass.async_create_task.assert_not_called()
+
+    def test_changed_status_saves_storage_once(self, fan_entity):
+        fan_entity.hass.async_create_task = MagicMock(side_effect=lambda coro: coro.close())
+        fan_entity._runtime_manager.get_last_reset = MagicMock(return_value="2026-01-01T00:00:00+00:00")
+        fan_entity._runtime_manager.get_last_preset = MagicMock(return_value="off")
+        fan_entity.schedule_update_ha_state = MagicMock()
+
+        fan_entity._handle_notify("fan", {"Fan": {"fanonoff": 1, "fanspeed": 3}})
+
+        assert fan_entity.hass.async_create_task.call_count == 1
 
     @pytest.mark.asyncio
     async def test_fan_set_preset_mode_updates_preset(self, fan_entity, mock_hub):
         """Test setting preset mode."""
         await fan_entity.async_turn_on()
         await fan_entity.async_set_preset_mode("high")
-        mock_hub.send_request.assert_called()
+        mock_hub.send_update.assert_called()
         # Preset is updated when notification is received from hub
         fan_entity._handle_notify("fan", {"Fan": {"fanonoff": 1, "fanspeed": 3}})
         assert fan_entity._preset_mode == "high"
@@ -164,9 +194,9 @@ class TestThermexFan:
         """Test turning on fan with percentage."""
         await fan_entity.async_turn_on(percentage=50)
         
-        call_args = mock_hub.send_request.call_args[0]
+        call_args = mock_hub.send_update.call_args[0]
         # Should map percentage to preset
-        assert "Fan" in call_args[1]
+        assert "Fan" in call_args[0]
 
     @pytest.mark.skip(reason="start_delayed_off creates uncancellable countdown timer - needs implementation change")
     @pytest.mark.asyncio
@@ -254,8 +284,8 @@ class TestThermexFan:
         await fan_entity.async_turn_on()
         
         # Should use default "medium"
-        call_args = mock_hub.send_request.call_args[0]
-        assert call_args[1]["Fan"]["fanspeed"] == 2  # medium
+        call_args = mock_hub.send_update.call_args[0]
+        assert call_args[0]["Fan"]["fanspeed"] == 2  # medium
 
 
 
@@ -315,7 +345,7 @@ class TestThermexFan:
             assert fan_entity._delayed_off_scheduled_time is None
             
             # Should turn off fan
-            mock_hub.send_request.assert_called_once()
+            mock_hub.send_update.assert_called_once()
             fan_entity.schedule_update_ha_state.assert_called()
             # Dispatcher called twice: once in async_turn_off, once in _handle_delayed_off
             assert mock_send.call_count == 2
