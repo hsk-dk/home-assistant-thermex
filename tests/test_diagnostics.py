@@ -33,7 +33,7 @@ class TestDiagnostics:
             mock_config_entry
         )
         
-        assert result["host"] == "192.168.1.100"
+        assert result["host"] == "**REDACTED**"  # host is redacted
         assert result["connection_state"] == "connected"
         assert "req1" in result["pending_requests"]
         assert result["websocket_connected"] is True
@@ -93,8 +93,8 @@ class TestDiagnostics:
             mock_config_entry
         )
         
-        assert result["host"] == "192.168.1.1"
-        assert result["unique_id"] == "test_unique_id"
+        assert result["host"] == "**REDACTED**"
+        assert result["unique_id"] == "**REDACTED**"
 
     @pytest.mark.asyncio
     async def test_diagnostics_with_runtime_manager(self, mock_hass, mock_config_entry):

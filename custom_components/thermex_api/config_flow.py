@@ -25,11 +25,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                 step_id="user", data_schema=STEP_USER_DATA_SCHEMA
             )
 
-        # Create a temporary ID for setup verification
-        temp_entry_id = self.hass.data.get(DOMAIN, {}).get("tmp_id", 0) + 1
-        self.hass.data.setdefault(DOMAIN, {})["tmp_id"] = temp_entry_id
-        
-        hub = ThermexHub(self.hass, user_input["host"], user_input["api_key"], f"tmp_{temp_entry_id}")
+        # One config entry per hood
+        await self.async_set_unique_id(user_input["host"])
+        self._abort_if_unique_id_configured()
+
+        hub = ThermexHub(self.hass, user_input["host"], user_input["api_key"], "config_flow")
         try:
             await hub.connect()
         except Exception as err:

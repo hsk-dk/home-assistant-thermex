@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
@@ -12,6 +13,8 @@ from .const import DOMAIN
 from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
+
+TO_REDACT = {"host", "api_key", "unique_id"}
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
@@ -62,7 +65,7 @@ async def async_get_config_entry_diagnostics(
                 "days_since_reset": runtime_manager.get_days_since_reset(),
             }
 
-        return diagnostics
+        return async_redact_data(diagnostics, TO_REDACT)
     
     except Exception as err:
         _LOGGER.exception("Error generating diagnostics")

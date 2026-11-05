@@ -235,3 +235,21 @@ class TestRuntimeManager:
         assert runtime_manager.get_runtime_hours() == 2.0
         # last_preset should be ignored
         assert runtime_manager._data.get("last_preset") is None
+
+
+class TestRuntimeDowntime:
+    @pytest.fixture
+    def runtime_manager(self, mock_store):
+        return RuntimeManager(mock_store)
+
+    @pytest.mark.asyncio
+    async def test_load_does_not_restore_open_session(self, runtime_manager, mock_store):
+        """An open session at shutdown must not count the HA downtime as runtime."""
+        mock_store.async_load = AsyncMock(return_value={
+            "runtime_hours": 3.0,
+            "last_start": 1.0,  # long ago
+        })
+        await runtime_manager.load()
+
+        assert runtime_manager._data.get("last_start") is None
+        assert runtime_manager.get_runtime_hours() == 3.0

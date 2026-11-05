@@ -6,6 +6,7 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import DOMAIN, THERMEX_NOTIFY
+from .entity_lookup import find_fan_entity_id
 from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
 
@@ -58,7 +59,7 @@ class ResetRuntimeButton(ButtonEntity):
 
         # Coordinator refresh (per entry)
         entry_data = self.hass.data[DOMAIN].get(self._entry_id)
-        coordinator = getattr(entry_data, "coordinator", None) if entry_data else None
+        coordinator = entry_data.get("coordinator") if entry_data else None
         if coordinator:
             await coordinator.async_request_refresh()
 
@@ -80,36 +81,14 @@ class DelayedTurnOffButton(ButtonEntity):
         """Handle the button press: start delayed turn-off for the fan."""
         _LOGGER.info("DelayedTurnOffButton pressed")
         
-        # Find the fan entity by trying multiple naming patterns
-        possible_entity_ids = [
-            f"fan.{self._hub.unique_id}_fan",
-            f"fan.{self._hub.unique_id.replace('_', '')}_fan",
-            "fan.thermex_hood_thermex_ventilator",
-        ]
-        
-        fan_entity_id = None
-        for entity_id in possible_entity_ids:
-            if self.hass.states.get(entity_id):
-                fan_entity_id = entity_id
-                _LOGGER.debug("Found fan entity: %s", fan_entity_id)
-                break
-        
+        fan_entity_id = find_fan_entity_id(self.hass, self._hub.unique_id)
         if not fan_entity_id:
-            _LOGGER.error("Could not find fan entity, tried: %s", possible_entity_ids)
+            _LOGGER.error("Could not find the Thermex fan entity in the entity registry")
             return
-        
-        try:
-            _LOGGER.info("Calling start_delayed_off entity service for: %s", fan_entity_id)
-            
-            await self.hass.services.async_call(
-                DOMAIN,  # thermex_api domain, not fan
-                "start_delayed_off",
-                {"entity_id": fan_entity_id},
-                blocking=False
-            )
-            _LOGGER.info("Entity service call completed")
-                
-        except Exception as err:
-            _LOGGER.error("Service call failed: %s", err)
-            import traceback
-            _LOGGER.error("Traceback: %s", traceback.format_exc())
+
+        await self.hass.services.async_call(
+            DOMAIN,
+            "start_delayed_off",
+            {"entity_id": fan_entity_id},
+            blocking=False,
+        )

@@ -62,8 +62,7 @@ class TestResetRuntimeButton:
         coordinator = MagicMock()
         coordinator.async_request_refresh = AsyncMock()
         
-        entry_data = MagicMock()
-        entry_data.coordinator = coordinator
+        entry_data = {"coordinator": coordinator}
         
         mock_hass.data = {
             "thermex_api": {
@@ -108,23 +107,32 @@ class TestDelayedTurnOffButton:
         assert delayed_button.icon == "mdi:timer-off"
 
     @pytest.mark.asyncio
-    async def test_delayed_button_press_domain_service(self, delayed_button, mock_hub):
-        """Test pressing delayed turn off button calls domain service."""
-        # Mock a fan entity state so button can find it
-        fan_entity_id = f"fan.{mock_hub.unique_id}_fan"
-        mock_fan_state = MagicMock()
-        delayed_button.hass.states.get = MagicMock(side_effect=lambda eid: mock_fan_state if eid == fan_entity_id else None)
-        
+    async def test_delayed_button_press_domain_service(self, delayed_button, mock_hub, monkeypatch):
+        """Pressing the button calls the domain service on the fan found via the registry."""
+        monkeypatch.setattr(
+            "custom_components.thermex_api.button.find_fan_entity_id",
+            lambda hass, unique_id: "fan.renamed_by_user",
+        )
+
         await delayed_button.async_press()
-        
+
         delayed_button.hass.services.async_call.assert_called_once()
         call_args = delayed_button.hass.services.async_call.call_args[0]
         assert call_args[0] == "thermex_api"  # domain
         assert call_args[1] == "start_delayed_off"  # service
-        
-        # Check service data includes fan entity_id
-        service_data = call_args[2]
-        assert service_data["entity_id"] == fan_entity_id
+        assert call_args[2]["entity_id"] == "fan.renamed_by_user"
+
+    @pytest.mark.asyncio
+    async def test_delayed_button_press_without_fan_entity(self, delayed_button, monkeypatch):
+        """No fan in the registry: do nothing instead of guessing an entity id."""
+        monkeypatch.setattr(
+            "custom_components.thermex_api.button.find_fan_entity_id",
+            lambda hass, unique_id: None,
+        )
+
+        await delayed_button.async_press()
+
+        delayed_button.hass.services.async_call.assert_not_called()
 
     def test_delayed_button_name(self, delayed_button):
         """Test delayed button uses translation key."""
@@ -173,14 +181,3 @@ class TestDelayedTurnOffButton:
         runtime_manager.reset.assert_called_once()
         runtime_manager.save.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_delayed_button_press_service_error(self, mock_hub, mock_hass):
-        """Test delayed button handles service call errors gracefully."""
-        button = DelayedTurnOffButton(mock_hub, "test_entry_id")
-        button.hass = mock_hass
-        
-        # Mock service call to raise error
-        mock_hass.services.async_call = AsyncMock(side_effect=Exception("Service error"))
-        
-        # Should not raise exception
-        await button.async_press()

@@ -78,6 +78,7 @@ class ThermexFan(FanEntity):
         self._entry = entry
         self._auto_off_handle: Callable[[], None] | None = None
         self._delayed_off_handle: Callable[[], None] | None = None
+        self._countdown_handle: Callable[[], None] | None = None
         self._delayed_off_active = False
         self._delayed_off_remaining = 0
         self._delayed_off_scheduled_time: datetime | None = None
@@ -316,7 +317,9 @@ class ThermexFan(FanEntity):
         _LOGGER.debug("Delayed turn-off scheduled: handle=%s, seconds=%d", self._delayed_off_handle is not None, delay_minutes * 60)
         
         # Start countdown timer (update every minute)
-        async_call_later(self.hass, DELAYED_TURNOFF_COUNTDOWN_INTERVAL, self._update_countdown)
+        self._countdown_handle = async_call_later(
+            self.hass, DELAYED_TURNOFF_COUNTDOWN_INTERVAL, self._update_countdown
+        )
         
         self.schedule_update_ha_state()
         
@@ -339,6 +342,10 @@ class ThermexFan(FanEntity):
         if self._delayed_off_handle:
             self._delayed_off_handle()
             self._delayed_off_handle = None
+        # Also stop the countdown chain, otherwise a later restart runs two of them
+        if self._countdown_handle:
+            self._countdown_handle()
+            self._countdown_handle = None
 
         self._delayed_off_active = False
         self._delayed_off_remaining = 0
@@ -357,6 +364,7 @@ class ThermexFan(FanEntity):
 
     def _update_countdown(self, _now=None) -> None:
         """Update the countdown timer display."""
+        self._countdown_handle = None
         if not self._delayed_off_active:
             return
 
@@ -367,7 +375,9 @@ class ThermexFan(FanEntity):
             
             # Schedule next update in 1 minute if still active
             if self._delayed_off_remaining > 0:
-                async_call_later(self.hass, DELAYED_TURNOFF_COUNTDOWN_INTERVAL, self._update_countdown)
+                self._countdown_handle = async_call_later(
+                    self.hass, DELAYED_TURNOFF_COUNTDOWN_INTERVAL, self._update_countdown
+                )
 
     async def _handle_delayed_off(self, _now) -> None:
         """Handle the delayed turn-off event."""
@@ -376,6 +386,9 @@ class ThermexFan(FanEntity):
         
         # Clear delayed turn-off state first
         self._delayed_off_handle = None
+        if self._countdown_handle:
+            self._countdown_handle()
+            self._countdown_handle = None
         self._delayed_off_active = False
         self._delayed_off_remaining = 0
         self._delayed_off_scheduled_time = None
@@ -404,12 +417,6 @@ class ThermexFan(FanEntity):
             self._unsub()
         await self.cancel_delayed_off()
 
-    async def _handle_auto_off(self, _now) -> None:
-        self._auto_off_handle = None
-        _LOGGER.info("Auto turning off fan after timeout")
-        await self.async_turn_off()
-        self.async_write_ha_state()
-    
     async def _fallback_status(self, _now):
         if self._got_initial_state:
             return

@@ -11,6 +11,25 @@ from custom_components.thermex_api.const import DOMAIN
 class TestConfigFlow:
     """Test the config flow."""
 
+    @pytest.mark.asyncio
+    async def test_duplicate_host_aborts(self, mock_hass):
+        """The same hood cannot be added twice."""
+        from homeassistant.data_entry_flow import AbortFlow
+
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock(side_effect=AbortFlow("already_configured"))
+
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect") as connect:
+            with pytest.raises(AbortFlow):
+                await flow.async_step_user(
+                    user_input={CONF_HOST: "192.168.1.100", "api_key": "k"}
+                )
+
+        flow.async_set_unique_id.assert_awaited_once_with("192.168.1.100")
+        connect.assert_not_called()
+
     @pytest.fixture
     def mock_setup_entry(self):
         """Mock setting up an entry."""
@@ -25,6 +44,8 @@ class TestConfigFlow:
         """Test we get the user form."""
         flow = ConfigFlow()
         flow.hass = mock_hass
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
         
         result = await flow.async_step_user()
         
@@ -36,6 +57,8 @@ class TestConfigFlow:
         """Test successful configuration with valid input."""
         flow = ConfigFlow()
         flow.hass = mock_hass
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
         mock_hass.data = {DOMAIN: {}}
         
         # Mock successful connection
@@ -59,6 +82,8 @@ class TestConfigFlow:
         """Test connection error handling."""
         flow = ConfigFlow()
         flow.hass = mock_hass
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
         mock_hass.data = {DOMAIN: {}}
         
         # Mock failed connection
@@ -81,6 +106,8 @@ class TestConfigFlow:
         """Test that hub is properly closed even when connection fails."""
         flow = ConfigFlow()
         flow.hass = mock_hass
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
         mock_hass.data = {DOMAIN: {}}
         
         # Create mock for hub.close() to verify it's called
@@ -111,6 +138,8 @@ class TestConfigFlow:
         """Test that hub is properly closed even when connection succeeds."""
         flow = ConfigFlow()
         flow.hass = mock_hass
+        flow.async_set_unique_id = AsyncMock()
+        flow._abort_if_unique_id_configured = MagicMock()
         mock_hass.data = {DOMAIN: {}}
         
         # Create mock for hub.close() to verify it's called
