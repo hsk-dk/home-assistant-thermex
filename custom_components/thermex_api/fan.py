@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
-from homeassistant.helpers import entity_platform
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_send,
 )
@@ -18,6 +18,7 @@ from homeassistant.util.percentage import (
 
 from .const import (
     DELAYED_TURNOFF_COUNTDOWN_INTERVAL,
+    DOMAIN,
     FALLBACK_STATUS_TIMEOUT,
 )
 from .data import ThermexConfigEntry
@@ -43,24 +44,6 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
     runtime_manager = entry.runtime_data.runtime_manager
     fan_entity = ThermexFan(hub, runtime_manager, entry)
     async_add_entities([fan_entity])
-
-    # Register entity services
-    platform = entity_platform.async_get_current_platform()
-    platform.async_register_entity_service(
-        "reset_runtime",
-        {},
-        "async_reset"
-    )
-    platform.async_register_entity_service(
-        "start_delayed_off",
-        {},
-        "start_delayed_off"
-    )
-    platform.async_register_entity_service(
-        "cancel_delayed_off",
-        {},
-        "cancel_delayed_off"
-    )
 
 
 class ThermexFan(ThermexEntity, FanEntity):
@@ -245,8 +228,10 @@ class ThermexFan(ThermexEntity, FanEntity):
         _LOGGER.info("start_delayed_off service called")
         
         if not self._is_on:
-            _LOGGER.warning("Cannot start delayed turn-off: fan is not running")
-            return
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="fan_not_running",
+            )
 
         # Cancel any existing delayed turn-off
         await self.cancel_delayed_off()

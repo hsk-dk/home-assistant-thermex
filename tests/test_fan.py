@@ -374,12 +374,15 @@ class TestThermexFan:
 
     @pytest.mark.asyncio
     async def test_fan_start_delayed_off_when_not_running(self, fan_entity):
-        """Test start_delayed_off does nothing if fan is off."""
+        """start_delayed_off on a fan that is off is a user error, not a silent no-op."""
+        from homeassistant.exceptions import ServiceValidationError
+
         fan_entity._is_on = False
-        
-        await fan_entity.start_delayed_off()
-        
-        # Should not activate delayed off
+
+        with pytest.raises(ServiceValidationError) as exc:
+            await fan_entity.start_delayed_off()
+
+        assert exc.value.translation_key == "fan_not_running"
         assert fan_entity._delayed_off_active is False
 
     @pytest.mark.asyncio

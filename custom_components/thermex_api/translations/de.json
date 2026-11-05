@@ -132,6 +132,12 @@
     },
     "request_rejected": {
       "message": "Die Thermex-Dunstabzugshaube hat den Befehl abgelehnt (Status {status})."
+    },
+    "fan_not_running": {
+      "message": "Der Lüfter läuft nicht, daher gibt es nichts, was später ausgeschaltet werden könnte. Starte zuerst den Lüfter."
+    },
+    "fan_entity_not_found": {
+      "message": "Die Thermex-Lüfterentität wurde nicht gefunden."
     }
   }
 }

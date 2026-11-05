@@ -110,17 +110,23 @@ class TestDelayedTurnOffButton:
         assert call_args[0] == "thermex_api"  # domain
         assert call_args[1] == "start_delayed_off"  # service
         assert call_args[2]["entity_id"] == "fan.renamed_by_user"
+        # blocking, so errors such as "fan not running" reach the user
+        assert delayed_button.hass.services.async_call.call_args.kwargs["blocking"] is True
 
     @pytest.mark.asyncio
     async def test_delayed_button_press_without_fan_entity(self, delayed_button, monkeypatch):
-        """No fan in the registry: do nothing instead of guessing an entity id."""
+        """No fan in the registry: tell the user instead of guessing an entity id."""
+        from homeassistant.exceptions import HomeAssistantError
+
         monkeypatch.setattr(
             "custom_components.thermex_api.button.find_fan_entity_id",
             lambda hass, unique_id: None,
         )
 
-        await delayed_button.async_press()
+        with pytest.raises(HomeAssistantError) as exc:
+            await delayed_button.async_press()
 
+        assert exc.value.translation_key == "fan_entity_not_found"
         delayed_button.hass.services.async_call.assert_not_called()
 
     def test_delayed_button_name(self, delayed_button):

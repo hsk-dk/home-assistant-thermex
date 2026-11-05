@@ -4,6 +4,7 @@ import logging
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import DOMAIN
@@ -70,16 +71,17 @@ class DelayedTurnOffButton(ThermexEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press: start delayed turn-off for the fan."""
-        _LOGGER.info("DelayedTurnOffButton pressed")
-        
         fan_entity_id = find_fan_entity_id(self.hass, self._hub.unique_id)
         if not fan_entity_id:
-            _LOGGER.error("Could not find the Thermex fan entity in the entity registry")
-            return
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="fan_entity_not_found",
+            )
 
+        # blocking, so a ServiceValidationError (fan not running) reaches the user
         await self.hass.services.async_call(
             DOMAIN,
             "start_delayed_off",
             {"entity_id": fan_entity_id},
-            blocking=False,
+            blocking=True,
         )

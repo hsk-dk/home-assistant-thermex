@@ -1,11 +1,17 @@
-﻿reset_runtime:
-  description: "Reset the Thermex fan's runtime counter to zero"
-  fields: {}
+reset_runtime:
+  target:
+    entity:
+      integration: thermex_api
+      domain: fan
 
 start_delayed_off:
-  description: "Start delayed turn-off timer for the Thermex fan"
-  fields: {}
+  target:
+    entity:
+      integration: thermex_api
+      domain: fan
 
 cancel_delayed_off:
-  description: "Cancel delayed turn-off timer for the Thermex fan"
-  fields: {}
+  target:
+    entity:
+      integration: thermex_api
+      domain: fan
