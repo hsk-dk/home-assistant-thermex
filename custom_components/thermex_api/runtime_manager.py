@@ -50,13 +50,9 @@ class RuntimeManager:
                     _LOGGER.warning("Invalid runtime_hours type, resetting to 0")
                     validated_data["runtime_hours"] = 0.0
             
-            # Validate last_start (should be float timestamp or None)
-            last_start = data.get("last_start")
-            if last_start is not None:
-                try:
-                    validated_data["last_start"] = float(last_start)
-                except (ValueError, TypeError):
-                    _LOGGER.warning("Invalid last_start timestamp, ignoring")
+            # last_start is deliberately NOT restored: a session that was open when
+            # HA stopped would otherwise count all the downtime as fan runtime.
+            # If the fan is still running, the first status notify starts a new session.
             
             # Validate last_reset (should be ISO format string or None)
             last_reset = data.get("last_reset")

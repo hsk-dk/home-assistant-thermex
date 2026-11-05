@@ -14,7 +14,6 @@ WEBSOCKET_PATH = "/api"
 # Signal for dispatching notify messages
 THERMEX_NOTIFY = "thermex_api_notify"
 STORAGE_VERSION = 1
-STORAGE_KEY = f"{DOMAIN}_runtime"
 RUNTIME_STORAGE_FILE = f"{DOMAIN}_{{entry_id}}_runtime.json"
 
 # Connection and Watchdog settings
@@ -22,7 +21,6 @@ DEFAULT_HEARTBEAT_INTERVAL = 30  # Seconds between heartbeat status requests
 DEFAULT_CONNECTION_TIMEOUT = 120  # Seconds before connection considered dead
 DEFAULT_RECONNECT_DELAY = 2  # Seconds between reconnection attempts
 MAX_RECONNECT_ATTEMPTS = 3  # Maximum number of consecutive reconnection attempts
-RECONNECT_WAIT_ITERATIONS = 20  # Wait iterations for another task's reconnection
 WEBSOCKET_REQUEST_TIMEOUT = 10  # Seconds to wait for websocket response
 
 # Light settings

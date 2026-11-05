@@ -17,8 +17,6 @@ from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
-STORAGE_VERSION = 1
-
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the Thermex filter‐alert binary sensor."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
@@ -90,7 +88,7 @@ class ThermexFilterAlert(BinarySensorEntity):
             days_exceeded = days_since_reset >= days_threshold
         else:
             # No reset date recorded - trigger if significant runtime
-            days_exceeded = runtime_hours > 5
+            days_exceeded = runtime_hours > MINIMUM_RUNTIME_FOR_NO_RESET_ALERT
         
         # Get hub data for connection status
         hub_data = self._hub.get_coordinator_data()

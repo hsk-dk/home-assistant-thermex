@@ -222,7 +222,6 @@ class TestThermexFan:
     async def test_fan_async_will_remove_from_hass(self, fan_entity):
         """Test cleanup when removing from hass."""
         fan_entity._delayed_off_handle = MagicMock()
-        fan_entity._auto_off_handle = MagicMock()
         
         await fan_entity.async_will_remove_from_hass()
         
@@ -440,19 +439,6 @@ class TestThermexFan:
         assert fan_entity._delayed_off_handle is None
 
     @pytest.mark.asyncio
-    async def test_fan_handle_auto_off(self, fan_entity, mock_hub):
-        """Test _handle_auto_off turns off fan."""
-        fan_entity._is_on = True
-        fan_entity._auto_off_handle = MagicMock()
-        
-        with patch.object(fan_entity, 'async_write_ha_state'):
-            await fan_entity._handle_auto_off(None)
-        
-        # Should turn off fan and clear handle
-        assert fan_entity._auto_off_handle is None
-        mock_hub.send_request.assert_called_once()
-
-    @pytest.mark.asyncio
     async def test_fan_first_on_resets_runtime(self, fan_entity, mock_hub):
         """Test fan resets runtime on first turn on."""
         fan_entity._runtime_manager.get_last_reset.return_value = None
@@ -467,3 +453,29 @@ class TestThermexFan:
         
         # Should have called reset
         fan_entity._runtime_manager.reset.assert_called_once()
+
+
+class TestFanCountdownTimer:
+    """Regression tests: cancelling must stop the countdown chain."""
+
+    @pytest.fixture
+    def fan_entity(self, mock_hub, mock_config_entry, mock_hass):
+        runtime_manager = MagicMock()
+        runtime_manager.get_last_preset = MagicMock(return_value="off")
+        fan = ThermexFan(mock_hub, runtime_manager, mock_config_entry)
+        fan.hass = mock_hass
+        return fan
+
+    @pytest.mark.asyncio
+    async def test_cancel_stops_countdown_timer(self, fan_entity):
+        fan_entity._is_on = True
+        fan_entity.schedule_update_ha_state = MagicMock()
+        cancel_off, cancel_count = MagicMock(), MagicMock()
+
+        with patch("custom_components.thermex_api.fan.async_call_later", side_effect=[cancel_off, cancel_count]),              patch("custom_components.thermex_api.fan.async_dispatcher_send"):
+            await fan_entity.start_delayed_off()
+            await fan_entity.cancel_delayed_off()
+
+        cancel_off.assert_called_once()
+        cancel_count.assert_called_once()
+        assert fan_entity._countdown_handle is None

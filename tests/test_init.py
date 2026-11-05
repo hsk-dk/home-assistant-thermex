@@ -2,6 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.thermex_api import async_setup_entry, async_unload_entry, async_create_coordinator
 
@@ -21,15 +22,23 @@ class TestInit:
         """Test successful setup entry."""
         mock_hub = MagicMock()
         mock_hub.connect = AsyncMock()
+        mock_hub.close = AsyncMock()
         mock_hub.get_coordinator_data = MagicMock(return_value={})
         
         mock_runtime_manager = MagicMock()
         mock_runtime_manager.load = AsyncMock()
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
         
         with patch('custom_components.thermex_api.async_get_integration', return_value=mock_integration):
             with patch('custom_components.thermex_api.ThermexHub', return_value=mock_hub):
                 with patch('custom_components.thermex_api.RuntimeManager', return_value=mock_runtime_manager):
-                    with patch('custom_components.thermex_api.Store'):
+                    with patch('custom_components.thermex_api.Store'), patch(
+                        'custom_components.thermex_api.async_create_coordinator',
+                        new_callable=AsyncMock,
+                        return_value=mock_coordinator,
+                    ):
                         with patch.object(mock_hass.config_entries, 'async_forward_entry_setups', new_callable=AsyncMock):
                             result = await async_setup_entry(mock_hass, mock_config_entry)
                             
@@ -88,25 +97,40 @@ class TestInit:
 
     @pytest.mark.asyncio
     async def test_async_create_coordinator(self, mock_hass):
-        """Test coordinator creation."""
+        """Test coordinator creation passes the expected name and interval."""
         mock_hub = MagicMock()
         mock_hub.get_coordinator_data = MagicMock(return_value={"test": "data"})
-        
-        coordinator = await async_create_coordinator(mock_hass, mock_hub)
-        
-        assert coordinator is not None
-        assert coordinator.name == "thermex_coordinator"
+
+        with patch('custom_components.thermex_api.DataUpdateCoordinator') as mock_cls:
+            coordinator = await async_create_coordinator(mock_hass, mock_hub)
+
+        assert coordinator is mock_cls.return_value
+        kwargs = mock_cls.call_args.kwargs
+        assert kwargs["name"] == "thermex_coordinator"
+        assert kwargs["update_interval"].total_seconds() == 30
 
     @pytest.mark.asyncio
     async def test_coordinator_update_method(self, mock_hass):
-        """Test coordinator update method calls hub."""
+        """Test coordinator update method returns the hub's data."""
         mock_hub = MagicMock()
         mock_hub.get_coordinator_data = MagicMock(return_value={"test": "data"})
-        
-        coordinator = await async_create_coordinator(mock_hass, mock_hub)
-        
-        # Manually call the update method
-        data = await coordinator._async_update_data()
-        
+
+        with patch('custom_components.thermex_api.DataUpdateCoordinator') as mock_cls:
+            await async_create_coordinator(mock_hass, mock_hub)
+
+        data = await mock_cls.call_args.kwargs["update_method"]()
+
         assert data == {"test": "data"}
         mock_hub.get_coordinator_data.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_coordinator_update_method_wraps_errors(self, mock_hass):
+        """Errors from the hub surface as UpdateFailed."""
+        mock_hub = MagicMock()
+        mock_hub.get_coordinator_data = MagicMock(side_effect=RuntimeError("boom"))
+
+        with patch('custom_components.thermex_api.DataUpdateCoordinator') as mock_cls:
+            await async_create_coordinator(mock_hass, mock_hub)
+
+        with pytest.raises(UpdateFailed):
+            await mock_cls.call_args.kwargs["update_method"]()

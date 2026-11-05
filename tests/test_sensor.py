@@ -199,8 +199,12 @@ class TestDelayedTurnOffSensor:
     """Test DelayedTurnOffSensor entity."""
 
     @pytest.fixture
-    def delayed_sensor(self, mock_hub, mock_hass):
+    def delayed_sensor(self, mock_hub, mock_hass, monkeypatch):
         """Create a DelayedTurnOffSensor entity."""
+        monkeypatch.setattr(
+            "custom_components.thermex_api.sensor.find_fan_entity_id",
+            lambda hass, unique_id: "fan.thermex_fan",
+        )
         runtime_manager = MagicMock()
         
         sensor = DelayedTurnOffSensor(

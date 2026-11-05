@@ -12,13 +12,13 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util import dt as dt_util
 from homeassistant.util.dt import parse_datetime
 
 from .const import DOMAIN, RUNTIME_UPDATE_INTERVAL, THERMEX_NOTIFY
+from .entity_lookup import find_fan_entity_id
 
 _LOGGER = logging.getLogger(__name__)
-
-STORAGE_VERSION = 1
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up persistent runtime-tracking sensors for the Thermex fan."""
@@ -232,71 +232,32 @@ class DelayedTurnOffSensor(BaseRuntimeSensor):
             _LOGGER.debug("DelayedTurnOffSensor received fan notification, updating state")
             self.async_write_ha_state()
         
+    def _fan_state(self):
+        """Return the fan's state object, found via the entity registry."""
+        fan_entity_id = find_fan_entity_id(self.hass, self._hub.unique_id)
+        return self.hass.states.get(fan_entity_id) if fan_entity_id else None
+
     @property
     def native_value(self):
         """Return the scheduled turn-off time."""
-        # Get the fan entity to check its delayed turn-off status
-        if hasattr(self.hass, 'data') and DOMAIN in self.hass.data:
-            entry_data = self.hass.data[DOMAIN].get(self._entry_id)
-            if entry_data and 'hub' in entry_data:
-                # Find the fan entity by checking entity registry
-                fan_entity_id = f"fan.{self._hub.unique_id}_fan"
-                
-                # Also try alternative naming schemes that HA might use
-                possible_entity_ids = [
-                    fan_entity_id,
-                    f"fan.{self._hub.unique_id.replace('_', '')}_fan",
-                    "fan.thermex_hood_thermex_ventilator",  # From the logs
-                ]
-                
-                _LOGGER.debug("DelayedTurnOffSensor: trying entity IDs: %s", possible_entity_ids)
-                
-                fan_state = None
-                actual_entity_id = None
-                
-                for entity_id in possible_entity_ids:
-                    fan_state = self.hass.states.get(entity_id)
-                    if fan_state:
-                        actual_entity_id = entity_id
-                        break
-                
-                _LOGGER.debug("DelayedTurnOffSensor: found fan at %s, fan_state=%s", actual_entity_id, fan_state is not None)
-                
-                if fan_state and fan_state.attributes:
-                    scheduled_time = fan_state.attributes.get("delayed_off_scheduled_time")
-                    _LOGGER.debug("DelayedTurnOffSensor: scheduled_time=%s", scheduled_time)
-                    if scheduled_time:
-                        parsed_dt = parse_datetime(scheduled_time)
-                        if parsed_dt:
-                            # Ensure timezone is set (assume local timezone if none)
-                            if parsed_dt.tzinfo is None:
-                                from homeassistant.util import dt as dt_util
-                                parsed_dt = parsed_dt.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
-                            return parsed_dt
-        return None
-        
-    @property 
+        fan_state = self._fan_state()
+        if not fan_state:
+            return None
+        scheduled_time = fan_state.attributes.get("delayed_off_scheduled_time")
+        if not scheduled_time:
+            return None
+        parsed_dt = parse_datetime(scheduled_time)
+        if parsed_dt and parsed_dt.tzinfo is None:
+            parsed_dt = parsed_dt.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+        return parsed_dt
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional delayed turn-off information."""
-        if hasattr(self.hass, 'data') and DOMAIN in self.hass.data:
-            entry_data = self.hass.data[DOMAIN].get(self._entry_id)
-            if entry_data and 'hub' in entry_data:
-                # Try multiple possible entity IDs
-                possible_entity_ids = [
-                    f"fan.{self._hub.unique_id}_fan",
-                    "fan.thermex_hood_thermex_ventilator",  # From the logs
-                ]
-                
-                for entity_id in possible_entity_ids:
-                    fan_state = self.hass.states.get(entity_id)
-                    if fan_state and fan_state.attributes:
-                        return {
-                            "delayed_off_active": fan_state.attributes.get("delayed_off_active", False),
-                            "delayed_off_remaining": fan_state.attributes.get("delayed_off_remaining", 0),
-                            "delayed_off_delay": fan_state.attributes.get("delayed_off_delay", 10),
-                        }
+        fan_state = self._fan_state()
+        attrs = fan_state.attributes if fan_state else {}
         return {
-            "delayed_off_active": False,
-            "delayed_off_remaining": 0,
-            "delayed_off_delay": 10,
+            "delayed_off_active": attrs.get("delayed_off_active", False),
+            "delayed_off_remaining": attrs.get("delayed_off_remaining", 0),
+            "delayed_off_delay": attrs.get("delayed_off_delay", 10),
         }
