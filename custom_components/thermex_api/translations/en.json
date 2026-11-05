@@ -132,6 +132,12 @@
     },
     "request_rejected": {
       "message": "The Thermex hood rejected the command (status {status})."
+    },
+    "fan_not_running": {
+      "message": "The fan is not running, so there is nothing to turn off later. Start the fan first."
+    },
+    "fan_entity_not_found": {
+      "message": "The Thermex fan entity could not be found."
     }
   }
 }

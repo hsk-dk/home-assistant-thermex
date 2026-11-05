@@ -132,6 +132,12 @@
     },
     "request_rejected": {
       "message": "Thermex-liesituuletin hylkäsi komennon (tila {status})."
+    },
+    "fan_not_running": {
+      "message": "Tuuletin ei käy, joten ei ole mitään sammutettavaa myöhemmin. Käynnistä tuuletin ensin."
+    },
+    "fan_entity_not_found": {
+      "message": "Thermex-tuuletinentiteettiä ei löytynyt."
     }
   }
 }

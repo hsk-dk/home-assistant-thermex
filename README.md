@@ -50,6 +50,8 @@ Install through [HACS](https://hacs.xyz/) by searching for "Thermex Hood Integra
 - `thermex_api.start_delayed_off`: Start delayed turn-off timer (also available as button entity)
 - `thermex_api.cancel_delayed_off`: Cancel active delayed turn-off
 
+All three actions target the Thermex fan entity. `start_delayed_off` returns an error if the fan is not running.
+
 ---
 
 ## Configuration

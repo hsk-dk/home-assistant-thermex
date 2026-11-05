@@ -132,6 +132,12 @@
     },
     "request_rejected": {
       "message": "Thermex-hetten avviste kommandoen (status {status})."
+    },
+    "fan_not_running": {
+      "message": "Viften går ikke, så det er ingenting å slå av senere. Start viften først."
+    },
+    "fan_entity_not_found": {
+      "message": "Thermex-vifteentiteten ble ikke funnet."
     }
   }
 }

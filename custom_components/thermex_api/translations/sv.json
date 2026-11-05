@@ -132,6 +132,12 @@
     },
     "request_rejected": {
       "message": "Thermex-fläkten avvisade kommandot (status {status})."
+    },
+    "fan_not_running": {
+      "message": "Fläkten är inte igång, så det finns inget att stänga av senare. Starta fläkten först."
+    },
+    "fan_entity_not_found": {
+      "message": "Thermex-fläktentiteten hittades inte."
     }
   }
 }

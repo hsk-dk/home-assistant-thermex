@@ -132,6 +132,12 @@
     },
     "request_rejected": {
       "message": "Thermex-emhætten afviste kommandoen (status {status})."
+    },
+    "fan_not_running": {
+      "message": "Emhætten kører ikke, så der er intet at slukke senere. Start emhætten først."
+    },
+    "fan_entity_not_found": {
+      "message": "Thermex-emhætteentiteten blev ikke fundet."
     }
   }
 }

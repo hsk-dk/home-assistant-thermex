@@ -2,10 +2,14 @@
 """Thermex API integration."""
 import logging
 
+from homeassistant.components.fan import DOMAIN as FAN_DOMAIN
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import service
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN, RUNTIME_STORAGE_FILE, STARTUP, STORAGE_VERSION
@@ -16,6 +20,29 @@ from .runtime_manager import RuntimeManager
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["light", "fan", "sensor", "binary_sensor", "button"]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+# action name -> method on the fan entity
+FAN_ACTIONS = {
+    "reset_runtime": "async_reset",
+    "start_delayed_off": "start_delayed_off",
+    "cancel_delayed_off": "cancel_delayed_off",
+}
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the actions once, so they exist even before an entry is loaded."""
+    for name, method in FAN_ACTIONS.items():
+        service.async_register_platform_entity_service(
+            hass,
+            DOMAIN,
+            name,
+            entity_domain=FAN_DOMAIN,
+            schema=None,
+            func=method,
+        )
+    return True
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> bool:
