@@ -455,16 +455,14 @@ class TestThermexFan:
     @pytest.mark.asyncio
     async def test_fan_async_will_remove_from_hass(self, fan_entity):
         """Test fan cleanup when removed."""
-        mock_unsub = MagicMock()
         mock_cancel = MagicMock()
-        fan_entity._unsub = mock_unsub
         fan_entity._delayed_off_handle = mock_cancel
-        
+
         with patch('custom_components.thermex_api.fan.async_dispatcher_send'):
             await fan_entity.async_will_remove_from_hass()
-        
-        # Should call unsub and cancel delayed off
-        mock_unsub.assert_called_once()
+
+        # Should cancel the delayed off timer (the dispatcher unsubscribe is
+        # registered with async_on_remove by the base entity)
         mock_cancel.assert_called_once()
         assert fan_entity._delayed_off_handle is None
 

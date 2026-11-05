@@ -85,7 +85,7 @@ Add the integration through Home Assistant UI (Settings â†’ Devices & Services â
 
 ## Compatibility
 
-- **Home Assistant**: Version **2024.1.0** or later
+- **Home Assistant**: Version **2025.8.0** or later
 - **Thermex API**: Version **1.1** (WebSocket protocol)
 - **Integration Version**: **3.3.0-beta6** (see [manifest.json](custom_components/thermex_api/manifest.json))
 

@@ -10,13 +10,13 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.core import callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 from homeassistant.util.dt import parse_datetime
 
-from .const import RUNTIME_UPDATE_INTERVAL, THERMEX_NOTIFY
+from .const import RUNTIME_UPDATE_INTERVAL
 from .data import ThermexConfigEntry
+from .entity import ThermexEntity
 from .entity_lookup import find_fan_entity_id
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,34 +26,24 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
     hub = entry.runtime_data.hub
     runtime_manager = entry.runtime_data.runtime_manager
 
-    device_info = hub.device_info
-
     async_add_entities([
-        LastResetSensor(hub, runtime_manager, device_info),
-        RuntimeHoursSensor(hub, runtime_manager, device_info),
-        ConnectionStatusSensor(hub, runtime_manager, device_info),
-        DelayedTurnOffSensor(hub, runtime_manager, device_info, entry.entry_id),
-    ], update_before_add=True)
+        LastResetSensor(hub, runtime_manager),
+        RuntimeHoursSensor(hub, runtime_manager),
+        ConnectionStatusSensor(hub, runtime_manager),
+        DelayedTurnOffSensor(hub, runtime_manager, entry.entry_id),
+    ])
 
 
-class BaseRuntimeSensor(SensorEntity):
-    """Base class for runtime sensors that listen to THERMEX_NOTIFY."""
-    def __init__(self, hub, runtime_manager, device_info):
-        self._hub = hub
+class BaseRuntimeSensor(ThermexEntity, SensorEntity):
+    """Base class for sensors that refresh on fan notifications."""
+
+    def __init__(self, hub, runtime_manager):
+        super().__init__(hub)
         self._runtime_manager = runtime_manager
-        self._attr_device_info = device_info
-        self._attr_has_entity_name = True
-        self._unsub = None
 
     async def async_added_to_hass(self):
-        self._unsub = async_dispatcher_connect(
-            self.hass, THERMEX_NOTIFY, self._handle_notify
-        )
+        await super().async_added_to_hass()
         self.async_write_ha_state()
-
-    async def async_will_remove_from_hass(self):
-        if self._unsub:
-            self._unsub()
 
     @callback
     def _handle_notify(self, ntf_type, data):
@@ -67,8 +57,8 @@ class RuntimeHoursSensor(BaseRuntimeSensor):
     _attr_unit_of_measurement = "h"  # type: ignore[assignment]
     _attr_state_class = "measurement"
 
-    def __init__(self, hub, runtime_manager, device_info):
-        super().__init__(hub, runtime_manager, device_info)
+    def __init__(self, hub, runtime_manager):
+        super().__init__(hub, runtime_manager)
         self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
         self._attr_translation_key = "thermex_sensor_runtime_hours"
         self._update_timer = None
@@ -138,9 +128,10 @@ class LastResetSensor(BaseRuntimeSensor):
     """Timestamp when the runtime counter was last reset."""
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _requires_connection = False  # stored locally
 
-    def __init__(self, hub, runtime_manager, device_info):
-        super().__init__(hub, runtime_manager, device_info)
+    def __init__(self, hub, runtime_manager):
+        super().__init__(hub, runtime_manager)
         self._attr_unique_id = f"{hub.unique_id}_last_reset"
         self._attr_translation_key = "thermex_sensor_last_reset"
 
@@ -157,8 +148,8 @@ class ConnectionStatusSensor(BaseRuntimeSensor):
 
     _attr_icon = "mdi:connection"
 
-    def __init__(self, hub, runtime_manager, device_info):
-        super().__init__(hub, runtime_manager, device_info)
+    def __init__(self, hub, runtime_manager):
+        super().__init__(hub, runtime_manager)
         self._attr_unique_id = f"{hub.unique_id}_connection_status"
         self._attr_translation_key = "thermex_sensor_connection_status"
      
@@ -200,34 +191,18 @@ class DelayedTurnOffSensor(BaseRuntimeSensor):
     
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     
-    def __init__(self, hub, runtime_manager, device_info, entry_id):
-        super().__init__(hub, runtime_manager, device_info)
+    def __init__(self, hub, runtime_manager, entry_id):
+        super().__init__(hub, runtime_manager)
         self._entry_id = entry_id
         self._attr_unique_id = f"{hub.unique_id}_delayed_turn_off_time"
         self._attr_translation_key = "thermex_sensor_delayed_turn_off"
         
-    async def async_added_to_hass(self):
-        """Listen for delayed turn-off notifications."""
-        await super().async_added_to_hass()
-        # Listen specifically for delayed turn-off notifications
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass, THERMEX_NOTIFY, self._handle_delayed_off_notify
-            )
-        )
-        
     @callback
-    def _handle_delayed_off_notify(self, ntf_type, data):
-        """Handle delayed turn-off notification."""
-        if ntf_type == "delayed_turn_off":
-            _LOGGER.debug("DelayedTurnOffSensor received notification: %s", data)
-            # Force update immediately when we get a delayed turn-off notification
+    def _handle_notify(self, ntf_type, data):
+        """Update on delayed turn-off changes and on fan state changes."""
+        if ntf_type == "delayed_turn_off" or ntf_type.lower() == "fan":
             self.async_write_ha_state()
-        elif ntf_type == "fan":
-            # Also update when fan state changes, as this might affect our display
-            _LOGGER.debug("DelayedTurnOffSensor received fan notification, updating state")
-            self.async_write_ha_state()
-        
+
     def _fan_state(self):
         """Return the fan's state object, found via the entity registry."""
         fan_entity_id = find_fan_entity_id(self.hass, self._hub.unique_id)

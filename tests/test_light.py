@@ -261,17 +261,6 @@ class TestThermexDecoLight:
         # Should mark as got initial state even on error
         assert decolight_entity._got_initial_state is True
 
-    @pytest.mark.asyncio
-    async def test_light_async_will_remove_from_hass(self, decolight_entity):
-        """Test light cleanup when removed."""
-        mock_unsub = MagicMock()
-        decolight_entity._unsub = mock_unsub
-        
-        await decolight_entity.async_will_remove_from_hass()
-        
-        # Should call unsub
-        mock_unsub.assert_called_once()
-
     def test_light_clamp_brightness(self, decolight_entity):
         """Test brightness clamping."""
         # Test minimum (MIN_BRIGHTNESS is 0)

@@ -6,6 +6,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import callback
 
 from .const import DOMAIN
 from .hub import ThermexAuthError, ThermexHub
@@ -25,7 +26,7 @@ async def _async_validate_connection(hass, host: str, api_key: str) -> str | Non
     except ThermexAuthError:
         return "invalid_auth"
     except Exception as err:
-        _LOGGER.error("Unable to connect to Thermex: %s", err)
+        _LOGGER.debug("Unable to connect to Thermex: %s", err)
         return "cannot_connect"
     finally:
         # Always close the temporary hub to prevent resource leaks
@@ -92,37 +93,30 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         )
 
     @staticmethod
-    def async_get_options_flow(entry: ConfigEntry):
-        return OptionsFlowHandler(entry)
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> "OptionsFlowHandler":
+        return OptionsFlowHandler()
 
 
-class OptionsFlowHandler(config_entries.OptionsFlow):
-    def __init__(self, entry: ConfigEntry):
-        self.entry = entry
+OPTIONS_SCHEMA = vol.Schema({
+    vol.Optional("enable_decolight", default=False): bool,
+    vol.Optional("fan_alert_hours", default=30): vol.All(int, vol.Range(min=1, max=1000)),
+    vol.Optional("fan_alert_days", default=90): vol.All(int, vol.Range(min=1, max=365)),
+    vol.Optional("fan_auto_off_delay", default=10): vol.All(int, vol.Range(min=1, max=120)),
+})
+
+
+class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
+    """Options; Home Assistant reloads the entry when they change."""
 
     async def async_step_init(self, user_input=None):
         """Manage options for Thermex integration."""
-        if user_input is None:
-            data_schema = vol.Schema({
-                vol.Optional(
-                    "enable_decolight",
-                    default=self.entry.options.get("enable_decolight", False)
-                ): bool,
-                vol.Optional(
-                    "fan_alert_hours",
-                    default=self.entry.options.get("fan_alert_hours", 30)
-                ): vol.All(int, vol.Range(min=1, max=1000)),
-                vol.Optional(
-                    "fan_alert_days",
-                    default=self.entry.options.get("fan_alert_days", 90)
-                ): vol.All(int, vol.Range(min=1, max=365)),
-                vol.Optional(
-                    "fan_auto_off_delay",
-                    default=self.entry.options.get("fan_auto_off_delay", 10)
-                ): vol.All(int, vol.Range(min=1, max=120)),
-            })
-            return self.async_show_form(
-                step_id="init", data_schema=data_schema
-            )
+        if user_input is not None:
+            return self.async_create_entry(title="Options", data=user_input)
 
-        return self.async_create_entry(title="Options", data=user_input)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                OPTIONS_SCHEMA, self.config_entry.options
+            ),
+        )

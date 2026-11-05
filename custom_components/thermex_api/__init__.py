@@ -30,10 +30,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> b
     try:
         await hub.connect()
     except ThermexAuthError as err:
-        raise ConfigEntryAuthFailed(f"Thermex at {host} rejected the API password") from err
+        raise ConfigEntryAuthFailed(
+            translation_domain=DOMAIN,
+            translation_key="invalid_auth",
+            translation_placeholders={"host": host},
+        ) from err
     except Exception as err:
-        _LOGGER.error("Failed to connect to Thermex at %s: %s", host, err)
-        raise ConfigEntryNotReady from err
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN,
+            translation_key="cannot_connect",
+            translation_placeholders={"host": host},
+        ) from err
 
     # If the hood later rejects the password (e.g. it was changed), start reauth
     hub.on_auth_failure = lambda: entry.async_start_reauth(hass)
@@ -53,21 +60,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> b
         # 3) Share hub + runtime manager with the platforms
         entry.runtime_data = ThermexData(hub=hub, runtime_manager=runtime_manager)
 
-        # 4) Watch for options changes
-        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
-
-        # 5) Forward setup to all platforms
+        # 4) Forward setup to all platforms (the options flow reloads the entry itself)
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     except BaseException:
         await hub.close()
         raise
     return True
-
-
-async def _async_update_listener(hass: HomeAssistant, entry: ThermexConfigEntry) -> None:
-    """Reload the entry when options change."""
-    _LOGGER.debug("Options updated, reloading Thermex entry %s", entry.entry_id)
-    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> bool:

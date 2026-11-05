@@ -251,10 +251,10 @@ class TestThermexHub:
             mock_dispatcher.assert_called_once()
             # Verify it was called with correct arguments (using actual signal value)
             mock_dispatcher.assert_called_with(
-                hub_instance._hass, "thermex_api_notify", "fan", {"Fan": {"fanonoff": 1}}
+                hub_instance._hass, hub_instance.signal, "fan", {"Fan": {"fanonoff": 1}}
             )
             call_args = mock_dispatcher.call_args[0]
-            assert call_args[1] == THERMEX_NOTIFY
+            assert call_args[1] == hub_instance.signal
             assert call_args[2] == "fan"
 
     @pytest.mark.asyncio
@@ -854,3 +854,84 @@ class TestThermexHubUpdates:
                 await hub.connect()
 
         assert isinstance(exc.value, ThermexAuthError) == (expected == "auth")
+
+
+class TestThermexHubAvailability:
+    """Per-hood signals and one-time loss/recovery handling."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        return ThermexHub(hass, "192.168.1.100", "pw", "entry-a")
+
+    def test_signals_are_scoped_per_config_entry(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        a = ThermexHub(hass, "10.0.0.1", "pw", "entry-a")
+        b = ThermexHub(hass, "10.0.0.2", "pw", "entry-b")
+
+        assert a.signal != b.signal
+        assert a.availability_signal != b.availability_signal
+        assert "entry-a" in a.signal
+
+    def test_available_only_when_connected(self, hub):
+        assert hub.available is False
+        hub._set_connection_state("connected")
+        assert hub.available is True
+        hub._set_connection_state("disconnected")
+        assert hub.available is False
+
+    def test_state_change_notifies_entities_once(self, hub):
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send") as send:
+            hub._set_connection_state("connected")
+            hub._set_connection_state("connected")  # no change
+            hub._set_connection_state("disconnected")
+            hub._set_connection_state("error")  # still unavailable: no new signal
+
+        assert [c.args[1] for c in send.call_args_list] == [hub.availability_signal] * 2
+
+    def test_loss_and_recovery_logged_once(self, hub, caplog):
+        import logging
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            with caplog.at_level(logging.INFO, logger="custom_components.thermex_api.hub"):
+                hub._set_connection_state("connected")
+                hub.last_error = "boom"
+                hub._set_connection_state("disconnected")
+                hub._set_connection_state("error")
+                hub._set_connection_state("disconnected")
+                hub._set_connection_state("connected")
+
+        messages = [r.getMessage() for r in caplog.records]
+        assert sum("restored" in m for m in messages) == 2  # first connect + recovery
+        assert sum("lost" in m for m in messages) == 1
+
+    def test_no_loss_warning_while_closing(self, hub, caplog):
+        import logging
+
+        hub._set_connection_state("connected")
+        hub._closing = True
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            with caplog.at_level(logging.INFO, logger="custom_components.thermex_api.hub"):
+                hub._set_connection_state("closed")
+
+        assert not [r for r in caplog.records if "lost" in r.getMessage()]
+
+    @pytest.mark.asyncio
+    async def test_notifications_use_the_entry_signal(self, hub):
+        msg = MagicMock()
+        msg.type = WSMsgType.TEXT
+        msg.data = json.dumps({"Notify": "fan", "Data": {"Fan": {"fanonoff": 1}}})
+
+        async def gen():
+            yield msg
+
+        ws = MagicMock()
+        ws.__aiter__ = lambda self: gen().__aiter__()
+        hub._ws = ws
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send") as send:
+            await hub._recv_loop()
+
+        assert send.call_args_list[0].args[1] == hub.signal

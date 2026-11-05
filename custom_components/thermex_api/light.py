@@ -10,8 +10,6 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util.color import color_hs_to_RGB, color_RGB_to_hs
 
@@ -20,9 +18,9 @@ from .const import (
     FALLBACK_STATUS_TIMEOUT,
     MAX_BRIGHTNESS,
     MIN_BRIGHTNESS,
-    THERMEX_NOTIFY,
 )
 from .data import ThermexConfigEntry
+from .entity import ThermexEntity
 from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,26 +61,20 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
     entities: list[LightEntity] = [ThermexLight(hub)]
     if enable_decolight:
         entities.append(ThermexDecoLight(hub))
-    async_add_entities(entities, update_before_add=True)
+    async_add_entities(entities)
 
-class ThermexLightBase(LightEntity):
+class ThermexLightBase(ThermexEntity, LightEntity):
     """Base class for Thermex light entities with common functionality."""
 
     def __init__(self, hub: ThermexHub, unique_id_suffix: str, translation_key: str):
         """Initialize the base light entity."""
-        self._hub = hub
+        super().__init__(hub)
         self._attr_unique_id = f"{hub.unique_id}_{unique_id_suffix}"
         self._attr_translation_key = translation_key
-        self._attr_has_entity_name = True
         self._is_on: bool = False
         self._brightness: int = DEFAULT_BRIGHTNESS
         self._last_brightness: int = DEFAULT_BRIGHTNESS
-        self._unsub = None
         self._got_initial_state: bool = False
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return self._hub.device_info
 
     @property
     def is_on(self) -> bool:
@@ -94,15 +86,12 @@ class ThermexLightBase(LightEntity):
 
     async def async_added_to_hass(self):
         """Called when entity is added to hass."""
+        await super().async_added_to_hass()
         self._got_initial_state = False
-        self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
         _LOGGER.debug("%s: awaiting initial notify for state", self.__class__.__name__)
-        async_call_later(self.hass, FALLBACK_STATUS_TIMEOUT, self._fallback_status)
-
-    async def async_will_remove_from_hass(self):
-        """Called when entity is being removed from hass."""
-        if self._unsub:
-            self._unsub()
+        self.async_on_remove(
+            async_call_later(self.hass, FALLBACK_STATUS_TIMEOUT, self._fallback_status)
+        )
 
     def _clamp_brightness(self, brightness: int) -> int:
         """Clamp brightness to valid range."""

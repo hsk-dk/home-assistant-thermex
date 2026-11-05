@@ -8,7 +8,6 @@ from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import callback
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.dispatcher import (
-    async_dispatcher_connect,
     async_dispatcher_send,
 )
 from homeassistant.helpers.event import async_call_later
@@ -16,9 +15,9 @@ from homeassistant.helpers.event import async_call_later
 from .const import (
     DELAYED_TURNOFF_COUNTDOWN_INTERVAL,
     FALLBACK_STATUS_TIMEOUT,
-    THERMEX_NOTIFY,
 )
 from .data import ThermexConfigEntry
+from .entity import ThermexEntity
 from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
 
@@ -34,7 +33,7 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
     hub = entry.runtime_data.hub
     runtime_manager = entry.runtime_data.runtime_manager
     fan_entity = ThermexFan(hub, runtime_manager, entry)
-    async_add_entities([fan_entity], update_before_add=True)
+    async_add_entities([fan_entity])
 
     # Register entity services
     platform = entity_platform.async_get_current_platform()
@@ -55,7 +54,7 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
     )
 
 
-class ThermexFan(FanEntity):
+class ThermexFan(ThermexEntity, FanEntity):
     """Thermex extractor fan with presets and runtime tracking."""
 
     _attr_supported_features = (
@@ -68,7 +67,7 @@ class ThermexFan(FanEntity):
     _attr_speed_count = 4  # 4 speeds: low(25%), medium(50%), high(75%), boost(100%)
 
     def __init__(self, hub: ThermexHub, runtime_manager: RuntimeManager, entry):
-        self._hub = hub
+        super().__init__(hub)
         self._runtime_manager = runtime_manager
         self._entry = entry
         self._auto_off_handle: Callable[[], None] | None = None
@@ -77,12 +76,9 @@ class ThermexFan(FanEntity):
         self._delayed_off_active = False
         self._delayed_off_remaining = 0
         self._delayed_off_scheduled_time: datetime | None = None
-        self._unsub: Callable[[], None] | None = None
         self._attr_translation_key = "thermex_fan"
-        self._attr_has_entity_name = True
         self._attr_unique_id = f"{hub.unique_id}_fan"
         self._attr_icon = "mdi:fan"
-        self._attr_device_info = hub.device_info
 
         # State
         self._is_on = False
@@ -152,10 +148,11 @@ class ThermexFan(FanEntity):
     async def async_added_to_hass(self) -> None:
         """Called when entity is added to hass."""
         _LOGGER.info("ThermexFan entity added to hass: %s", self.entity_id)
-        self._unsub = async_dispatcher_connect(self.hass, THERMEX_NOTIFY, self._handle_notify)
+        await super().async_added_to_hass()
         _LOGGER.debug("ThermexFan: awaiting initial notify for state")
-        # Use a longer timeout and check if startup is complete
-        async_call_later(self.hass, FALLBACK_STATUS_TIMEOUT, self._fallback_status)
+        self.async_on_remove(
+            async_call_later(self.hass, FALLBACK_STATUS_TIMEOUT, self._fallback_status)
+        )
 
     @callback
     def _handle_notify(self, ntf_type: str, data: dict) -> None:
@@ -299,11 +296,10 @@ class ThermexFan(FanEntity):
         self.schedule_update_ha_state()
         
         # Notify other entities about delayed turn-off activation
-        from .const import THERMEX_NOTIFY
         scheduled_iso = self._delayed_off_scheduled_time.isoformat() if self._delayed_off_scheduled_time else None
         async_dispatcher_send(
             self.hass,
-            THERMEX_NOTIFY,
+            self._hub.signal,
             "delayed_turn_off",
             {
                 "active": True, 
@@ -329,10 +325,9 @@ class ThermexFan(FanEntity):
         _LOGGER.info("Delayed turn-off cancelled")
         
         # Notify other entities about delayed turn-off status change
-        from .const import THERMEX_NOTIFY
         async_dispatcher_send(
             self.hass,
-            THERMEX_NOTIFY,
+            self._hub.signal,
             "delayed_turn_off",
             {"active": False, "scheduled_time": None},
         )
@@ -378,18 +373,15 @@ class ThermexFan(FanEntity):
         self.schedule_update_ha_state()
         
         # Notify other entities about delayed turn-off completion
-        from .const import THERMEX_NOTIFY
         async_dispatcher_send(
             self.hass,
-            THERMEX_NOTIFY,
+            self._hub.signal,
             "delayed_turn_off",
             {"active": False, "scheduled_time": None},
         )
 
     async def async_will_remove_from_hass(self) -> None:
         """Cancel any pending timers when entity is removed."""
-        if self._unsub:
-            self._unsub()
         await self.cancel_delayed_off()
 
     async def _fallback_status(self, _now):

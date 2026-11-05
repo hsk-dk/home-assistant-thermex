@@ -19,6 +19,9 @@ def mock_hub():
     }
     hub.send_request = AsyncMock()
     hub.send_update = AsyncMock()
+    hub.signal = "thermex_api_notify_test"
+    hub.availability_signal = "thermex_api_notify_availability_test"
+    hub.available = True
     hub.get_coordinator_data = MagicMock(return_value={
         "connection_state": "connected",
         "last_error": None,

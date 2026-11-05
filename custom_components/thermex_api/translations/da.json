@@ -106,5 +106,16 @@
       "name": "Annuller forsinket slukning",
       "description": "Annuller forsinket slukning-timer for Thermex-emhætten."
     }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Kan ikke oprette forbindelse til Thermex-emhætten på {host}. Kontroller IP-adressen, og at API'et er aktiveret i Thermex-appen."
+    },
+    "invalid_auth": {
+      "message": "Thermex-emhætten på {host} afviste API-adgangskoden. Indtast den aktuelle adgangskode for at fortsætte."
+    },
+    "request_rejected": {
+      "message": "Thermex-emhætten afviste kommandoen (status {status})."
+    }
   }
 }
