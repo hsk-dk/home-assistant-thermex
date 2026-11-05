@@ -52,6 +52,7 @@ class TestInit:
     async def test_async_unload_entry_success(self, mock_hass, mock_config_entry):
         """Test successful unload entry."""
         mock_hub = MagicMock()
+        mock_hub.close = AsyncMock()
         
         mock_hass.data = {
             "thermex_api": {
@@ -65,8 +66,25 @@ class TestInit:
             result = await async_unload_entry(mock_hass, mock_config_entry)
             
             assert result is True
-            # Verify entry data was removed
+            # Verify entry data was removed and the hub connection closed
             assert mock_config_entry.entry_id not in mock_hass.data["thermex_api"]
+            mock_hub.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_async_unload_entry_failure_keeps_hub(self, mock_hass, mock_config_entry):
+        """A failed platform unload must not close the hub or drop entry data."""
+        mock_hub = MagicMock()
+        mock_hub.close = AsyncMock()
+        mock_hass.data = {
+            "thermex_api": {mock_config_entry.entry_id: {"hub": mock_hub}}
+        }
+
+        with patch.object(mock_hass.config_entries, 'async_unload_platforms', new_callable=AsyncMock, return_value=False):
+            result = await async_unload_entry(mock_hass, mock_config_entry)
+
+        assert result is False
+        mock_hub.close.assert_not_called()
+        assert mock_config_entry.entry_id in mock_hass.data["thermex_api"]
 
     @pytest.mark.asyncio
     async def test_async_create_coordinator(self, mock_hass):
