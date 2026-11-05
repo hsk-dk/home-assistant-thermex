@@ -165,9 +165,12 @@ class TestConfigFlow:
         assert result["type"] == FlowResultType.CREATE_ENTRY
 
     @pytest.mark.asyncio
-    async def test_options_flow(self, mock_config_entry):
+    async def test_options_flow(self, mock_hass, mock_config_entry):
         """Test options flow."""
-        flow = OptionsFlowHandler(mock_config_entry)
+        flow = OptionsFlowHandler()
+        flow.hass = mock_hass
+        flow.handler = mock_config_entry.entry_id
+        mock_hass.config_entries.async_get_known_entry = MagicMock(return_value=mock_config_entry)
         
         result = await flow.async_step_init(user_input=None)
         
@@ -175,9 +178,12 @@ class TestConfigFlow:
         assert result["step_id"] == "init"
 
     @pytest.mark.asyncio
-    async def test_options_flow_with_input(self, mock_config_entry):
+    async def test_options_flow_with_input(self, mock_hass, mock_config_entry):
         """Test options flow with valid input."""
-        flow = OptionsFlowHandler(mock_config_entry)
+        flow = OptionsFlowHandler()
+        flow.hass = mock_hass
+        flow.handler = mock_config_entry.entry_id
+        mock_hass.config_entries.async_get_known_entry = MagicMock(return_value=mock_config_entry)
         
         result = await flow.async_step_init(
             user_input={
@@ -253,3 +259,10 @@ class TestReauthFlow:
 
         assert result["type"] == FlowResultType.FORM
         assert result["step_id"] == "reauth_confirm"
+
+
+def test_options_flow_reloads_entry_automatically():
+    from homeassistant.config_entries import OptionsFlowWithReload
+
+    assert issubclass(OptionsFlowHandler, OptionsFlowWithReload)
+    assert isinstance(ConfigFlow.async_get_options_flow(MagicMock()), OptionsFlowHandler)

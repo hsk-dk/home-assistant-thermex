@@ -10,10 +10,10 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.core import callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
-from .const import MINIMUM_RUNTIME_FOR_NO_RESET_ALERT, THERMEX_NOTIFY
+from .const import MINIMUM_RUNTIME_FOR_NO_RESET_ALERT
 from .data import ThermexConfigEntry
+from .entity import ThermexEntity
 
 _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
@@ -21,25 +21,21 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
     hub = entry.runtime_data.hub
     runtime_manager = entry.runtime_data.runtime_manager
 
-    device_info = hub.device_info
-
     async_add_entities([
-        ThermexFilterAlert(hub, runtime_manager, entry.options, device_info)
-    ], update_before_add=True)
+        ThermexFilterAlert(hub, runtime_manager, entry.options)
+    ])
 
-class ThermexFilterAlert(BinarySensorEntity):
+class ThermexFilterAlert(ThermexEntity, BinarySensorEntity):
     """Binary sensor that goes ON when runtime exceeds threshold."""
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _requires_connection = False  # computed from locally stored runtime
 
-    def __init__(self, hub, runtime_manager, options, device_info):
-        self._hub = hub
+    def __init__(self, hub, runtime_manager, options):
+        super().__init__(hub)
         self._runtime_manager = runtime_manager
         self._options = options
-        self._attr_device_info = device_info
         self._attr_unique_id = f"{hub.unique_id}_threshold_alert"
         self._attr_translation_key = "thermex_binary_sensor_threshold_alert"
-        self._attr_has_entity_name = True
-        self._unsub = None
 
     @property
     def is_on(self) -> bool:
@@ -119,15 +115,9 @@ class ThermexFilterAlert(BinarySensorEntity):
         return " and ".join(reasons)
 
     async def async_added_to_hass(self):
-        self._unsub = async_dispatcher_connect(
-            self.hass, THERMEX_NOTIFY, self._handle_notify
-        )
+        await super().async_added_to_hass()
         # push initial state
         self.async_write_ha_state()
-
-    async def async_will_remove_from_hass(self):
-        if self._unsub:
-            self._unsub()
 
     @callback
     def _handle_notify(self, ntf_type, data):

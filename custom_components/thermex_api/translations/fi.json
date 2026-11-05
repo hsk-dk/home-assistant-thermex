@@ -106,5 +106,16 @@
       "name": "Peruuta viivästetty sammutus",
       "description": "Peruuta viivästetyn sammutuksen ajastin Thermex-liesituulettimelle."
     }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Yhteyttä Thermex-liesituulettimeen osoitteessa {host} ei voi muodostaa. Tarkista IP-osoite ja että API on otettu käyttöön Thermex-sovelluksessa."
+    },
+    "invalid_auth": {
+      "message": "Thermex-liesituuletin osoitteessa {host} hylkäsi API-salasanan. Anna nykyinen salasana jatkaaksesi."
+    },
+    "request_rejected": {
+      "message": "Thermex-liesituuletin hylkäsi komennon (tila {status})."
+    }
   }
 }

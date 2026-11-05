@@ -5,8 +5,9 @@ import logging
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import DOMAIN, THERMEX_NOTIFY
+from .const import DOMAIN
 from .data import ThermexConfigEntry
+from .entity import ThermexEntity
 from .entity_lookup import find_fan_entity_id
 from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
@@ -23,19 +24,19 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
     ])
 
 
-class ResetRuntimeButton(ButtonEntity):
+class ResetRuntimeButton(ThermexEntity, ButtonEntity):
     """Button that resets the fan runtime (filter usage) counter."""
 
+    _requires_connection = False  # only resets the locally stored counter
+
     def __init__(self, hub: ThermexHub, runtime_manager: RuntimeManager, entry_id: str):
-        self._hub = hub
+        super().__init__(hub)
         self._runtime_manager = runtime_manager
         self._entry_id = entry_id
 
         self._attr_unique_id = f"{hub.unique_id}_reset_runtime"
         self._attr_translation_key = "thermex_button_reset_runtime"
-        self._attr_has_entity_name = True
         self._attr_icon = "mdi:refresh"
-        self._attr_device_info = hub.device_info
 
     async def async_press(self) -> None:
         """Handle the button press: reset runtime and filter time."""
@@ -48,24 +49,22 @@ class ResetRuntimeButton(ButtonEntity):
         # Trigger fan + filter sensor updates
         async_dispatcher_send(
             self.hass,
-            THERMEX_NOTIFY,
+            self._hub.signal,
             "fan",
             {"Fan": {}},
         )
 
 
-class DelayedTurnOffButton(ButtonEntity):
+class DelayedTurnOffButton(ThermexEntity, ButtonEntity):
     """Button that starts delayed turn-off for the fan."""
 
     def __init__(self, hub: ThermexHub, entry_id: str):
-        self._hub = hub
+        super().__init__(hub)
         self._entry_id = entry_id
 
         self._attr_unique_id = f"{hub.unique_id}_delayed_turn_off"
         self._attr_translation_key = "thermex_button_delayed_turn_off"
-        self._attr_has_entity_name = True
         self._attr_icon = "mdi:timer-off"
-        self._attr_device_info = hub.device_info
 
     async def async_press(self) -> None:
         """Handle the button press: start delayed turn-off for the fan."""

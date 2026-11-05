@@ -106,5 +106,16 @@
       "name": "Avbryt fördröjd avstängning",
       "description": "Avbryt timer för fördröjd avstängning av Thermex-fläkten."
     }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Kan inte ansluta till Thermex-fläkten på {host}. Kontrollera IP-adressen och att API:et är aktiverat i Thermex-appen."
+    },
+    "invalid_auth": {
+      "message": "Thermex-fläkten på {host} avvisade API-lösenordet. Ange det aktuella lösenordet för att fortsätta."
+    },
+    "request_rejected": {
+      "message": "Thermex-fläkten avvisade kommandot (status {status})."
+    }
   }
 }

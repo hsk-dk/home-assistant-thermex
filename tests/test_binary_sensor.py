@@ -53,7 +53,6 @@ class TestThermexFilterAlert:
             mock_hub,
             runtime_manager,
             options,
-            mock_hub.device_info
         )
         sensor.hass = mock_hass
         return sensor

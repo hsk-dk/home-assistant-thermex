@@ -50,7 +50,7 @@ class TestRuntimeHoursSensor:
         runtime_manager = MagicMock()
         runtime_manager.get_runtime_hours = MagicMock(return_value=42.5)
         
-        sensor = RuntimeHoursSensor(mock_hub, runtime_manager, mock_hub.device_info)
+        sensor = RuntimeHoursSensor(mock_hub, runtime_manager)
         sensor.hass = mock_hass
         return sensor
 
@@ -128,7 +128,7 @@ class TestLastResetSensor:
         reset_time = datetime(2026, 1, 1, 12, 0, 0)
         runtime_manager.get_last_reset = MagicMock(return_value=reset_time)
         
-        sensor = LastResetSensor(mock_hub, runtime_manager, mock_hub.device_info)
+        sensor = LastResetSensor(mock_hub, runtime_manager)
         sensor.hass = mock_hass
         return sensor
 
@@ -160,7 +160,7 @@ class TestConnectionStatusSensor:
         """Create a ConnectionStatusSensor entity."""
         runtime_manager = MagicMock()
         
-        sensor = ConnectionStatusSensor(mock_hub, runtime_manager, mock_hub.device_info)
+        sensor = ConnectionStatusSensor(mock_hub, runtime_manager)
         sensor.hass = mock_hass
         return sensor
 
@@ -210,7 +210,6 @@ class TestDelayedTurnOffSensor:
         sensor = DelayedTurnOffSensor(
             mock_hub,
             runtime_manager,
-            mock_hub.device_info,
             "test_entry_id"
         )
         sensor.hass = mock_hass
@@ -296,10 +295,10 @@ class TestDelayedTurnOffSensor:
         assert attrs["delayed_off_active"] is True
         assert attrs["delayed_off_remaining"] == 180
 
-    def test_sensor_handle_delayed_off_notify(self, delayed_sensor):
+    def test_sensor_handle_notify(self, delayed_sensor):
         """Test sensor handles delayed_turn_off notifications."""
         with patch.object(delayed_sensor, 'async_write_ha_state') as mock_write:
-            delayed_sensor._handle_delayed_off_notify("delayed_turn_off", {})
+            delayed_sensor._handle_notify("delayed_turn_off", {})
             
             # Should trigger state write
             mock_write.assert_called_once()
@@ -307,7 +306,7 @@ class TestDelayedTurnOffSensor:
     def test_sensor_handle_fan_notify(self, delayed_sensor):
         """Test sensor handles fan notifications."""
         with patch.object(delayed_sensor, 'async_write_ha_state') as mock_write:
-            delayed_sensor._handle_delayed_off_notify("fan", {})
+            delayed_sensor._handle_notify("fan", {})
             
             # Should trigger state write
             mock_write.assert_called_once()

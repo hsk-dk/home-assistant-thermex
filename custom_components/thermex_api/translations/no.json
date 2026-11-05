@@ -106,5 +106,16 @@
       "name": "Avbryt forsinket avslåing",
       "description": "Avbryt timer for forsinket avslåing av Thermex-hetten."
     }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Kan ikke koble til Thermex-hetten på {host}. Kontroller IP-adressen og at API-et er aktivert i Thermex-appen."
+    },
+    "invalid_auth": {
+      "message": "Thermex-hetten på {host} avviste API-passordet. Skriv inn gjeldende passord for å fortsette."
+    },
+    "request_rejected": {
+      "message": "Thermex-hetten avviste kommandoen (status {status})."
+    }
   }
 }

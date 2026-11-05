@@ -123,3 +123,21 @@ class TestInit:
 
         assert result is False
         mock_hub.close.assert_not_called()
+
+
+class TestSetupErrorMessages:
+    @pytest.mark.asyncio
+    async def test_connect_failure_has_translated_message(self, mock_hass, mock_config_entry):
+        from unittest.mock import AsyncMock, patch
+
+        hub = MagicMock()
+        hub.connect = AsyncMock(side_effect=OSError("down"))
+        integration = MagicMock(version="1")
+        with patch('custom_components.thermex_api.async_get_integration', return_value=integration), \
+             patch('custom_components.thermex_api.ThermexHub', return_value=hub):
+            with pytest.raises(ConfigEntryNotReady) as exc:
+                await async_setup_entry(mock_hass, mock_config_entry)
+
+        assert exc.value.translation_key == "cannot_connect"
+        assert exc.value.translation_domain == "thermex_api"
+        assert exc.value.translation_placeholders == {"host": "192.168.1.100"}

@@ -106,5 +106,16 @@
       "name": "Cancel delayed turn-off",
       "description": "Cancel delayed turn-off timer for the Thermex fan."
     }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Cannot connect to the Thermex hood at {host}. Check the IP address and make sure the API is enabled in the Thermex app."
+    },
+    "invalid_auth": {
+      "message": "The Thermex hood at {host} rejected the API password. Enter the current password to continue."
+    },
+    "request_rejected": {
+      "message": "The Thermex hood rejected the command (status {status})."
+    }
   }
 }

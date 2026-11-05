@@ -106,5 +106,16 @@
       "name": "Verzögerte Abschaltung abbrechen",
       "description": "Bricht den Timer für die verzögerte Abschaltung der Thermex-Dunstabzugshaube ab."
     }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Keine Verbindung zur Thermex-Dunstabzugshaube unter {host}. Prüfe die IP-Adresse und ob die API in der Thermex-App aktiviert ist."
+    },
+    "invalid_auth": {
+      "message": "Die Thermex-Dunstabzugshaube unter {host} hat das API-Passwort abgelehnt. Gib das aktuelle Passwort ein, um fortzufahren."
+    },
+    "request_rejected": {
+      "message": "Die Thermex-Dunstabzugshaube hat den Befehl abgelehnt (Status {status})."
+    }
   }
 }
