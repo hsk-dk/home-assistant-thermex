@@ -95,7 +95,7 @@ class TestThermexHub:
         mock_session = MagicMock()
         mock_session.ws_connect = AsyncMock(return_value=mock_ws)
         
-        with patch("custom_components.thermex_api.hub.aiohttp.ClientSession", return_value=mock_session):
+        with patch("custom_components.thermex_api.hub.async_get_clientsession", return_value=mock_session):
             with patch.object(hub_instance, "_recv_loop", new_callable=AsyncMock):
                 with patch.object(hub_instance, "_watchdog_loop", new_callable=AsyncMock):
                     with patch.object(hub_instance, "_dispatch_initial_status", new_callable=AsyncMock):
@@ -122,7 +122,7 @@ class TestThermexHub:
         mock_session = MagicMock()
         mock_session.ws_connect = AsyncMock(return_value=mock_ws)
         
-        with patch("custom_components.thermex_api.hub.aiohttp.ClientSession", return_value=mock_session):
+        with patch("custom_components.thermex_api.hub.async_get_clientsession", return_value=mock_session):
             with pytest.raises(ConnectionError, match="Authentication failed"):
                 await hub_instance.connect()
 
@@ -132,7 +132,7 @@ class TestThermexHub:
         mock_session = MagicMock()
         mock_session.ws_connect = AsyncMock(side_effect=Exception("Network error"))
         
-        with patch("custom_components.thermex_api.hub.aiohttp.ClientSession", return_value=mock_session):
+        with patch("custom_components.thermex_api.hub.async_get_clientsession", return_value=mock_session):
             with pytest.raises(Exception, match="Network error"):
                 await hub_instance.connect()
         
