@@ -15,20 +15,16 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 from homeassistant.util.dt import parse_datetime
 
-from .const import DOMAIN, RUNTIME_UPDATE_INTERVAL, THERMEX_NOTIFY
+from .const import RUNTIME_UPDATE_INTERVAL, THERMEX_NOTIFY
+from .data import ThermexConfigEntry
 from .entity_lookup import find_fan_entity_id
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
     """Set up persistent runtime-tracking sensors for the Thermex fan."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub = entry_data.get("hub")
-    runtime_manager = entry_data.get("runtime_manager")
-    
-    if not hub or not runtime_manager:
-        _LOGGER.error("Missing hub or runtime_manager in entry data")
-        return
+    hub = entry.runtime_data.hub
+    runtime_manager = entry.runtime_data.runtime_manager
 
     device_info = hub.device_info
 

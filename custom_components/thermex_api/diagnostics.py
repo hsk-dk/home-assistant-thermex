@@ -6,10 +6,9 @@ import logging
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .data import ThermexConfigEntry
 from .hub import ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,19 +16,12 @@ _LOGGER = logging.getLogger(__name__)
 TO_REDACT = {"host", "api_key", "unique_id"}
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: ThermexConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
 
     try:
-        # Get the ThermexHub instance using proper entry_data pattern
-        entry_data = hass.data[DOMAIN].get(entry.entry_id)
-        if not entry_data:
-            return {"error": "Entry data not found"}
-        
-        hub: ThermexHub = entry_data.get("hub")
-        if not hub:
-            return {"error": "Hub not found in entry data"}
+        hub: ThermexHub = entry.runtime_data.hub
 
         # Gather diagnostic info with safe attribute access
         recv_task = getattr(hub, "_recv_task", None)
@@ -57,7 +49,7 @@ async def async_get_config_entry_diagnostics(
             diagnostics["recent_messages"] = list(hub.recent_messages)[-5:]
         
         # Include runtime manager data if available
-        runtime_manager = entry_data.get("runtime_manager")
+        runtime_manager = entry.runtime_data.runtime_manager
         if runtime_manager:
             diagnostics["runtime_data"] = {
                 "runtime_hours": runtime_manager.get_runtime_hours(),

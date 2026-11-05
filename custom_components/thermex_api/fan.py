@@ -15,10 +15,10 @@ from homeassistant.helpers.event import async_call_later
 
 from .const import (
     DELAYED_TURNOFF_COUNTDOWN_INTERVAL,
-    DOMAIN,
     FALLBACK_STATUS_TIMEOUT,
     THERMEX_NOTIFY,
 )
+from .data import ThermexConfigEntry
 from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
 
@@ -29,15 +29,10 @@ _MODE_TO_VALUE = {"off": 0, "low": 1, "medium": 2, "high": 3, "boost": 4}
 _VALUE_TO_MODE = {v: k for k, v in _MODE_TO_VALUE.items()}
 
 
-async def async_setup_entry(hass, entry, async_add_entities) -> None:
+async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities) -> None:
     """Set up the Thermex fan with runtime storage."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub = entry_data.get("hub")
-    runtime_manager = entry_data.get("runtime_manager")
-    
-    if not hub or not runtime_manager:
-        _LOGGER.error("Missing hub or runtime_manager in entry data")
-        return
+    hub = entry.runtime_data.hub
+    runtime_manager = entry.runtime_data.runtime_manager
     fan_entity = ThermexFan(hub, runtime_manager, entry)
     async_add_entities([fan_entity], update_before_add=True)
 

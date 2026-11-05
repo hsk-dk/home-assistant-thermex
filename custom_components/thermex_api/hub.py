@@ -2,11 +2,13 @@ import asyncio
 import collections
 import json
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import aiohttp
 from aiohttp import ClientWebSocketResponse, WSMsgType
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
 
@@ -31,6 +33,10 @@ _REQUEST_MAP: dict[str, str] = {
     "protocolversion": "ProtocolVersion",
 }
 
+class ThermexAuthError(ConnectionError):
+    """The hood rejected the API password."""
+
+
 class ThermexHub:
     def __init__(self, hass: HomeAssistant, host: str, api_key: str, entry_id: str):
         self._hass = hass
@@ -44,7 +50,10 @@ class ThermexHub:
         self._ws_lock = asyncio.Lock()
         self._ws: ClientWebSocketResponse | None = None
         self._recv_task: asyncio.Task | None = None
-        self._session: aiohttp.ClientSession | None = None
+        self._session: aiohttp.ClientSession | None = None  # HA's shared session; never closed here
+        self._auth_failed = False
+        # Set by the integration: called once when the hood rejects the password
+        self.on_auth_failure: Callable[[], None] | None = None
         self._protocol_version: str | None = None
         self.runtime_manager: Any = None  # Set later in __init__.py
 
@@ -86,6 +95,8 @@ class ThermexHub:
         """Ensure that the WebSocket connection is alive, reconnect if needed."""
         if self._closing:
             raise ConnectionError("Hub is closing")
+        if self._auth_failed:
+            raise ThermexAuthError("API password was rejected; reauthentication required")
         
         if self._ws and not self._ws.closed:
             return
@@ -138,6 +149,13 @@ class ThermexHub:
                 await self.connect()
                 _LOGGER.info("ThermexHub: WebSocket reconnected successfully")
                 return
+            except ThermexAuthError:
+                self._auth_failed = True
+                self.last_error = "Authentication failed: API password was rejected"
+                _LOGGER.error("ThermexHub: API password rejected, giving up reconnecting")
+                if self.on_auth_failure:
+                    self.on_auth_failure()
+                raise
             except Exception as err:
                 self.last_error = f"Reconnect attempt {attempt} failed: {err}"
                 _LOGGER.error("ThermexHub: Reconnect attempt %d/%d failed: %s", 
@@ -156,12 +174,8 @@ class ThermexHub:
                 _LOGGER.debug("Error closing WebSocket: %s", e)
             self._ws = None
             
-        if self._session:
-            try:
-                await self._session.close()
-            except Exception as e:
-                _LOGGER.debug("Error closing session: %s", e)
-            self._session = None
+        # The aiohttp session is Home Assistant's shared one: just drop our reference
+        self._session = None
 
     async def connect(self) -> None:
         """Connect and authenticate; leaves no open resources on failure."""
@@ -189,7 +203,7 @@ class ThermexHub:
         await self._cancel_recv_task()
         
         try:
-            self._session = aiohttp.ClientSession()
+            self._session = async_get_clientsession(self._hass)
             url = f"ws://{self._host}:{DEFAULT_PORT}{WEBSOCKET_PATH}"
             _LOGGER.debug("Connecting to Thermex at %s", url)
             self._ws = await self._session.ws_connect(url)
@@ -218,7 +232,7 @@ class ThermexHub:
             _LOGGER.error("Authentication rejected: %s", data)
             self._connection_state = "error"
             self.last_error = f"Authentication failed: {data}"
-            raise ConnectionError(f"Authentication failed: {data}")
+            raise ThermexAuthError(f"Authentication failed: {data}")
         _LOGGER.debug("Authenticated successfully with Thermex (status=200)")
 
         self._recv_task = self._hass.async_create_background_task(

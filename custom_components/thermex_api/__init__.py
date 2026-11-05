@@ -1,17 +1,15 @@
 # File: __init__.py
 """Thermex API integration."""
 import logging
-from datetime import timedelta
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN, RUNTIME_STORAGE_FILE, STARTUP, STORAGE_VERSION
-from .hub import ThermexHub
+from .data import ThermexConfigEntry, ThermexData
+from .hub import ThermexAuthError, ThermexHub
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -19,23 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["light", "fan", "sensor", "binary_sensor", "button"]
 
 
-async def async_create_coordinator(hass: HomeAssistant, hub: ThermexHub) -> DataUpdateCoordinator:
-    async def async_update_data():
-        try:
-            return hub.get_coordinator_data()
-        except Exception as err:
-            raise UpdateFailed(f"Failed to fetch data: {err}") from err
-
-    return DataUpdateCoordinator(
-        hass,
-        _LOGGER,
-        name="thermex_coordinator",
-        update_method=async_update_data,
-        update_interval=timedelta(seconds=30),
-    )
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> bool:
     """Set up Thermex API from a config entry."""
     integration = await async_get_integration(hass, DOMAIN)
     _LOGGER.info(STARTUP, integration.version)
@@ -47,18 +29,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hub = ThermexHub(hass, host, api_key, entry.entry_id)
     try:
         await hub.connect()
+    except ThermexAuthError as err:
+        raise ConfigEntryAuthFailed(f"Thermex at {host} rejected the API password") from err
     except Exception as err:
         _LOGGER.error("Failed to connect to Thermex at %s: %s", host, err)
         raise ConfigEntryNotReady from err
 
+    # If the hood later rejects the password (e.g. it was changed), start reauth
+    hub.on_auth_failure = lambda: entry.async_start_reauth(hass)
+
     # Anything below can fail; never leave the websocket open if setup aborts
     try:
-        # 2) Prepare per-entry storage in hass.data
-        hass.data.setdefault(DOMAIN, {})
-        entry_data: dict = {}
-        entry_data["hub"] = hub
-
-        # 3) Initialize & load the shared RuntimeManager
+        # 2) Initialize & load the shared RuntimeManager
         store: Store = Store(
             hass,
             STORAGE_VERSION,
@@ -67,45 +49,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         runtime_manager = RuntimeManager(store)
         await runtime_manager.load()
         hub.runtime_manager = runtime_manager
-        entry_data["runtime_manager"] = runtime_manager
 
-        # 4) Create & refresh the coordinator
-        coordinator = await async_create_coordinator(hass, hub)
-        await coordinator.async_config_entry_first_refresh()
-        entry_data["coordinator"] = coordinator
-    except BaseException:
-        await hub.close()
-        raise
+        # 3) Share hub + runtime manager with the platforms
+        entry.runtime_data = ThermexData(hub=hub, runtime_manager=runtime_manager)
 
-    # 5) Save entry_data back into hass.data
-    hass.data[DOMAIN][entry.entry_id] = entry_data
+        # 4) Watch for options changes
+        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
-    # 6) Watch for options changes
-    entry.async_on_unload(
-        entry.add_update_listener(_async_update_listener)
-    )
-
-    # 7) Forward setup to all platforms
-    try:
+        # 5) Forward setup to all platforms
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     except BaseException:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
         await hub.close()
         raise
     return True
 
 
-async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _async_update_listener(hass: HomeAssistant, entry: ThermexConfigEntry) -> None:
     """Reload the entry when options change."""
     _LOGGER.debug("Options updated, reloading Thermex entry %s", entry.entry_id)
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> bool:
     """Unload a config entry and clean up the hub."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        entry_data = hass.data[DOMAIN].pop(entry.entry_id, None)
-        if entry_data and (hub := entry_data.get("hub")):
-            await hub.close()
+        await entry.runtime_data.hub.close()
     return unload_ok

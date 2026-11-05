@@ -5,7 +5,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 from aiohttp import WSMsgType
 
-from custom_components.thermex_api.hub import ThermexHub
+from custom_components.thermex_api.hub import ThermexAuthError, ThermexHub
 from custom_components.thermex_api.const import (
     DOMAIN,
     THERMEX_NOTIFY,
@@ -334,7 +334,8 @@ class TestThermexHub:
         assert hub_instance._ws is None
         assert hub_instance._session is None
         assert mock_ws.close.called
-        assert mock_session.close.called
+        # The aiohttp session is Home Assistant's shared one and must stay open
+        assert not mock_session.close.called
 
     @pytest.mark.asyncio
     async def test_close(self, hub_instance):
@@ -683,7 +684,7 @@ class TestThermexHubLifecycle:
         return ThermexHub(hass, "192.168.1.100", "pw", "entry")
 
     @pytest.mark.asyncio
-    async def test_failed_connect_closes_session(self, hub):
+    async def test_failed_connect_closes_websocket(self, hub):
         """If authentication fails, no websocket/session may be left open."""
         ws = MagicMock()
         ws.closed = False
@@ -694,12 +695,12 @@ class TestThermexHubLifecycle:
         session.ws_connect = AsyncMock(return_value=ws)
         session.close = AsyncMock()
 
-        with patch("custom_components.thermex_api.hub.aiohttp.ClientSession", return_value=session):
+        with patch("custom_components.thermex_api.hub.async_get_clientsession", return_value=session):
             with pytest.raises(ConnectionError):
                 await hub.connect()
 
         ws.close.assert_awaited()
-        session.close.assert_awaited()
+        session.close.assert_not_called()  # shared HA session is never closed
         assert hub._ws is None
         assert hub._session is None
 
@@ -740,3 +741,45 @@ class TestThermexHubLifecycle:
             hub.send_request("Status", {}),
         )
         assert sorted(started) == ["Status", "Update"]
+
+
+class TestThermexHubAuth:
+    """Rejected passwords are reported distinctly and stop reconnecting."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        return ThermexHub(hass, "192.168.1.100", "pw", "entry")
+
+    @pytest.mark.asyncio
+    async def test_rejected_password_raises_auth_error(self, hub):
+        ws = MagicMock()
+        ws.closed = False
+        ws.close = AsyncMock()
+        ws.send_json = AsyncMock()
+        ws.receive = AsyncMock(return_value=MagicMock(
+            type=WSMsgType.TEXT, data=json.dumps({"Response": "Authenticate", "Status": 401})
+        ))
+        session = MagicMock()
+        session.ws_connect = AsyncMock(return_value=ws)
+
+        with patch("custom_components.thermex_api.hub.async_get_clientsession", return_value=session):
+            with pytest.raises(ThermexAuthError):
+                await hub.connect()
+
+        ws.close.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_reconnect_auth_failure_notifies_and_stops(self, hub):
+        callback = MagicMock()
+        hub.on_auth_failure = callback
+
+        with patch.object(hub, "connect", AsyncMock(side_effect=ThermexAuthError("nope"))) as connect:
+            with pytest.raises(ThermexAuthError):
+                await hub._perform_reconnection()
+
+        connect.assert_awaited_once()  # no retries with a wrong password
+        callback.assert_called_once()
+        with pytest.raises(ThermexAuthError):
+            await hub._ensure_connected()  # and no further attempts later

@@ -6,21 +6,17 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import DOMAIN, THERMEX_NOTIFY
+from .data import ThermexConfigEntry
 from .entity_lookup import find_fan_entity_id
 from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass, entry, async_add_entities) -> None:
+async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities) -> None:
     """Set up the Reset Runtime button for Thermex API."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    hub = entry_data.get("hub")
-    runtime_manager = entry_data.get("runtime_manager")
-    
-    if not hub or not runtime_manager:
-        _LOGGER.error("Missing hub or runtime_manager in entry data")
-        return
+    hub = entry.runtime_data.hub
+    runtime_manager = entry.runtime_data.runtime_manager
     async_add_entities([
         ResetRuntimeButton(hub, runtime_manager, entry.entry_id),
         DelayedTurnOffButton(hub, entry.entry_id),
@@ -56,12 +52,6 @@ class ResetRuntimeButton(ButtonEntity):
             "fan",
             {"Fan": {}},
         )
-
-        # Coordinator refresh (per entry)
-        entry_data = self.hass.data[DOMAIN].get(self._entry_id)
-        coordinator = entry_data.get("coordinator") if entry_data else None
-        if coordinator:
-            await coordinator.async_request_refresh()
 
 
 class DelayedTurnOffButton(ButtonEntity):

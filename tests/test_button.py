@@ -57,26 +57,14 @@ class TestResetRuntimeButton:
         assert button_entity.icon == "mdi:refresh"
 
     @pytest.mark.asyncio
-    async def test_button_press_resets_runtime(self, button_entity, mock_hass):
-        """Test pressing button resets runtime."""
-        coordinator = MagicMock()
-        coordinator.async_request_refresh = AsyncMock()
-        
-        entry_data = {"coordinator": coordinator}
-        
-        mock_hass.data = {
-            "thermex_api": {
-                "test_entry_id": entry_data
-            }
-        }
-        
+    async def test_button_press_resets_runtime(self, button_entity):
+        """Test pressing button resets runtime and tells the entities to refresh."""
         with patch("custom_components.thermex_api.button.async_dispatcher_send") as mock_dispatch:
             await button_entity.async_press()
-        
+
         button_entity._runtime_manager.reset.assert_called_once()
         button_entity._runtime_manager.save.assert_called_once()
         mock_dispatch.assert_called_once()
-        coordinator.async_request_refresh.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_button_press_with_no_runtime_manager(self, mock_hub, mock_hass):
