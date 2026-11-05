@@ -43,12 +43,21 @@ class ThermexRequestError(HomeAssistantError):
 
 
 class ThermexHub:
-    def __init__(self, hass: HomeAssistant, host: str, api_key: str, entry_id: str):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        host: str,
+        api_key: str,
+        entry_id: str,
+        device_id: str | None = None,
+    ):
         self._hass = hass
         self._entry_id = entry_id 
         self._host = host
         self._api_key = api_key
-        self.unique_id = f"thermex_{host.replace('.', '_')}"
+        # Stable id used for the device and entity unique ids. It must not depend
+        # on the IP address (which can change); the config entry stores it.
+        self.unique_id = device_id or f"thermex_{host.replace('.', '_')}"
         self._pending: dict[str, asyncio.Future] = {}
         # Responses are matched by name only, so allow one in-flight request per type
         self._request_locks: dict[str, asyncio.Lock] = {}
@@ -570,7 +579,7 @@ class ThermexHub:
     @property
     def name(self) -> str:
         """Return the name of the device."""
-        return f"Thermex Hood ({self._host})"
+        return "Thermex Hood"
 
     @property
     def startup_complete(self) -> bool:
@@ -598,7 +607,8 @@ class ThermexHub:
         return DeviceInfo(
             identifiers={(DOMAIN, self.unique_id)},
             manufacturer="Thermex",
-            model=f"ESP-API ({self._host})",
+            name="Thermex Hood",
+            model="ESP-API",
             sw_version=self.protocol_version
         )
 

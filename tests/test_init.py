@@ -141,3 +141,48 @@ class TestSetupErrorMessages:
         assert exc.value.translation_key == "cannot_connect"
         assert exc.value.translation_domain == "thermex_api"
         assert exc.value.translation_placeholders == {"host": "192.168.1.100"}
+
+
+class TestMigration:
+    @pytest.mark.asyncio
+    async def test_v1_entry_keeps_existing_ids(self, mock_hass, mock_config_entry):
+        """The id derived from the IP is frozen into the entry; registries stay valid."""
+        from custom_components.thermex_api import async_migrate_entry
+
+        mock_config_entry.version = 1
+        mock_config_entry.data = {"host": "192.168.1.100", "api_key": "k"}
+
+        assert await async_migrate_entry(mock_hass, mock_config_entry) is True
+
+        kwargs = mock_hass.config_entries.async_update_entry.call_args.kwargs
+        assert kwargs["data"]["device_id"] == "thermex_192_168_1_100"
+        assert kwargs["unique_id"] == "thermex_192_168_1_100"
+        assert kwargs["version"] == 2
+        assert kwargs["data"]["host"] == "192.168.1.100"
+
+    @pytest.mark.asyncio
+    async def test_v2_entry_is_left_alone(self, mock_hass, mock_config_entry):
+        from custom_components.thermex_api import async_migrate_entry
+
+        mock_config_entry.version = 2
+
+        assert await async_migrate_entry(mock_hass, mock_config_entry) is True
+        mock_hass.config_entries.async_update_entry.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_setup_passes_stored_device_id_to_hub(self, mock_hass, mock_config_entry):
+        hub = MagicMock()
+        hub.connect = AsyncMock()
+        hub.close = AsyncMock()
+        rm = MagicMock()
+        rm.load = AsyncMock()
+        mock_config_entry.data = {"host": "10.0.0.5", "api_key": "k", "device_id": "thermex_abc"}
+        mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
+
+        with patch('custom_components.thermex_api.async_get_integration', return_value=MagicMock(version="1")), \
+             patch('custom_components.thermex_api.ThermexHub', return_value=hub) as hub_cls, \
+             patch('custom_components.thermex_api.RuntimeManager', return_value=rm), \
+             patch('custom_components.thermex_api.Store'):
+            await async_setup_entry(mock_hass, mock_config_entry)
+
+        assert hub_cls.call_args.args[4] == "thermex_abc"

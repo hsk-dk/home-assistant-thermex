@@ -2,6 +2,7 @@
 """Thermex API integration."""
 import logging
 
+from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.storage import Store
@@ -17,6 +18,26 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["light", "fan", "sensor", "binary_sensor", "button"]
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> bool:
+    """Migrate old config entries.
+
+    v1 -> v2: the ids of the device and all entities were derived from the host.
+    Freeze that id into the entry so a later IP change no longer creates a new
+    device and entities (nothing in the registries has to change), and stop using
+    the IP address as the config entry's unique id.
+    """
+    if entry.version == 1:
+        device_id = f"thermex_{entry.data['host'].replace('.', '_')}"
+        hass.config_entries.async_update_entry(
+            entry,
+            data={**entry.data, CONF_DEVICE_ID: device_id},
+            unique_id=device_id,
+            version=2,
+        )
+        _LOGGER.debug("Migrated Thermex entry %s to version 2", entry.entry_id)
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> bool:
     """Set up Thermex API from a config entry."""
     integration = await async_get_integration(hass, DOMAIN)
@@ -26,7 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> b
     api_key = entry.data["api_key"]
 
     # 1) Create and connect the Hub
-    hub = ThermexHub(hass, host, api_key, entry.entry_id)
+    hub = ThermexHub(hass, host, api_key, entry.entry_id, entry.data.get(CONF_DEVICE_ID))
     try:
         await hub.connect()
     except ThermexAuthError as err:

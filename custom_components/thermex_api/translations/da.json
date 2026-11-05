@@ -15,15 +15,25 @@
         "data": {
           "api_key": "API-password"
         }
+      },
+      "reconfigure": {
+        "title": "Omkonfigurer Thermex-emhætte",
+        "description": "Skift IP-adresse eller API-adgangskode for denne emhætte.",
+        "data": {
+          "host": "Emhætte IP-adresse",
+          "api_key": "API-password"
+        }
       }
     },
     "error": {
       "cannot_connect": "Kunne ikke oprette forbindelse. Tjek IP og password.",
-      "invalid_auth": "Ugyldig API-adgangskode."
+      "invalid_auth": "Ugyldig API-adgangskode.",
+      "host_in_use": "Denne IP-adresse bruges allerede af en anden Thermex-emhætte."
     },
     "abort": {
       "already_configured": "Denne Thermex-emhætte er allerede konfigureret.",
-      "reauth_successful": "Genautentificering lykkedes."
+      "reauth_successful": "Genautentificering lykkedes.",
+      "reconfigure_successful": "Omkonfigurering lykkedes."
     }
   },
   "options": {

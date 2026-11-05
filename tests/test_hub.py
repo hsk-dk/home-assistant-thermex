@@ -48,7 +48,9 @@ class TestThermexHub:
         device_info = hub_instance.device_info
         assert device_info["identifiers"] == {(DOMAIN, hub_instance.unique_id)}
         assert device_info["manufacturer"] == "Thermex"
-        assert "192.168.1.100" in device_info["model"]
+        assert device_info["name"] == "Thermex Hood"
+        assert device_info["model"] == "ESP-API"  # no IP address in static device data
+        assert "192.168.1.100" not in str(device_info)
 
     def test_protocol_version_property(self, hub_instance):
         """Test protocol version property."""
@@ -64,7 +66,7 @@ class TestThermexHub:
 
     def test_name_property(self, hub_instance):
         """Test name property."""
-        assert hub_instance.name == "Thermex Hood (192.168.1.100)"
+        assert hub_instance.name == "Thermex Hood"
 
     def test_configure_watchdog(self, hub_instance):
         """Test watchdog configuration."""
@@ -935,3 +937,28 @@ class TestThermexHubAvailability:
             await hub._recv_loop()
 
         assert send.call_args_list[0].args[1] == hub.signal
+
+
+class TestThermexHubIdentity:
+    def test_stable_id_is_used_when_given(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        hub = ThermexHub(hass, "10.0.0.9", "pw", "entry", "thermex_abc123")
+
+        assert hub.unique_id == "thermex_abc123"
+        assert hub.device_info["identifiers"] == {(DOMAIN, "thermex_abc123")}
+
+    def test_changing_host_does_not_change_ids(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        before = ThermexHub(hass, "10.0.0.1", "pw", "entry", "thermex_abc123")
+        after = ThermexHub(hass, "10.0.0.2", "pw", "entry", "thermex_abc123")
+
+        assert before.unique_id == after.unique_id
+
+    def test_legacy_fallback_matches_old_ids(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        hub = ThermexHub(hass, "192.168.1.100", "pw", "entry")
+
+        assert hub.unique_id == "thermex_192_168_1_100"

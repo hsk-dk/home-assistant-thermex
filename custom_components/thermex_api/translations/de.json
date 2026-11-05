@@ -15,15 +15,25 @@
         "data": {
           "api_key": "API-Passwort"
         }
+      },
+      "reconfigure": {
+        "title": "Thermex-Dunstabzugshaube neu konfigurieren",
+        "description": "Ändere die IP-Adresse oder das API-Passwort dieser Haube.",
+        "data": {
+          "host": "IP-Adresse der Dunstabzugshaube",
+          "api_key": "API-Passwort"
+        }
       }
     },
     "error": {
       "cannot_connect": "Verbindung nicht möglich. Bitte IP-Adresse und Passwort prüfen.",
-      "invalid_auth": "Ungültiges API-Passwort."
+      "invalid_auth": "Ungültiges API-Passwort.",
+      "host_in_use": "Diese IP-Adresse wird bereits von einer anderen Thermex-Haube verwendet."
     },
     "abort": {
       "already_configured": "Diese Thermex-Dunstabzugshaube wurde bereits konfiguriert.",
-      "reauth_successful": "Die erneute Authentifizierung war erfolgreich."
+      "reauth_successful": "Die erneute Authentifizierung war erfolgreich.",
+      "reconfigure_successful": "Die Neukonfiguration war erfolgreich."
     }
   },
   "options": {

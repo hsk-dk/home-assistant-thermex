@@ -15,15 +15,25 @@
         "data": {
           "api_key": "API lösenord"
         }
+      },
+      "reconfigure": {
+        "title": "Konfigurera om Thermex-fläkten",
+        "description": "Ändra IP-adress eller API-lösenord för den här fläkten.",
+        "data": {
+          "host": "Köksfläktens IP address",
+          "api_key": "API lösenord"
+        }
       }
     },
     "error": {
       "cannot_connect": "Kan inte ansluta. Kolla IP och lösenord.",
-      "invalid_auth": "Ogiltigt API-lösenord."
+      "invalid_auth": "Ogiltigt API-lösenord.",
+      "host_in_use": "Den här IP-adressen används redan av en annan Thermex-fläkt."
     },
     "abort": {
       "already_configured": "Den här köksfläkten är redan konfigurerad.",
-      "reauth_successful": "Ominloggningen lyckades."
+      "reauth_successful": "Ominloggningen lyckades.",
+      "reconfigure_successful": "Omkonfigureringen lyckades."
     }
   },
   "options": {

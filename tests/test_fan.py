@@ -507,3 +507,15 @@ class TestFanCountdownTimer:
         cancel_off.assert_called_once()
         cancel_count.assert_called_once()
         assert fan_entity._countdown_handle is None
+
+
+def test_fan_is_the_main_entity_of_the_device(mock_hub, mock_config_entry):
+    """Named after the device (name=None) so it does not read 'Thermex Hood Hood'."""
+    from custom_components.thermex_api.fan import ThermexFan
+
+    runtime_manager = MagicMock()
+    runtime_manager.get_last_preset = MagicMock(return_value="off")
+
+    fan = ThermexFan(mock_hub, runtime_manager, mock_config_entry)
+
+    assert fan.name is None
