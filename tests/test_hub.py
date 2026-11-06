@@ -23,6 +23,8 @@ class TestThermexHub:
         hass = MagicMock()
         hass.data = {}
         hass.loop = event_loop
+        # Background tasks are not run in unit tests; close the coroutine cleanly
+        hass.async_create_background_task = MagicMock(side_effect=lambda coro, name=None: coro.close())
         return hass
 
     @pytest.fixture
@@ -865,6 +867,7 @@ class TestThermexHubAvailability:
     def hub(self, event_loop):
         hass = MagicMock()
         hass.loop = event_loop
+        hass.async_create_background_task = MagicMock(side_effect=lambda coro, name=None: coro.close())
         return ThermexHub(hass, "192.168.1.100", "pw", "entry-a")
 
     def test_signals_are_scoped_per_config_entry(self, event_loop):
@@ -962,3 +965,107 @@ class TestThermexHubIdentity:
         hub = ThermexHub(hass, "192.168.1.100", "pw", "entry")
 
         assert hub.unique_id == "thermex_192_168_1_100"
+
+
+class TestThermexHubClose:
+    """What happens when the hood closes the connection."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        hass.async_create_background_task = MagicMock(side_effect=lambda coro, name=None: coro.close())
+        return ThermexHub(hass, "192.168.1.100", "pw", "entry")
+
+    @staticmethod
+    def _ws(close_code=1006, exception=None, messages=()):
+        async def gen():
+            for m in messages:
+                yield m
+
+        ws = MagicMock()
+        ws.closed = True
+        ws.close_code = close_code
+        ws.exception = MagicMock(return_value=exception)
+        ws.__aiter__ = lambda self: gen().__aiter__()
+        return ws
+
+    @pytest.mark.asyncio
+    async def test_close_code_is_recorded_and_logged(self, hub, caplog):
+        import logging
+
+        hub._set_connection_state("connected")
+        hub._ws = self._ws(close_code=1001)
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            with caplog.at_level(logging.WARNING, logger="custom_components.thermex_api.hub"):
+                await hub._recv_loop()
+
+        assert hub.last_error == "Connection closed by the hood (close code 1001)"
+        assert any("1001" in r.getMessage() and "lost" in r.getMessage() for r in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_transport_error_is_included(self, hub):
+        hub._ws = self._ws(close_code=1006, exception=ConnectionResetError("reset by peer"))
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            await hub._recv_loop()
+
+        assert "1006" in hub.last_error and "reset by peer" in hub.last_error
+
+    @pytest.mark.asyncio
+    async def test_reconnects_immediately_when_the_stream_ends(self, hub):
+        hub._ws = self._ws()
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            await hub._recv_loop()
+
+        hub._hass.async_create_background_task.assert_called_once()
+        assert hub._hass.async_create_background_task.call_args.args[1] == "thermex_api_reconnect_entry"
+
+    @pytest.mark.asyncio
+    async def test_no_reconnect_while_closing(self, hub):
+        hub._ws = self._ws()
+        hub._closing = True
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            await hub._recv_loop()
+
+        hub._hass.async_create_background_task.assert_not_called()
+        assert hub.last_error is None
+
+    @pytest.mark.asyncio
+    async def test_no_reconnect_if_socket_was_already_replaced(self, hub):
+        old, new = self._ws(), self._ws()
+        hub._ws = old
+
+        async def swap_then_end():
+            hub._ws = new  # a reconnect finished while the old loop was winding down
+            return
+            yield  # pragma: no cover
+
+        old.__aiter__ = lambda self: swap_then_end().__aiter__()
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            await hub._recv_loop()
+
+        hub._hass.async_create_background_task.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_websocket_error_keeps_its_own_message(self, hub):
+        msg = MagicMock(type=WSMsgType.ERROR, data="boom")
+        hub._ws = self._ws(messages=[msg])
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            await hub._recv_loop()
+
+        assert hub.last_error == "WebSocket error: boom"
+
+    @pytest.mark.asyncio
+    async def test_reconnect_now_reconnects_and_swallows_failures(self, hub):
+        with patch.object(hub, "_ensure_connected", AsyncMock()) as ensure:
+            await hub._reconnect_now()
+        ensure.assert_awaited_once()
+
+        with patch.object(hub, "_ensure_connected", AsyncMock(side_effect=ConnectionError("down"))):
+            await hub._reconnect_now()  # must not raise: the watchdog retries
