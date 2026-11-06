@@ -321,8 +321,10 @@ class ThermexHub:
 
     async def _recv_loop(self) -> None:
         assert self._ws is not None
+        ws = self._ws
+        errored = False
         try:
-            async for msg in self._ws:
+            async for msg in ws:
                 # Update activity timestamp whenever we receive a message
                 self._last_activity = asyncio.get_event_loop().time()
 
@@ -361,15 +363,36 @@ class ThermexHub:
 
                 elif msg.type == WSMsgType.ERROR:
                     self.last_error = f"WebSocket error: {msg.data}"
-                    _LOGGER.error("WebSocket error: %s", msg.data)
+                    errored = True
+                    _LOGGER.debug("WebSocket error: %s", msg.data)
                     break
 
         except Exception as err:
-            self._set_connection_state("disconnected")
             self.last_error = f"Receive loop error: {err}"
+        else:
+            if not errored and not self._closing:
+                # The stream ended: the hood (or the network) closed the connection.
+                # Record how, so the "connection lost" warning says why.
+                exc = ws.exception()
+                self.last_error = (
+                    f"Connection closed by the hood (close code {ws.close_code})"
+                    + (f": {exc}" if exc else "")
+                )
         finally:
             self._set_connection_state("disconnected")
-            # Optionally, trigger reconnection or notify
+            # Reconnect right away instead of waiting for the next watchdog tick,
+            # unless we are shutting down or a reconnect already replaced this socket.
+            if ws is self._ws and not self._closing:
+                self._hass.async_create_background_task(
+                    self._reconnect_now(), f"{DOMAIN}_reconnect_{self._entry_id}"
+                )
+
+    async def _reconnect_now(self) -> None:
+        """Reconnect immediately after the connection was closed."""
+        try:
+            await self._ensure_connected()
+        except Exception as err:
+            _LOGGER.debug("Immediate reconnect failed, the watchdog will retry: %s", err)
 
     async def _watchdog_loop(self) -> None:
         """Watchdog loop that monitors connection health and sends periodic heartbeats."""
