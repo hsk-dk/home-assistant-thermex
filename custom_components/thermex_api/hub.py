@@ -20,6 +20,8 @@ from .const import (
     DEFAULT_RECONNECT_DELAY,
     DOMAIN,
     MAX_RECONNECT_ATTEMPTS,
+    MIN_CONNECTION_LIFETIME,
+    MIN_CONNECTION_LIFETIME_PAUSE,
     THERMEX_NOTIFY,
     WEBSOCKET_PATH,
     WEBSOCKET_REQUEST_TIMEOUT,
@@ -76,6 +78,7 @@ class ThermexHub:
         self.last_error: str | None = None
         self.recent_messages: collections.deque = collections.deque(maxlen=10)
         self._startup_complete: bool = False
+        self._connected_at = 0.0
 
         self._reconnect_lock = asyncio.Lock()
         self._reconnect_delay = DEFAULT_RECONNECT_DELAY
@@ -250,21 +253,25 @@ class ThermexHub:
             self._session = async_get_clientsession(self._hass)
             url = f"ws://{self._host}:{DEFAULT_PORT}{WEBSOCKET_PATH}"
             _LOGGER.debug("Connecting to Thermex at %s", url)
-            self._ws = await self._session.ws_connect(url)
+            # A hood that only half answers must not block setup or the config flow
+            async with asyncio.timeout(WEBSOCKET_REQUEST_TIMEOUT):
+                self._ws = await self._session.ws_connect(url)
         except Exception as err:
-            self.last_error = str(err)
+            self.last_error = str(err) or type(err).__name__
             self._set_connection_state("error")
             raise
 
         # Authenticate
         auth_payload = {"Request": "Authenticate", "Data": {"Code": self._api_key}}
         try:
-            await self._ws.send_json(auth_payload)
-            msg = await self._ws.receive()
+            async with asyncio.timeout(WEBSOCKET_REQUEST_TIMEOUT):
+                await self._ws.send_json(auth_payload)
+                msg = await self._ws.receive()
         except Exception as err:
+            reason = str(err) or type(err).__name__
             self._set_connection_state("error")
-            self.last_error = f"Authentication send/receive failed: {err}"
-            raise ConnectionError(f"Authentication send/receive failed: {err}")
+            self.last_error = f"Authentication send/receive failed: {reason}"
+            raise ConnectionError(f"Authentication send/receive failed: {reason}") from err
             
         if msg.type != WSMsgType.TEXT:
             self._set_connection_state("error")
@@ -281,6 +288,7 @@ class ThermexHub:
                 raise ThermexAuthError(f"Authentication failed: {data}")
             raise ConnectionError(f"Authentication failed: {data}")
         _LOGGER.debug("Authenticated successfully with Thermex (status=200)")
+        self._connected_at = asyncio.get_event_loop().time()
         self._set_connection_state("connected")
 
         self._recv_task = self._hass.async_create_background_task(
@@ -383,13 +391,19 @@ class ThermexHub:
             # Reconnect right away instead of waiting for the next watchdog tick,
             # unless we are shutting down or a reconnect already replaced this socket.
             if ws is self._ws and not self._closing:
+                # A connection that was closed right after it opened is reopened
+                # after a short pause, so a misbehaving hood is not hammered.
+                lived = asyncio.get_event_loop().time() - self._connected_at
+                pause = MIN_CONNECTION_LIFETIME_PAUSE if lived < MIN_CONNECTION_LIFETIME else 0.0
                 self._hass.async_create_background_task(
-                    self._reconnect_now(), f"{DOMAIN}_reconnect_{self._entry_id}"
+                    self._reconnect_now(pause), f"{DOMAIN}_reconnect_{self._entry_id}"
                 )
 
-    async def _reconnect_now(self) -> None:
-        """Reconnect immediately after the connection was closed."""
+    async def _reconnect_now(self, pause: float = 0.0) -> None:
+        """Reconnect (almost) immediately after the connection was closed."""
         try:
+            if pause:
+                await asyncio.sleep(pause)
             await self._ensure_connected()
         except Exception as err:
             _LOGGER.debug("Immediate reconnect failed, the watchdog will retry: %s", err)
@@ -570,7 +584,14 @@ class ThermexHub:
         not assume their command was applied as sent. The Status read-back is
         dispatched to the entities by the receive loop.
         """
-        resp = await self.send_request("Update", body)
+        try:
+            resp = await self.send_request("Update", body)
+        except (ConnectionError, TimeoutError) as err:
+            raise ThermexRequestError(
+                translation_domain=DOMAIN,
+                translation_key="cannot_connect",
+                translation_placeholders={"host": self._host},
+            ) from err
         status = resp.get("Status")
         if status != 200:
             _LOGGER.debug("Update %s rejected with status %s", body, status)

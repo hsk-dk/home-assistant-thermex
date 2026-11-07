@@ -1069,3 +1069,133 @@ class TestThermexHubClose:
 
         with patch.object(hub, "_ensure_connected", AsyncMock(side_effect=ConnectionError("down"))):
             await hub._reconnect_now()  # must not raise: the watchdog retries
+
+
+class TestThermexHubTimeouts:
+    """A hood that stops answering must not block setup or the config flow."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        return ThermexHub(hass, "192.168.1.100", "pw", "entry")
+
+    @pytest.mark.asyncio
+    async def test_no_reply_to_authenticate_times_out(self, hub):
+        async def never(*args, **kwargs):
+            await asyncio.sleep(3600)
+
+        ws = MagicMock()
+        ws.closed = False
+        ws.close = AsyncMock()
+        ws.send_json = AsyncMock()
+        ws.receive = never
+        session = MagicMock()
+        session.ws_connect = AsyncMock(return_value=ws)
+
+        with patch("custom_components.thermex_api.hub.async_get_clientsession", return_value=session), \
+             patch("custom_components.thermex_api.hub.WEBSOCKET_REQUEST_TIMEOUT", 0.05):
+            with pytest.raises(ConnectionError, match="Authentication send/receive failed"):
+                await hub.connect()
+
+        ws.close.assert_awaited()
+        assert hub.last_error and "TimeoutError" in hub.last_error
+
+    @pytest.mark.asyncio
+    async def test_connect_that_never_completes_times_out(self, hub):
+        async def never(*args, **kwargs):
+            await asyncio.sleep(3600)
+
+        session = MagicMock()
+        session.ws_connect = never
+
+        with patch("custom_components.thermex_api.hub.async_get_clientsession", return_value=session), \
+             patch("custom_components.thermex_api.hub.WEBSOCKET_REQUEST_TIMEOUT", 0.05):
+            with pytest.raises(TimeoutError):
+                await hub.connect()
+
+        assert hub.last_error == "TimeoutError"
+
+
+class TestThermexHubCommandErrors:
+    """Connection problems while sending a command are translated, not raw."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        return ThermexHub(hass, "192.168.1.100", "pw", "entry")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("error", [ConnectionError("down"), TimeoutError()])
+    async def test_connection_errors_become_a_translated_error(self, hub, error):
+        from custom_components.thermex_api.hub import ThermexRequestError
+
+        hub.send_request = AsyncMock(side_effect=error)
+
+        with pytest.raises(ThermexRequestError) as exc:
+            await hub.send_update({"Light": {"lightonoff": 1}})
+
+        assert exc.value.translation_key == "cannot_connect"
+        assert exc.value.translation_placeholders == {"host": "192.168.1.100"}
+
+
+class TestThermexHubReconnectPause:
+    """A connection the hood closes right after opening is not reopened in a tight loop."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        hass.async_create_background_task = MagicMock(side_effect=lambda coro, name=None: None)
+        hub = ThermexHub(hass, "192.168.1.100", "pw", "entry")
+        hub._reconnect_now = MagicMock(return_value=None)
+        return hub
+
+    @staticmethod
+    def _ws():
+        async def gen():
+            return
+            yield  # pragma: no cover
+
+        ws = MagicMock()
+        ws.closed = True
+        ws.close_code = 1006
+        ws.exception = MagicMock(return_value=None)
+        ws.__aiter__ = lambda self: gen().__aiter__()
+        return ws
+
+    @pytest.mark.asyncio
+    async def test_short_lived_connection_waits_before_reconnecting(self, hub, event_loop):
+        from custom_components.thermex_api.const import MIN_CONNECTION_LIFETIME_PAUSE
+
+        hub._ws = self._ws()
+        hub._connected_at = event_loop.time()
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            await hub._recv_loop()
+
+        hub._reconnect_now.assert_called_once_with(MIN_CONNECTION_LIFETIME_PAUSE)
+
+    @pytest.mark.asyncio
+    async def test_long_lived_connection_reconnects_at_once(self, hub, event_loop):
+        hub._ws = self._ws()
+        hub._connected_at = event_loop.time() - 600
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            await hub._recv_loop()
+
+        hub._reconnect_now.assert_called_once_with(0.0)
+
+    @pytest.mark.asyncio
+    async def test_reconnect_now_sleeps_for_the_pause(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        hub = ThermexHub(hass, "192.168.1.100", "pw", "entry")
+        hub._ensure_connected = AsyncMock()
+
+        with patch("custom_components.thermex_api.hub.asyncio.sleep", new=AsyncMock()) as sleep:
+            await hub._reconnect_now(5)
+
+        sleep.assert_awaited_once_with(5)
+        hub._ensure_connected.assert_awaited_once()

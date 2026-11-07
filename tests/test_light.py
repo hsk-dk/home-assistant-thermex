@@ -14,6 +14,7 @@ class TestThermexLight:
         """Create a ThermexLight entity."""
         light = ThermexLight(mock_hub)
         light.hass = mock_hass
+        light.async_write_ha_state = MagicMock()
         return light
 
     def test_light_initialization(self, light_entity, mock_hub):
@@ -116,6 +117,7 @@ class TestThermexDecoLight:
         """Create a ThermexDecoLight entity."""
         light = ThermexDecoLight(mock_hub)
         light.hass = mock_hass
+        light.async_write_ha_state = MagicMock()
         return light
 
     def test_decolight_initialization(self, decolight_entity, mock_hub):
@@ -297,23 +299,23 @@ class TestThermexDecoLight:
         from custom_components.thermex_api.light import ThermexLight
         light = ThermexLight(decolight_entity._hub)
         light.hass = decolight_entity.hass
-        light.schedule_update_ha_state = MagicMock()
+        light.async_write_ha_state = MagicMock()
         
         # Call with missing Light key
         light._handle_notify("light", {"OtherData": {}})
         
         # Should not crash and not update state
-        light.schedule_update_ha_state.assert_not_called()
+        light.async_write_ha_state.assert_not_called()
 
     def test_decolight_handle_notify_missing_decolight_key(self, decolight_entity):
         """Test DecoLight handles notify with missing Decolight key."""
-        decolight_entity.schedule_update_ha_state = MagicMock()
+        decolight_entity.async_write_ha_state = MagicMock()
         
         # Call with missing Decolight key
         decolight_entity._handle_notify("decolight", {"OtherData": {}})
         
         # Should not crash and not update state
-        decolight_entity.schedule_update_ha_state.assert_not_called()
+        decolight_entity.async_write_ha_state.assert_not_called()
 
     def test_light_marks_got_initial_state_on_first_notify(self, decolight_entity):
         """Test light marks got_initial_state on first notify."""
@@ -321,7 +323,7 @@ class TestThermexDecoLight:
         light = ThermexLight(decolight_entity._hub)
         light.hass = decolight_entity.hass
         light._got_initial_state = False
-        light.schedule_update_ha_state = MagicMock()
+        light.async_write_ha_state = MagicMock()
         
         light._handle_notify("light", {
             "Light": {
@@ -379,7 +381,7 @@ class TestThermexDecoLight:
                 "decolightb": 0
             }
         })
-        decolight_entity.schedule_update_ha_state = MagicMock()
+        decolight_entity.async_write_ha_state = MagicMock()
         
         await decolight_entity._fallback_status(None)
         
@@ -388,7 +390,7 @@ class TestThermexDecoLight:
         # 100% API brightness -> 255 HA brightness
         assert decolight_entity._brightness == 255
         assert decolight_entity._hs_color[0] == 0.0  # Red
-        decolight_entity.schedule_update_ha_state.assert_called_once()
+        decolight_entity.async_write_ha_state.assert_called_once()
 
     def test_decolight_process_fallback_no_data(self, decolight_entity):
         """Test deco light handles missing fallback data."""
@@ -420,7 +422,7 @@ class TestDecoLightColorMemory:
         from custom_components.thermex_api.light import ThermexDecoLight
 
         entity = ThermexDecoLight(mock_hub)
-        entity.schedule_update_ha_state = MagicMock()
+        entity.async_write_ha_state = MagicMock()
         return entity
 
     def test_color_survives_off(self, deco):
@@ -465,7 +467,7 @@ class TestLightStateComesFromReadback:
         from custom_components.thermex_api.light import ThermexLight
 
         light = ThermexLight(mock_hub)
-        light.schedule_update_ha_state = MagicMock()
+        light.async_write_ha_state = MagicMock()
 
         await light.async_turn_on(brightness=255)
 
