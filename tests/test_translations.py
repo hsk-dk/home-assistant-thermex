@@ -53,3 +53,39 @@ def test_same_placeholders_as_english(language):
 
     for path, english in ENGLISH.items():
         assert set(re.findall(r"{(\w+)}", translated[path])) == set(re.findall(r"{(\w+)}", english)), path
+
+
+# The wording of Thermex' own sites (thermex.dk/.no/.se/.fi/.es) for the decorative light, which
+# is what the setup option for the Decolight is called in each language.
+DECORATIVE_LIGHT = {
+    "da": "dekorationslys",
+    "no": "dekorasjonslys",
+    "sv": "dekorationsljus",
+    "fi": "tunnelmavalo",
+    "es": "luz decorativa",
+}
+
+
+@pytest.mark.parametrize("language,term", sorted(DECORATIVE_LIGHT.items()))
+def test_the_decolight_option_uses_the_word_on_thermexs_site(language, term):
+    option = load(language)["config"]["step"]["user"]["data"]["enable_decolight"]
+
+    assert term in option.lower()
+
+
+# Mistakes that were found and fixed, so they do not come back.
+MISTAKES = {
+    "da": ["Enhætte", "password", "adgangskode"],  # typo for "Emhætte"; the app says "kodeord"
+    "sv": ["filterbyte", "ljuss", "API lösenord", "Deco Light"],  # the filter is cleaned, not replaced
+    "no": ["stemningslys"],
+    "fi": ["tunnelmavalaistus"],
+    "es": ["reinicio", "reiniciar", "luz ambiental"],
+}
+
+
+@pytest.mark.parametrize("language", sorted(MISTAKES))
+def test_known_mistakes_stay_fixed(language):
+    everything = " | ".join(text for _, text in texts(load(language))).lower()
+
+    for mistake in MISTAKES[language]:
+        assert mistake.lower() not in everything, mistake

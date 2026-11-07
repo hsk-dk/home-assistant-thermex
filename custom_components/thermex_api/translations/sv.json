@@ -3,26 +3,26 @@
     "step": {
       "user": {
         "title": "Thermex köksfläktsanslutning",
-        "description": "Fyll i Thermex köksfläkt IP och API lösenord.",
+        "description": "Ange IP-adress och API-lösenord för Thermex köksfläkt.",
         "data": {
-          "host": "Köksfläktens IP address",
-          "api_key": "API lösenord",
-          "enable_decolight": "Aktivera DecoLight"
+          "host": "Köksfläktens IP-adress",
+          "api_key": "API-lösenord",
+          "enable_decolight": "Aktivera dekorationsljus"
         }
       },
       "discovery_confirm": {
         "title": "Konfigurera Thermex köksfläkt",
         "description": "En Thermex köksfläkt hittades på {host}. Ange dess API-lösenord.",
         "data": {
-          "api_key": "API lösenord",
-          "enable_decolight": "Aktivera DecoLight"
+          "api_key": "API-lösenord",
+          "enable_decolight": "Aktivera dekorationsljus"
         }
       },
       "reauth_confirm": {
         "title": "Autentisera Thermex-fläkten igen",
         "description": "API-lösenordet för {host} avvisades. Ange det aktuella API-lösenordet.",
         "data": {
-          "api_key": "API lösenord"
+          "api_key": "API-lösenord"
         }
       },
       "reconfigure": {
@@ -30,7 +30,7 @@
         "description": "Ändra IP-adress eller API-lösenord för den här fläkten.",
         "data": {
           "host": "Köksfläktens IP address",
-          "api_key": "API lösenord"
+          "api_key": "API-lösenord"
         }
       }
     },
@@ -52,10 +52,10 @@
       "init": {
         "title": "Thermex-inställningar",
         "data": {
-          "enable_decolight": "Aktivera DecoLight",
-          "fan_alert_hours": "Notis för filterbyte efter (driftstimmar)",
-          "fan_alert_days": "Notis för filterbyte efter (dagar sedan nollställning)",
-          "fan_auto_off_delay": "Fördröjd avstängning timer (minuter)"
+          "enable_decolight": "Aktivera dekorationsljus",
+          "fan_alert_hours": "Notis för rengöring av fettfilter efter (driftstimmar)",
+          "fan_alert_days": "Notis för rengöring av fettfilter efter (dagar sedan nollställning)",
+          "fan_auto_off_delay": "Timer för fördröjd avstängning (minuter)"
         },
         "description": "Filteralarm utlöses när ANTINGEN driftstimmar ELLER dagar sedan nollställning överskrids."
       }
@@ -79,7 +79,7 @@
         }
       },
       "thermex_sensor_delayed_turn_off": {
-        "name": "Fördröjd avstängning tid"
+        "name": "Tidpunkt för fördröjd avstängning"
       },
       "thermex_sensor_days_since_reset": {
         "name": "Filter dagar sedan senaste nollställning"
@@ -119,17 +119,17 @@
     },
     "light": {
       "thermex_light": {
-        "name": "Köksfläktssljus"
+        "name": "Köksfläktens ljus"
       },
       "thermex_decolight": {
-        "name": "Thermex Deco Light"
+        "name": "Köksfläktens dekorationsljus"
       }
     }
   },
   "services": {
     "reset_runtime": {
       "name": "Återställ filter driftstid",
-      "description": "Återställ Thermex-fläktens driftstidsräknare till noll."
+      "description": "Nollställ driftstidsräknaren för Thermex-fläkten."
     },
     "start_delayed_off": {
       "name": "Starta fördröjd avstängning",

@@ -7,7 +7,7 @@
         "data": {
           "host": "IP-adresse for hetten",
           "api_key": "API-passord",
-          "enable_decolight": "Aktiver stemningslys"
+          "enable_decolight": "Aktiver dekorasjonslys"
         }
       },
       "discovery_confirm": {
@@ -15,7 +15,7 @@
         "description": "En Thermex-hette ble funnet på {host}. Skriv inn API-passordet.",
         "data": {
           "api_key": "API-passord",
-          "enable_decolight": "Aktiver stemningslys"
+          "enable_decolight": "Aktiver dekorasjonslys"
         }
       },
       "reauth_confirm": {
@@ -52,7 +52,7 @@
       "init": {
         "title": "Thermex-innstillinger",
         "data": {
-          "enable_decolight": "Aktiver stemningslys",
+          "enable_decolight": "Aktiver dekorasjonslys",
           "fan_alert_hours": "Varsel for rengjøring av fettfilter etter (driftstimer)",
           "fan_alert_days": "Varsel for rengjøring av fettfilter etter (dager siden tilbakestilling)",
           "fan_auto_off_delay": "Forsinket avslåing (minutter)"
@@ -122,7 +122,7 @@
         "name": "Lys i kjøkkenhette"
       },
       "thermex_decolight": {
-        "name": "Dekorlys i kjøkkenhette"
+        "name": "Dekorasjonslys i kjøkkenhette"
       }
     }
   },

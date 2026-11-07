@@ -3,40 +3,40 @@
     "step": {
       "user": {
         "title": "Forbind til Thermex-emhætten",
-        "description": "Indtast Thermex-emhættens IP-adresse og API-password.",
+        "description": "Indtast Thermex-emhættens IP-adresse og API-kodeord.",
         "data": {
           "host": "Emhætte IP-adresse",
-          "api_key": "API-password",
-          "enable_decolight": "Aktivér Decolys"
+          "api_key": "API-kodeord",
+          "enable_decolight": "Aktivér dekorationslys"
         }
       },
       "discovery_confirm": {
         "title": "Opsæt Thermex-emhætte",
-        "description": "Der blev fundet en Thermex-emhætte på {host}. Indtast dens API-password.",
+        "description": "Der blev fundet en Thermex-emhætte på {host}. Indtast dens API-kodeord.",
         "data": {
-          "api_key": "API-password",
-          "enable_decolight": "Aktivér Decolys"
+          "api_key": "API-kodeord",
+          "enable_decolight": "Aktivér dekorationslys"
         }
       },
       "reauth_confirm": {
         "title": "Genautentificer Thermex-emhætte",
-        "description": "API-adgangskoden for {host} blev afvist. Indtast den aktuelle API-adgangskode.",
+        "description": "API-kodeordet for {host} blev afvist. Indtast det aktuelle API-kodeord.",
         "data": {
-          "api_key": "API-password"
+          "api_key": "API-kodeord"
         }
       },
       "reconfigure": {
         "title": "Omkonfigurer Thermex-emhætte",
-        "description": "Skift IP-adresse eller API-adgangskode for denne emhætte.",
+        "description": "Skift IP-adresse eller API-kodeord for denne emhætte.",
         "data": {
           "host": "Emhætte IP-adresse",
-          "api_key": "API-password"
+          "api_key": "API-kodeord"
         }
       }
     },
     "error": {
-      "cannot_connect": "Kunne ikke oprette forbindelse. Tjek IP og password.",
-      "invalid_auth": "Ugyldig API-adgangskode.",
+      "cannot_connect": "Kunne ikke oprette forbindelse. Tjek IP og kodeord.",
+      "invalid_auth": "Ugyldigt API-kodeord.",
       "host_in_use": "Denne IP-adresse bruges allerede af en anden Thermex-emhætte."
     },
     "abort": {
@@ -52,10 +52,10 @@
       "init": {
         "title": "Thermex-indstillinger",
         "data": {
-          "enable_decolight": "Aktivér Decolys",
+          "enable_decolight": "Aktivér dekorationslys",
           "fan_alert_hours": "Filter rengøringsadvarsel efter (driftstimer)",
           "fan_alert_days": "Filter rengøringsadvarsel efter (dage siden nulstilling)",
-          "fan_auto_off_delay": "Forsinket slukning timer (minutter)"
+          "fan_auto_off_delay": "Timer for forsinket slukning (minutter)"
         },
         "description": "Filter alarm udløses når ENTEN driftstimer ELLER dage siden nulstilling overskrides."
       }
@@ -79,7 +79,7 @@
         }
       },
       "thermex_sensor_delayed_turn_off": {
-        "name": "Forsinket slukning tid"
+        "name": "Tidspunkt for forsinket slukning"
       },
       "thermex_sensor_days_since_reset": {
         "name": "Filter dage siden sidste nulstilling"
@@ -114,15 +114,15 @@
     },
     "binary_sensor": {
       "thermex_binary_sensor_threshold_alert": {
-        "name": "Kræver filterrensning"
+        "name": "Filteret skal rengøres"
       }
     },
     "light": {
       "thermex_light": {
-        "name": "Enhættelys"
+        "name": "Emhættelys"
       },
       "thermex_decolight": {
-        "name": "Enhætte Decolys"
+        "name": "Emhættens dekorationslys"
       }
     }
   },
@@ -151,7 +151,7 @@
       "message": "Kan ikke oprette forbindelse til Thermex-emhætten på {host}. Kontroller IP-adressen, og at API'et er aktiveret i Thermex-appen."
     },
     "invalid_auth": {
-      "message": "Thermex-emhætten på {host} afviste API-adgangskoden. Indtast den aktuelle adgangskode for at fortsætte."
+      "message": "Thermex-emhætten på {host} afviste API-kodeordet. Indtast det aktuelle kodeord for at fortsætte."
     },
     "request_rejected": {
       "message": "Thermex-emhætten afviste kommandoen (status {status})."

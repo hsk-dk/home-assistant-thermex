@@ -7,7 +7,7 @@
         "data": {
           "host": "Liesituulettimen IP-osoite",
           "api_key": "API-salasana",
-          "enable_decolight": "Ota tunnelmavalaistus käyttöön"
+          "enable_decolight": "Ota tunnelmavalo käyttöön"
         }
       },
       "discovery_confirm": {
@@ -15,7 +15,7 @@
         "description": "Thermex-liesituuletin löytyi osoitteesta {host}. Anna sen API-salasana.",
         "data": {
           "api_key": "API-salasana",
-          "enable_decolight": "Ota tunnelmavalaistus käyttöön"
+          "enable_decolight": "Ota tunnelmavalo käyttöön"
         }
       },
       "reauth_confirm": {
@@ -52,7 +52,7 @@
       "init": {
         "title": "Thermex-asetukset",
         "data": {
-          "enable_decolight": "Ota tunnelmavalaistus käyttöön",
+          "enable_decolight": "Ota tunnelmavalo käyttöön",
           "fan_alert_hours": "Rasvasuodattimen puhdistusilmoitus (käyttötunnit)",
           "fan_alert_days": "Rasvasuodattimen puhdistusilmoitus (päiviä nollauksesta)",
           "fan_auto_off_delay": "Viivästetty sammutus (minuutit)"
