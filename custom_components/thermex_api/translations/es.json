@@ -7,7 +7,7 @@
         "data": {
           "host": "Dirección IP de la campana",
           "api_key": "Contraseña de la API",
-          "enable_decolight": "Activar luz ambiental"
+          "enable_decolight": "Activar luz decorativa"
         }
       },
       "discovery_confirm": {
@@ -15,7 +15,7 @@
         "description": "Se ha encontrado una campana Thermex en {host}. Introduce su contraseña de la API.",
         "data": {
           "api_key": "Contraseña de la API",
-          "enable_decolight": "Activar luz ambiental"
+          "enable_decolight": "Activar luz decorativa"
         }
       },
       "reauth_confirm": {
@@ -52,22 +52,22 @@
       "init": {
         "title": "Opciones de Thermex",
         "data": {
-          "enable_decolight": "Activar luz ambiental",
+          "enable_decolight": "Activar luz decorativa",
           "fan_alert_hours": "Aviso de limpieza del filtro de grasa tras (horas de funcionamiento)",
-          "fan_alert_days": "Aviso de limpieza del filtro de grasa tras (días desde el reinicio)",
+          "fan_alert_days": "Aviso de limpieza del filtro de grasa tras (días desde el restablecimiento)",
           "fan_auto_off_delay": "Temporizador de apagado diferido (minutos)"
         },
-        "description": "El aviso del filtro se activa cuando se supera el límite de horas de funcionamiento O el de días desde el reinicio."
+        "description": "El aviso del filtro se activa cuando se supera el límite de horas de funcionamiento O el de días desde el restablecimiento."
       }
     }
   },
   "entity": {
     "sensor": {
       "thermex_sensor_last_reset": {
-        "name": "Último reinicio del tiempo del filtro de grasa"
+        "name": "Último restablecimiento del tiempo del filtro de grasa"
       },
       "thermex_sensor_runtime_hours": {
-        "name": "Tiempo de funcionamiento del filtro de grasa desde el último reinicio"
+        "name": "Tiempo de funcionamiento del filtro de grasa desde el último restablecimiento"
       },
       "thermex_sensor_connection_status": {
         "name": "Estado de la conexión",
@@ -82,7 +82,7 @@
         "name": "Hora del apagado diferido"
       },
       "thermex_sensor_days_since_reset": {
-        "name": "Días desde el último reinicio del filtro de grasa"
+        "name": "Días desde el último restablecimiento del filtro de grasa"
       },
       "thermex_sensor_hours_until_cleaning": {
         "name": "Horas hasta la limpieza del filtro de grasa"
@@ -90,7 +90,7 @@
     },
     "button": {
       "thermex_button_reset_runtime": {
-        "name": "Reiniciar el tiempo del filtro"
+        "name": "Restablecer el tiempo del filtro"
       },
       "thermex_button_delayed_turn_off": {
         "name": "Iniciar apagado diferido"
@@ -106,7 +106,7 @@
               "low": "Baja",
               "medium": "Media",
               "high": "Alta",
-              "boost": "Intensiva"
+              "boost": "Boost"
             }
           }
         }
@@ -128,7 +128,7 @@
   },
   "services": {
     "reset_runtime": {
-      "name": "Reiniciar el tiempo de funcionamiento del filtro",
+      "name": "Restablecer el tiempo de funcionamiento del filtro",
       "description": "Pone a cero el contador de funcionamiento del ventilador Thermex."
     },
     "start_delayed_off": {
@@ -148,7 +148,7 @@
   },
   "exceptions": {
     "cannot_connect": {
-      "message": "No se puede conectar con la campana Thermex en {host}. Comprueba la dirección IP y asegúrate de que la API esté activada en la app de Thermex."
+      "message": "No se puede conectar con la campana Thermex en {host}. Comprueba la dirección IP y asegúrate de que la API esté activada en la aplicación de Thermex."
     },
     "invalid_auth": {
       "message": "La campana Thermex en {host} rechazó la contraseña de la API. Introduce la contraseña actual para continuar."
