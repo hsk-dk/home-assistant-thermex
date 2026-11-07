@@ -9,6 +9,13 @@
           "api_key": "API-salasana"
         }
       },
+      "discovery_confirm": {
+        "title": "Määritä Thermex-liesituuletin",
+        "description": "Thermex-liesituuletin löytyi osoitteesta {host}. Anna sen API-salasana.",
+        "data": {
+          "api_key": "API-salasana"
+        }
+      },
       "reauth_confirm": {
         "title": "Todenna Thermex-liesituuletin uudelleen",
         "description": "API-salasana laitteelle {host} hylättiin. Anna nykyinen API-salasana.",
@@ -33,8 +40,10 @@
     "abort": {
       "already_configured": "Tämä Thermex-liesituuletin on jo määritetty.",
       "reauth_successful": "Uudelleentodennus onnistui.",
-      "reconfigure_successful": "Uudelleenmääritys onnistui."
-    }
+      "reconfigure_successful": "Uudelleenmääritys onnistui.",
+      "already_in_progress": "Tätä Thermex-liesituuletinta ollaan jo määrittämässä."
+    },
+    "flow_title": "Thermex-liesituuletin ({host})"
   },
   "options": {
     "step": {

@@ -9,6 +9,13 @@
           "api_key": "API password"
         }
       },
+      "discovery_confirm": {
+        "title": "Set up Thermex Hood",
+        "description": "A Thermex hood was found at {host}. Enter its API password.",
+        "data": {
+          "api_key": "API password"
+        }
+      },
       "reauth_confirm": {
         "title": "Re-authenticate Thermex Hood",
         "description": "The API password for {host} was rejected. Enter the current API password.",
@@ -33,8 +40,10 @@
     "abort": {
       "already_configured": "This Thermex hood has already been configured.",
       "reauth_successful": "Re-authentication was successful.",
-      "reconfigure_successful": "Reconfiguration was successful."
-    }
+      "reconfigure_successful": "Reconfiguration was successful.",
+      "already_in_progress": "This Thermex hood is already being set up."
+    },
+    "flow_title": "Thermex Hood ({host})"
   },
   "options": {
     "step": {
