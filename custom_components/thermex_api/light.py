@@ -11,18 +11,17 @@ from homeassistant.components.light import (
     LightEntity,
 )
 from homeassistant.core import callback
-from homeassistant.helpers.event import async_call_later
 from homeassistant.util.color import color_hs_to_RGB, color_RGB_to_hs
 
 from .const import (
     DEFAULT_BRIGHTNESS,
-    FALLBACK_STATUS_TIMEOUT,
     MAX_BRIGHTNESS,
     MIN_BRIGHTNESS,
 )
+from .coordinator import ThermexCoordinator
 from .data import ThermexConfigEntry
 from .entity import ThermexEntity
-from .hub import ThermexHub
+from .state import DecolightState, LightState
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -58,78 +57,57 @@ def _to_ha_brightness(api_brightness: int) -> int:
 
 async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
     """Setup Thermex main and deco lights."""
-    hub = entry.runtime_data.hub
-    
-    enable_decolight = entry.options.get("enable_decolight", False)
-    entities: list[LightEntity] = [ThermexLight(hub)]
-    if enable_decolight:
-        entities.append(ThermexDecoLight(hub))
+    coordinator = entry.runtime_data.coordinator
+
+    entities: list[LightEntity] = [ThermexLight(coordinator)]
+    if entry.options.get("enable_decolight", False):
+        entities.append(ThermexDecoLight(coordinator))
     async_add_entities(entities)
+
+
+def _clamp_brightness(brightness: int) -> int:
+    """Clamp brightness to the Home Assistant range."""
+    return max(MIN_BRIGHTNESS, min(MAX_BRIGHTNESS, brightness))
+
 
 class ThermexLightBase(ThermexEntity, LightEntity):
     """Base class for Thermex light entities with common functionality."""
 
-    def __init__(self, hub: ThermexHub, unique_id_suffix: str, translation_key: str):
+    def __init__(self, coordinator: ThermexCoordinator, unique_id_suffix: str, translation_key: str):
         """Initialize the base light entity."""
-        super().__init__(hub)
-        self._attr_unique_id = f"{hub.unique_id}_{unique_id_suffix}"
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self._hub.unique_id}_{unique_id_suffix}"
         self._attr_translation_key = translation_key
-        self._is_on: bool = False
-        self._brightness: int = DEFAULT_BRIGHTNESS
+        # The hood reports brightness 0 while off; remember the last real one
         self._last_brightness: int = DEFAULT_BRIGHTNESS
-        self._got_initial_state: bool = False
+        self._remember()
+
+    @property
+    def _section(self) -> LightState | DecolightState | None:
+        """The hood's reported state of this light."""
+        raise NotImplementedError
 
     @property
     def is_on(self) -> bool:
-        return self._is_on
+        return bool(self._section and self._section.on)
 
     @property
     def brightness(self) -> int:
-        return self._brightness
+        section = self._section
+        if section and section.on and section.brightness > 0:
+            return _clamp_brightness(_to_ha_brightness(section.brightness))
+        return self._last_brightness
 
-    async def async_added_to_hass(self):
-        """Called when entity is added to hass."""
-        await super().async_added_to_hass()
-        self._got_initial_state = False
-        _LOGGER.debug("%s: awaiting initial notify for state", self.__class__.__name__)
-        self.async_on_remove(
-            async_call_later(self.hass, FALLBACK_STATUS_TIMEOUT, self._fallback_status)
-        )
-
-    def _clamp_brightness(self, brightness: int) -> int:
-        """Clamp brightness to valid range."""
-        return max(MIN_BRIGHTNESS, min(MAX_BRIGHTNESS, brightness))
-
-    async def _fallback_status(self, _now):
-        """Request fallback status if no initial notify received."""
-        if self._got_initial_state:
-            return
-        
-        if self._hub.startup_complete:
-            _LOGGER.debug("%s: Hub startup complete but no notify received, using default state", 
-                         self.__class__.__name__)
-            self._got_initial_state = True
-            return
-            
-        _LOGGER.warning("%s: no notify in %ss, fetching fallback status", 
-                       self.__class__.__name__, FALLBACK_STATUS_TIMEOUT)
-        try:
-            data = await self._hub.request_fallback_status(self.__class__.__name__)
-            self._process_fallback_data(data)
-            self._got_initial_state = True
-            self.async_write_ha_state()
-        except Exception as err:
-            _LOGGER.error("%s: fallback status failed: %s", self.__class__.__name__, err)
-            self._got_initial_state = True
-
-    def _process_fallback_data(self, data: dict):
-        """Process fallback status data. Override in subclasses."""
-        raise NotImplementedError
+    def _remember(self) -> None:
+        """Keep what the hood forgets while the light is off."""
+        section = self._section
+        if section and section.on and section.brightness > 0:
+            self._last_brightness = self.brightness
 
     @callback
-    def _handle_notify(self, ntf_type: str, data: dict) -> None:
-        """Handle notifications from the hub. Override in subclasses."""
-        raise NotImplementedError
+    def _handle_coordinator_update(self) -> None:
+        self._remember()
+        super()._handle_coordinator_update()
 
 
 class ThermexLight(ThermexLightBase):
@@ -137,42 +115,18 @@ class ThermexLight(ThermexLightBase):
     _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.BRIGHTNESS}
     _attr_color_mode = ColorMode.BRIGHTNESS
 
-    def __init__(self, hub: ThermexHub):
-        super().__init__(hub, "light", "thermex_light")
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator, "light", "thermex_light")
 
-    @callback
-    def _handle_notify(self, ntf_type: str, data: dict) -> None:
-        """Handle light notifications from the hub."""
-        if ntf_type.lower() != "light":
-            _LOGGER.debug("ThermexLight received non-light notify: %s", data)
-            return
-        
-        light = data.get("Light")
-        if light is None:
-            _LOGGER.warning("ThermexLight notify missing 'Light' key: %s", data)
-            return
-        
-        if not self._got_initial_state:
-            _LOGGER.debug("ThermexLight: Received initial state via notify")
-            self._got_initial_state = True
-            
-        self._is_on = bool(light.get("lightonoff", 0))
-
-        api_brightness = light.get("lightbrightness", 1)
-        brightness = self._clamp_brightness(_to_ha_brightness(api_brightness))
-
-        self._brightness = brightness
-        if self._is_on and brightness > 0:
-            self._last_brightness = brightness
-
-        self.async_write_ha_state()
+    @property
+    def _section(self) -> LightState | None:
+        return self.coordinator.data.light if self.coordinator.data else None
 
     async def async_turn_on(self, **kwargs):
         """Turn on the light."""
-        brightness = kwargs.get(ATTR_BRIGHTNESS, self._last_brightness)
-        brightness = self._clamp_brightness(brightness)
+        brightness = _clamp_brightness(kwargs.get(ATTR_BRIGHTNESS, self._last_brightness))
         api_brightness = _to_api_brightness(brightness)
-        
+
         _LOGGER.debug("ThermexLight: Turn on - HA Brightness: %s, API Brightness: %s", brightness, api_brightness)
         # State is updated from the Status read-back the hub dispatches: the
         # hood may clamp or rewrite what we sent.
@@ -186,22 +140,6 @@ class ThermexLight(ThermexLightBase):
             "Light": {"lightonoff": 0, "lightbrightness": 1}
         })
 
-    def _process_fallback_data(self, data: dict):
-        """Process fallback status data for main light."""
-        light = data.get("Light", {})
-        if not light:
-            _LOGGER.debug("ThermexLight: No light data in fallback response, using defaults")
-            return
-            
-        self._is_on = bool(light.get("lightonoff", 0))
-
-        api_brightness = light.get("lightbrightness", 1)
-        brightness = self._clamp_brightness(_to_ha_brightness(api_brightness))
-
-        self._brightness = brightness
-        if self._is_on and brightness > 0:
-            self._last_brightness = brightness
-
 
 class ThermexDecoLight(ThermexLightBase):
     """Deco light entity for Thermex hood."""
@@ -209,50 +147,29 @@ class ThermexDecoLight(ThermexLightBase):
     _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.HS}
     _attr_color_mode = ColorMode.HS
 
-    def __init__(self, hub: ThermexHub):
-        super().__init__(hub, "decolight", "thermex_decolight")
+    def __init__(self, coordinator: ThermexCoordinator):
         self._hs_color: tuple[float, float] = (0.0, 0.0)
+        super().__init__(coordinator, "decolight", "thermex_decolight")
+
+    @property
+    def _section(self) -> DecolightState | None:
+        return self.coordinator.data.decolight if self.coordinator.data else None
 
     @property
     def hs_color(self) -> tuple[float, float]:
         return self._hs_color
 
-    def _remember_color(self, deco: dict) -> None:
+    def _remember(self) -> None:
         """Keep the last real colour: the hood reports 0,0,0 while it is off."""
-        r = deco.get("decolightr", 0)
-        g = deco.get("decolightg", 0)
-        b = deco.get("decolightb", 0)
-        if self._is_on and (r or g or b):
-            self._hs_color = color_RGB_to_hs(r, g, b)
-
-    @callback
-    def _handle_notify(self, ntf_type: str, data: dict) -> None:
-        """Handle decolight notifications from the hub."""
-        if ntf_type.lower() != "decolight":
-            _LOGGER.debug("ThermexDecoLight received non-decolight notify: %s", data)
-            return
-        
-        deco = data.get("Decolight")
-        if deco is None:
-            _LOGGER.warning("ThermexDecoLight notify missing 'Decolight' key: %s", data)
-            return
-        
-        self._is_on = bool(deco.get("decolightonoff", 0))
-        api_brightness = deco.get("decolightbrightness", 1)
-        brightness = self._clamp_brightness(_to_ha_brightness(api_brightness))
-        self._brightness = brightness
-        if self._is_on and brightness > 0:
-            self._last_brightness = brightness
-        
-        self._remember_color(deco)
-        self._got_initial_state = True
-        self.async_write_ha_state()
+        super()._remember()
+        section = self._section
+        if section and section.on and any(section.rgb):
+            self._hs_color = color_RGB_to_hs(*section.rgb)
 
     async def async_turn_on(self, **kwargs):
         """Turn on the deco light."""
-        brightness = kwargs.get(ATTR_BRIGHTNESS, self._last_brightness)
-        brightness = self._clamp_brightness(brightness)
-        
+        brightness = _clamp_brightness(kwargs.get(ATTR_BRIGHTNESS, self._last_brightness))
+
         rgb = kwargs.get(ATTR_RGB_COLOR)
         hs = kwargs.get(ATTR_HS_COLOR)
         if rgb:
@@ -261,7 +178,7 @@ class ThermexDecoLight(ThermexLightBase):
             r, g, b = color_hs_to_RGB(*hs)
         else:
             r, g, b = color_hs_to_RGB(*self._hs_color)
-        
+
         payload = {
             "decolightonoff": 1,
             "decolightbrightness": _to_api_brightness(brightness),
@@ -276,19 +193,3 @@ class ThermexDecoLight(ThermexLightBase):
         await self._hub.send_update({
             "Decolight": {"decolightonoff": 0, "decolightbrightness": 1}
         })
-
-    def _process_fallback_data(self, data: dict):
-        """Process fallback status data for deco light."""
-        deco = data.get("Decolight", {})
-        if not deco:
-            _LOGGER.debug("ThermexDecoLight: No decolight data in fallback response, using defaults")
-            return
-            
-        self._is_on = bool(deco.get("decolightonoff", 0))
-        api_brightness = deco.get("decolightbrightness", 1)
-        brightness = self._clamp_brightness(_to_ha_brightness(api_brightness))
-        self._brightness = brightness
-        if self._is_on and brightness > 0:
-            self._last_brightness = brightness
-        
-        self._remember_color(deco)

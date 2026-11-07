@@ -21,6 +21,7 @@ from .const import (
     STARTUP,
     STORAGE_VERSION,
 )
+from .coordinator import ThermexCoordinator
 from .data import ThermexConfigEntry, ThermexData
 from .hub import ThermexAuthError, ThermexHub
 from .runtime_manager import RuntimeManager
@@ -111,10 +112,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> b
         )
         runtime_manager = RuntimeManager(store)
         await runtime_manager.load()
-        hub.runtime_manager = runtime_manager
 
-        # 3) Share hub + runtime manager with the platforms
-        entry.runtime_data = ThermexData(hub=hub, runtime_manager=runtime_manager)
+        # 3) The coordinator holds the hood's state; the first refresh fetches it
+        coordinator = ThermexCoordinator(hass, entry, hub, runtime_manager)
+        await coordinator.async_config_entry_first_refresh()
+        coordinator.delayed_off.restore()
+
+        # 4) Share everything with the platforms
+        entry.runtime_data = ThermexData(
+            hub=hub, runtime_manager=runtime_manager, coordinator=coordinator
+        )
 
         # While the fan runs, regularly move the open session into the saved total
         async def _checkpoint(_now: datetime) -> None:
@@ -128,7 +135,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> b
             )
         )
 
-        # 4) Forward setup to all platforms (the options flow reloads the entry itself)
+        # 5) Forward setup to all platforms (the options flow reloads the entry itself)
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     except BaseException:
         await hub.close()

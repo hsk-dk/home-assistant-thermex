@@ -1,477 +1,171 @@
-"""Tests for light entities."""
+"""Tests for the light entities."""
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from homeassistant.components.light import ColorMode
 
-from custom_components.thermex_api.light import ThermexLight, ThermexDecoLight
+from custom_components.thermex_api.light import ThermexDecoLight, ThermexLight
+from custom_components.thermex_api.state import DecolightState, LightState, ThermexState
 
 
-class TestThermexLight:
-    """Test ThermexLight entity."""
-
-    @pytest.fixture
-    def light_entity(self, mock_hub, mock_hass):
-        """Create a ThermexLight entity."""
-        light = ThermexLight(mock_hub)
-        light.hass = mock_hass
-        light.async_write_ha_state = MagicMock()
-        return light
-
-    def test_light_initialization(self, light_entity, mock_hub):
-        """Test light entity initialization."""
-        assert light_entity._hub == mock_hub
-        assert light_entity.is_on is False
-        assert light_entity._brightness == 204  # DEFAULT_BRIGHTNESS
-
-    def test_light_color_mode(self, light_entity):
-        """Test light supports brightness mode."""
-        assert ColorMode.BRIGHTNESS in light_entity.supported_color_modes
-        assert light_entity.color_mode == ColorMode.BRIGHTNESS
-
-    @pytest.mark.asyncio
-    async def test_light_turn_on_default(self, light_entity, mock_hub):
-        """Test turning on light with default brightness."""
-        await light_entity.async_turn_on()
-        
-        mock_hub.send_update.assert_called_once()
-        call_args = mock_hub.send_update.call_args[0]
-        assert call_args[0]["Light"]["lightonoff"] == 1
-        # 204 HA brightness -> 80% API brightness
-        assert call_args[0]["Light"]["lightbrightness"] == 80
-
-    @pytest.mark.asyncio
-    async def test_light_turn_on_with_brightness(self, light_entity, mock_hub):
-        """Test turning on light with specific brightness."""
-        await light_entity.async_turn_on(brightness=128)
-        
-        call_args = mock_hub.send_update.call_args[0]
-        # 128 HA brightness -> 50% API brightness
-        assert call_args[0]["Light"]["lightbrightness"] == 50
-
-    @pytest.mark.asyncio
-    async def test_light_turn_off(self, light_entity, mock_hub):
-        """Test turning off light."""
-        light_entity._is_on = True
-        
-        await light_entity.async_turn_off()
-        
-        mock_hub.send_update.assert_called_once()
-        call_args = mock_hub.send_update.call_args[0]
-        assert call_args[0]["Light"]["lightonoff"] == 0
-
-    def test_light_handle_notify_updates_state(self, light_entity):
-        """Test light state updates from notifications."""
-        light_entity._handle_notify("light", {
-            "Light": {
-                "lightonoff": 1,
-                "lightbrightness": 59,  # API value (1-100); 59% -> 150 HA brightness
-            }
-        })
-        
-        assert light_entity.is_on is True
-        assert light_entity._brightness == 150
-
-    def test_light_brightness_clamping(self, light_entity):
-        """Test brightness values are clamped to valid range."""
-        # Test below min brightness (gets clamped to 0)
-        result = light_entity._clamp_brightness(-10)
-        assert result == 0  # MIN_BRIGHTNESS
-        
-        # Test at min brightness
-        result = light_entity._clamp_brightness(0)
-        assert result == 0
-        
-        # Test max brightness
-        result = light_entity._clamp_brightness(300)
-        assert result == 255  # MAX_BRIGHTNESS
-        
-        # Test normal value
-        result = light_entity._clamp_brightness(128)
-        assert result == 128
-
-    def test_light_remembers_last_brightness(self, light_entity):
-        """Test light remembers last brightness when turned on."""
-        light_entity._handle_notify("light", {
-            "Light": {
-                "lightonoff": 1,
-                "lightbrightness": 71,  # API value (1-100); 71% -> 181 HA brightness
-            }
-        })
-        
-        assert light_entity._last_brightness == 181
-
-    def test_light_ignores_non_light_notifications(self, light_entity):
-        """Test light ignores notifications for other entities."""
-        original_state = light_entity.is_on
-        
-        light_entity._handle_notify("fan", {"Fan": {"fanspeed": 2}})
-        
-        assert light_entity.is_on == original_state
+@pytest.fixture
+def light(coordinator, mock_hass):
+    entity = ThermexLight(coordinator)
+    entity.hass = mock_hass
+    entity.async_write_ha_state = MagicMock()
+    return entity
 
 
-class TestThermexDecoLight:
-    """Test ThermexDecoLight entity."""
+@pytest.fixture
+def deco(coordinator, mock_hass):
+    entity = ThermexDecoLight(coordinator)
+    entity.hass = mock_hass
+    entity.async_write_ha_state = MagicMock()
+    return entity
 
-    @pytest.fixture
-    def decolight_entity(self, mock_hub, mock_hass):
-        """Create a ThermexDecoLight entity."""
-        light = ThermexDecoLight(mock_hub)
-        light.hass = mock_hass
-        light.async_write_ha_state = MagicMock()
-        return light
 
-    def test_decolight_initialization(self, decolight_entity, mock_hub):
-        """Test deco light entity initialization."""
-        assert decolight_entity._hub == mock_hub
-        assert decolight_entity.is_on is False
-        assert decolight_entity._hs_color == (0.0, 0.0)
+class TestMainLight:
+    def test_is_a_brightness_light(self, light):
+        assert light.supported_color_modes == {ColorMode.BRIGHTNESS}
+        assert light.color_mode == ColorMode.BRIGHTNESS
+        assert light.unique_id == "test_thermex_hub_light"
 
-    def test_decolight_color_modes(self, decolight_entity):
-        """Test deco light supports HS and brightness modes."""
-        assert ColorMode.HS in decolight_entity.supported_color_modes
-        assert ColorMode.BRIGHTNESS not in decolight_entity.supported_color_modes
-        assert decolight_entity.color_mode == ColorMode.HS
+    def test_unknown_state_is_off_with_default_brightness(self, light):
+        assert light.is_on is False
+        assert light.brightness == 204
+
+    def test_state_comes_from_the_coordinator(self, light, coordinator):
+        coordinator.data = ThermexState(light=LightState(on=True, brightness=50))
+
+        assert light.is_on is True
+        assert light.brightness == 128  # 50 % of 255
+
+    def test_brightness_is_remembered_while_off(self, light, coordinator):
+        coordinator.data = ThermexState(light=LightState(on=True, brightness=40))
+        light._handle_coordinator_update()
+        coordinator.data = ThermexState(light=LightState(on=False, brightness=0))
+        light._handle_coordinator_update()
+
+        assert light.is_on is False
+        assert light.brightness == 102  # 40 % of 255
+
+    def test_a_state_update_writes_state(self, light):
+        light._handle_coordinator_update()
+
+        light.async_write_ha_state.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_decolight_turn_on_with_color(self, decolight_entity, mock_hub):
-        """Test turning on deco light with RGB color."""
-        await decolight_entity.async_turn_on(
-            brightness=200,
-            rgb_color=(255, 0, 0)  # Red
-        )
-        
-        call_args = mock_hub.send_update.call_args[0]
-        assert call_args[0]["Decolight"]["decolightonoff"] == 1
-        assert call_args[0]["Decolight"]["decolightbrightness"] == 78  # 200/255 -> API %
-        assert call_args[0]["Decolight"]["decolightr"] == 255
-        assert call_args[0]["Decolight"]["decolightg"] == 0
-        assert call_args[0]["Decolight"]["decolightb"] == 0
+    async def test_turn_on_default(self, light, mock_hub):
+        await light.async_turn_on()
+
+        mock_hub.send_update.assert_awaited_once_with({"Light": {"lightonoff": 1, "lightbrightness": 80}})
 
     @pytest.mark.asyncio
-    async def test_decolight_turn_off(self, decolight_entity, mock_hub):
-        """Test turning off deco light."""
-        decolight_entity._is_on = True
-        
-        await decolight_entity.async_turn_off()
-        
-        call_args = mock_hub.send_update.call_args[0]
-        assert call_args[0]["Decolight"]["decolightonoff"] == 0
+    async def test_turn_on_with_brightness(self, light, mock_hub):
+        await light.async_turn_on(brightness=128)
 
-    def test_decolight_handle_notify_with_color(self, decolight_entity):
-        """Test deco light updates from notifications including color."""
-        decolight_entity._handle_notify("decolight", {
-            "Decolight": {
-                "decolightonoff": 1,
-                "decolightbrightness": 100,  # API sends 100% = max
-                "decolightr": 0,
-                "decolightg": 255,
-                "decolightb": 0,
-            }
-        })
-        
-        assert decolight_entity.is_on is True
-        # 100% API brightness -> 255 HA brightness
-        assert decolight_entity._brightness == 255
-        # Color should be converted to HS (green)
-        assert decolight_entity._hs_color[0] == 120.0  # Green hue
-
-    def test_decolight_ignores_wrong_notifications(self, decolight_entity):
-        """Test deco light ignores non-decolight notifications."""
-        original_state = decolight_entity.is_on
-        
-        decolight_entity._handle_notify("light", {"Light": {"lightonoff": 1}})
-        
-        assert decolight_entity.is_on == original_state
-    @pytest.mark.skip(reason="async_added_to_hass creates fallback timer - needs implementation change to store handle")
-    @pytest.mark.asyncio
-    async def test_light_async_added_to_hass(self, decolight_entity, mock_hass):
-        """Test deco light added to hass connects dispatcher and schedules fallback."""
-        await decolight_entity.async_added_to_hass()
-        
-        assert decolight_entity._unsub is not None
-        assert decolight_entity._got_initial_state is False
-
-    @pytest.mark.skip(reason="async_added_to_hass creates fallback timer - needs implementation change to store handle")
-    @pytest.mark.asyncio
-    async def test_decolight_async_added_to_hass(self, decolight_entity, mock_hass):
-        """Test deco light creates necessary state on add."""
-        await decolight_entity.async_added_to_hass()
-        
-        assert decolight_entity._got_initial_state is False
-        assert decolight_entity._unsub is not None
-
-    def test_light_handle_notify_preserves_brightness_on_off(self, decolight_entity):
-        """Test deco light preserves brightness when turned off."""
-        decolight_entity._brightness = 255  # Start with HA brightness
-        
-        decolight_entity._handle_notify("decolight", {
-            "Decolight": {
-                "decolightonoff": 0,
-                "decolightbrightness": 100,  # API sends 100%
-            }
-        })
-        
-        assert decolight_entity._is_on is False
-        # 100% API brightness -> 255 HA brightness
-        assert decolight_entity._brightness == 255
+        assert mock_hub.send_update.call_args.args[0]["Light"]["lightbrightness"] == 50
 
     @pytest.mark.asyncio
-    async def test_light_turn_on_uses_last_brightness(self, decolight_entity, mock_hub):
-        """Test deco light uses last brightness when turning on."""
-        decolight_entity._last_brightness = 150
-        
-        await decolight_entity.async_turn_on()
-        
-        call_args = mock_hub.send_update.call_args[0]
-        assert call_args[0]["Decolight"]["decolightbrightness"] == 59  # 150/255 -> API %
+    async def test_turn_on_returns_to_the_last_brightness(self, light, coordinator, mock_hub):
+        coordinator.data = ThermexState(light=LightState(on=True, brightness=30))
+        light._handle_coordinator_update()
+        coordinator.data = ThermexState(light=LightState(on=False, brightness=0))
+        light._handle_coordinator_update()
 
-    def test_decolight_rgb_to_hs_conversion(self, decolight_entity):
-        """Test RGB to HS color conversion."""
-        # Test red
-        decolight_entity._handle_notify("decolight", {
-            "Decolight": {
-                "decolightonoff": 1,
-                "decolightbrightness": 255,
-                "decolightr": 255,
-                "decolightg": 0,
-                "decolightb": 0,
-            }
-        })
-        
-        assert decolight_entity._hs_color[0] == 0.0  # Red hue
+        await light.async_turn_on()
+
+        assert mock_hub.send_update.call_args.args[0]["Light"]["lightbrightness"] == 30
 
     @pytest.mark.asyncio
-    async def test_light_fallback_status_startup_complete(self, decolight_entity, mock_hub):
-        """Test fallback status when hub startup is complete."""
-        decolight_entity._got_initial_state = False
-        mock_hub.startup_complete = True
-        
-        await decolight_entity._fallback_status(None)
-        
-        # Should mark as got initial state without requesting
-        assert decolight_entity._got_initial_state is True
+    async def test_turn_off(self, light, mock_hub):
+        await light.async_turn_off()
+
+        mock_hub.send_update.assert_awaited_once_with({"Light": {"lightonoff": 0, "lightbrightness": 1}})
 
     @pytest.mark.asyncio
-    async def test_light_fallback_status_error(self, decolight_entity, mock_hub):
-        """Test fallback status handles errors gracefully."""
-        decolight_entity._got_initial_state = False
-        mock_hub.startup_complete = False
-        mock_hub.request_fallback_status = AsyncMock(side_effect=Exception("Connection error"))
-        
-        await decolight_entity._fallback_status(None)
-        
-        # Should mark as got initial state even on error
-        assert decolight_entity._got_initial_state is True
+    async def test_state_is_not_assumed_after_a_command(self, light, mock_hub):
+        """The hood may clamp or rewrite the value, so the state comes from the read-back."""
+        await light.async_turn_on(brightness=255)
 
-    def test_light_clamp_brightness(self, decolight_entity):
-        """Test brightness clamping."""
-        # Test minimum (MIN_BRIGHTNESS is 0)
-        assert decolight_entity._clamp_brightness(0) == 0
-        assert decolight_entity._clamp_brightness(-10) == 0
-        
-        # Test maximum
-        assert decolight_entity._clamp_brightness(256) == 255
-        assert decolight_entity._clamp_brightness(300) == 255
-        
-        # Test valid range
-        assert decolight_entity._clamp_brightness(128) == 128
-
-    def test_light_process_fallback_no_light_data(self, decolight_entity):
-        """Test ThermexLight handles missing light data in fallback."""
-        # Create a ThermexLight instance
-        from custom_components.thermex_api.light import ThermexLight
-        light = ThermexLight(decolight_entity._hub)
-        light.hass = decolight_entity.hass
-        
-        # Call with empty dict
-        light._process_fallback_data({})
-        
-        # Should not crash, uses defaults
-
-    def test_decolight_process_fallback_data_empty(self, decolight_entity):
-        """Test DecoLight handles empty fallback data."""
-        decolight_entity._process_fallback_data({})
-        
-        # Should not crash, uses defaults
-
-    def test_light_handle_notify_missing_light_key(self, decolight_entity):
-        """Test ThermexLight handles notify with missing Light key."""
-        from custom_components.thermex_api.light import ThermexLight
-        light = ThermexLight(decolight_entity._hub)
-        light.hass = decolight_entity.hass
-        light.async_write_ha_state = MagicMock()
-        
-        # Call with missing Light key
-        light._handle_notify("light", {"OtherData": {}})
-        
-        # Should not crash and not update state
+        assert light.is_on is False
         light.async_write_ha_state.assert_not_called()
 
-    def test_decolight_handle_notify_missing_decolight_key(self, decolight_entity):
-        """Test DecoLight handles notify with missing Decolight key."""
-        decolight_entity.async_write_ha_state = MagicMock()
-        
-        # Call with missing Decolight key
-        decolight_entity._handle_notify("decolight", {"OtherData": {}})
-        
-        # Should not crash and not update state
-        decolight_entity.async_write_ha_state.assert_not_called()
 
-    def test_light_marks_got_initial_state_on_first_notify(self, decolight_entity):
-        """Test light marks got_initial_state on first notify."""
-        from custom_components.thermex_api.light import ThermexLight
-        light = ThermexLight(decolight_entity._hub)
-        light.hass = decolight_entity.hass
-        light._got_initial_state = False
-        light.async_write_ha_state = MagicMock()
-        
-        light._handle_notify("light", {
-            "Light": {
-                "lightonoff": 1,
-                "lightbrightness": 100
-            }
-        })
-        
-        assert light._got_initial_state is True
+class TestDecolight:
+    def test_is_an_hs_light(self, deco):
+        assert deco.supported_color_modes == {ColorMode.HS}
+        assert deco.color_mode == ColorMode.HS
+        assert deco.unique_id == "test_thermex_hub_decolight"
 
-    def test_decolight_brightness_state(self, decolight_entity):
-        """Test deco light brightness property."""
-        decolight_entity._brightness = 128
-        assert decolight_entity.brightness == 128
+    def test_colour_comes_from_the_hoods_rgb(self, deco, coordinator):
+        coordinator.data = ThermexState(decolight=DecolightState(on=True, brightness=100, rgb=(255, 0, 0)))
+        deco._handle_coordinator_update()
 
-    @pytest.mark.asyncio
-    async def test_decolight_turn_on_default_color(self, decolight_entity, mock_hub):
-        """Test deco light turns on with default color."""
-        await decolight_entity.async_turn_on()
-        
-        call_args = mock_hub.send_update.call_args[0]
-        assert "Decolight" in call_args[0]
-        assert call_args[0]["Decolight"]["decolightonoff"] == 1
+        assert deco.hs_color == (0.0, 100.0)
 
-    def test_light_color_modes(self, decolight_entity):
-        """Test deco light supports HS color mode."""
-        # DecoLight supports HS color and brightness, not color temp
-        from homeassistant.components.light import ColorMode
-        assert ColorMode.HS in decolight_entity.supported_color_modes
-        assert ColorMode.BRIGHTNESS not in decolight_entity.supported_color_modes
-        assert decolight_entity.color_mode == ColorMode.HS
-
-    @pytest.mark.asyncio
-    async def test_light_fallback_status_request(self, decolight_entity, mock_hub):
-        """Test deco light requests fallback status."""
-        decolight_entity._got_initial_state = False
-        mock_hub.startup_complete = True
-        mock_hub.request_fallback_status = AsyncMock()
-        
-        await decolight_entity._fallback_status(None)
-        
-        assert decolight_entity._got_initial_state is True
-
-    @pytest.mark.asyncio
-    async def test_decolight_fallback_status_with_data(self, decolight_entity, mock_hub):
-        """Test deco light processes fallback data correctly."""
-        decolight_entity._got_initial_state = False
-        mock_hub.startup_complete = False
-        mock_hub.request_fallback_status = AsyncMock(return_value={
-            "Decolight": {
-                "decolightonoff": 1,
-                "decolightbrightness": 100,  # API sends 100%
-                "decolightr": 255,
-                "decolightg": 0,
-                "decolightb": 0
-            }
-        })
-        decolight_entity.async_write_ha_state = MagicMock()
-        
-        await decolight_entity._fallback_status(None)
-        
-        assert decolight_entity._got_initial_state is True
-        assert decolight_entity._is_on is True
-        # 100% API brightness -> 255 HA brightness
-        assert decolight_entity._brightness == 255
-        assert decolight_entity._hs_color[0] == 0.0  # Red
-        decolight_entity.async_write_ha_state.assert_called_once()
-
-    def test_decolight_process_fallback_no_data(self, decolight_entity):
-        """Test deco light handles missing fallback data."""
-        decolight_entity._process_fallback_data({})
-        
-        # Should use defaults when no decolight data
-        assert decolight_entity._is_on is False
-
-    def test_decolight_turn_on_preserves_color(self, decolight_entity):
-        """Test deco light preserves color when no RGB provided."""
-        decolight_entity._hs_color = (120.0, 100.0)  # Green
-        # The turn on should use current _hs_color when no RGB is provided
-    @pytest.mark.asyncio  
-    async def test_decolight_fallback_status_request(self, decolight_entity, mock_hub):
-        """Test deco light requests fallback status."""
-        decolight_entity._got_initial_state = False
-        mock_hub.startup_complete = True
-        mock_hub.request_fallback_status = AsyncMock()
-        
-        await decolight_entity._fallback_status(None)
-        
-        assert decolight_entity._got_initial_state is True
-
-class TestDecoLightColorMemory:
-    """The hood reports 0,0,0 while off; the last colour must survive."""
-
-    @pytest.fixture
-    def deco(self, mock_hub):
-        from custom_components.thermex_api.light import ThermexDecoLight
-
-        entity = ThermexDecoLight(mock_hub)
-        entity.async_write_ha_state = MagicMock()
-        return entity
-
-    def test_color_survives_off(self, deco):
-        deco._handle_notify("decolight", {"Decolight": {
-            "decolightonoff": 1, "decolightbrightness": 50,
-            "decolightr": 0, "decolightg": 255, "decolightb": 0}})
-        green = deco.hs_color
-
-        deco._handle_notify("decolight", {"Decolight": {
-            "decolightonoff": 0, "decolightbrightness": 0,
-            "decolightr": 0, "decolightg": 0, "decolightb": 0}})
+    def test_colour_survives_being_switched_off(self, deco, coordinator):
+        coordinator.data = ThermexState(decolight=DecolightState(on=True, brightness=100, rgb=(0, 255, 0)))
+        deco._handle_coordinator_update()
+        coordinator.data = ThermexState(decolight=DecolightState(on=False, brightness=0, rgb=(0, 0, 0)))
+        deco._handle_coordinator_update()
 
         assert deco.is_on is False
-        assert deco.hs_color == green  # not reset to white/black
+        assert deco.hs_color == (120.0, 100.0)
+
+    def test_colour_is_known_from_the_start(self, coordinator, mock_hass):
+        coordinator.data = ThermexState(decolight=DecolightState(on=True, brightness=100, rgb=(0, 0, 255)))
+
+        assert ThermexDecoLight(coordinator).hs_color == (240.0, 100.0)
 
     @pytest.mark.asyncio
-    async def test_turn_on_after_off_reuses_last_color(self, deco, mock_hub):
-        deco._handle_notify("decolight", {"Decolight": {
-            "decolightonoff": 1, "decolightbrightness": 50,
-            "decolightr": 0, "decolightg": 255, "decolightb": 0}})
-        deco._handle_notify("decolight", {"Decolight": {
-            "decolightonoff": 0, "decolightbrightness": 0,
-            "decolightr": 0, "decolightg": 0, "decolightb": 0}})
+    async def test_turn_on_after_off_reuses_the_last_colour(self, deco, coordinator, mock_hub):
+        coordinator.data = ThermexState(decolight=DecolightState(on=True, brightness=100, rgb=(0, 0, 255)))
+        deco._handle_coordinator_update()
+        coordinator.data = ThermexState(decolight=DecolightState(on=False, brightness=0, rgb=(0, 0, 0)))
+        deco._handle_coordinator_update()
 
         await deco.async_turn_on()
 
-        payload = mock_hub.send_update.call_args[0][0]["Decolight"]
-        assert (payload["decolightr"], payload["decolightg"], payload["decolightb"]) == (0, 255, 0)
+        payload = mock_hub.send_update.call_args.args[0]["Decolight"]
+        assert (payload["decolightr"], payload["decolightg"], payload["decolightb"]) == (0, 0, 255)
 
     @pytest.mark.asyncio
-    async def test_turn_on_accepts_hs_color(self, deco, mock_hub):
+    async def test_turn_on_with_rgb(self, deco, mock_hub):
+        await deco.async_turn_on(rgb_color=(10, 20, 30), brightness=128)
+
+        assert mock_hub.send_update.call_args.args[0] == {"Decolight": {
+            "decolightonoff": 1, "decolightbrightness": 50,
+            "decolightr": 10, "decolightg": 20, "decolightb": 30,
+        }}
+
+    @pytest.mark.asyncio
+    async def test_turn_on_with_hs(self, deco, mock_hub):
         await deco.async_turn_on(hs_color=(0.0, 100.0))
 
-        payload = mock_hub.send_update.call_args[0][0]["Decolight"]
+        payload = mock_hub.send_update.call_args.args[0]["Decolight"]
         assert (payload["decolightr"], payload["decolightg"], payload["decolightb"]) == (255, 0, 0)
 
-
-class TestLightStateComesFromReadback:
     @pytest.mark.asyncio
-    async def test_turn_on_does_not_assume_value_was_applied(self, mock_hub):
-        """The hood clamps/rewrites values, so state only changes via the Status read-back."""
-        from custom_components.thermex_api.light import ThermexLight
+    async def test_turn_off(self, deco, mock_hub):
+        await deco.async_turn_off()
 
-        light = ThermexLight(mock_hub)
-        light.async_write_ha_state = MagicMock()
+        mock_hub.send_update.assert_awaited_once_with(
+            {"Decolight": {"decolightonoff": 0, "decolightbrightness": 1}}
+        )
 
-        await light.async_turn_on(brightness=255)
 
-        assert light.is_on is False  # not yet confirmed by the hood
-        light._handle_notify("light", {"Light": {"lightonoff": 1, "lightbrightness": 100}})
-        assert light.is_on is True
-        assert light.brightness == 255
+@pytest.mark.asyncio
+@pytest.mark.parametrize("decolight,expected", [(False, {ThermexLight}), (True, {ThermexLight, ThermexDecoLight})])
+async def test_setup_adds_the_decolight_only_when_enabled(
+    coordinator, mock_hass, mock_config_entry, decolight, expected
+):
+    from custom_components.thermex_api.light import async_setup_entry
+
+    mock_config_entry.options = {**mock_config_entry.options, "enable_decolight": decolight}
+    mock_config_entry.runtime_data = MagicMock(coordinator=coordinator)
+    add = MagicMock()
+
+    await async_setup_entry(mock_hass, mock_config_entry, add)
+
+    assert {type(e) for e in add.call_args.args[0]} == expected

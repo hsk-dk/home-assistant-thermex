@@ -7,6 +7,16 @@ from custom_components.thermex_api import async_setup_entry, async_unload_entry
 from custom_components.thermex_api.hub import ThermexAuthError
 
 
+@pytest.fixture(autouse=True)
+def mock_coordinator():
+    """The coordinator is tested on its own; here it only has to be wired up."""
+    coordinator = MagicMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    with patch('custom_components.thermex_api.ThermexCoordinator', return_value=coordinator) as cls:
+        coordinator.cls = cls
+        yield coordinator
+
+
 class TestInit:
     """Test __init__ functions."""
 
@@ -53,7 +63,9 @@ class TestInit:
         mock_runtime_manager.load.assert_called_once()
         assert mock_config_entry.runtime_data.hub is mock_hub
         assert mock_config_entry.runtime_data.runtime_manager is mock_runtime_manager
-        assert mock_hub.runtime_manager is mock_runtime_manager
+        assert mock_config_entry.runtime_data.coordinator.cls.call_args.args[1:] == (
+            mock_config_entry, mock_hub, mock_runtime_manager
+        )
         mock_hass.config_entries.async_forward_entry_setups.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -258,3 +270,52 @@ class TestRuntimeCheckpoint:
         await track.call_args.args[1](None)
         mock_runtime_manager.checkpoint.assert_not_called()
         mock_runtime_manager.save.assert_not_awaited()
+
+
+class TestCoordinatorWiring:
+    @pytest.fixture
+    def mock_integration(self):
+        return MagicMock(version="1.0.0")
+
+    @pytest.fixture
+    def mock_hub(self):
+        hub = MagicMock()
+        hub.connect = AsyncMock()
+        hub.close = AsyncMock()
+        return hub
+
+    @pytest.fixture
+    def mock_runtime_manager(self):
+        rm = MagicMock()
+        rm.load = AsyncMock()
+        return rm
+
+    @pytest.mark.asyncio
+    async def test_first_refresh_runs_before_the_platforms_and_the_timer_is_restored(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_hub, mock_runtime_manager, mock_integration
+    ):
+        order = []
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock(side_effect=lambda: order.append("refresh"))
+        mock_coordinator.delayed_off.restore = MagicMock(side_effect=lambda: order.append("restore"))
+        mock_hass.config_entries.async_forward_entry_setups = AsyncMock(
+            side_effect=lambda *a: order.append("platforms")
+        )
+
+        with patch('custom_components.thermex_api.async_get_integration', return_value=mock_integration),              patch('custom_components.thermex_api.ThermexHub', return_value=mock_hub),              patch('custom_components.thermex_api.RuntimeManager', return_value=mock_runtime_manager),              patch('custom_components.thermex_api.Store'):
+            await async_setup_entry(mock_hass, mock_config_entry)
+
+        assert order == ["refresh", "restore", "platforms"]
+
+    @pytest.mark.asyncio
+    async def test_unreachable_hood_at_first_refresh_retries_later_and_closes_the_hub(
+        self, mock_hass, mock_config_entry, mock_coordinator, mock_hub, mock_runtime_manager, mock_integration
+    ):
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock(side_effect=ConfigEntryNotReady)
+        mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
+
+        with patch('custom_components.thermex_api.async_get_integration', return_value=mock_integration),              patch('custom_components.thermex_api.ThermexHub', return_value=mock_hub),              patch('custom_components.thermex_api.RuntimeManager', return_value=mock_runtime_manager),              patch('custom_components.thermex_api.Store'):
+            with pytest.raises(ConfigEntryNotReady):
+                await async_setup_entry(mock_hass, mock_config_entry)
+
+        mock_hub.close.assert_awaited_once()
+        mock_hass.config_entries.async_forward_entry_setups.assert_not_awaited()

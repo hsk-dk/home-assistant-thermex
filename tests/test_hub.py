@@ -31,9 +31,6 @@ class TestThermexHub:
     def hub_instance(self, mock_hass):
         """Create a ThermexHub instance."""
         hub = ThermexHub(mock_hass, "192.168.1.100", "test_password", "test_entry_id")
-        # Add runtime_manager mock
-        hub.runtime_manager = MagicMock()
-        hub.runtime_manager.get_filter_time = MagicMock(return_value=50)
         return hub
 
     def test_hub_initialization(self, hub_instance):
@@ -43,7 +40,6 @@ class TestThermexHub:
         assert hub_instance._entry_id == "test_entry_id"
         assert hub_instance.unique_id == "thermex_192_168_1_100"
         assert hub_instance._connection_state == "disconnected"
-        assert hub_instance._startup_complete is False
 
     def test_device_info(self, hub_instance):
         """Test device info property."""
@@ -59,28 +55,6 @@ class TestThermexHub:
         assert hub_instance.protocol_version is None
         hub_instance._protocol_version = "1.0"
         assert hub_instance.protocol_version == "1.0"
-
-    def test_startup_complete_property(self, hub_instance):
-        """Test startup complete property."""
-        assert hub_instance.startup_complete is False
-        hub_instance._startup_complete = True
-        assert hub_instance.startup_complete is True
-
-    def test_name_property(self, hub_instance):
-        """Test name property."""
-        assert hub_instance.name == "Thermex Hood"
-
-    def test_configure_watchdog(self, hub_instance):
-        """Test watchdog configuration."""
-        hub_instance.configure_watchdog(heartbeat_interval=60, connection_timeout=180)
-        assert hub_instance._heartbeat_interval == 60
-        assert hub_instance._connection_timeout == 180
-
-    def test_configure_watchdog_defaults(self, hub_instance):
-        """Test watchdog configuration with defaults."""
-        hub_instance.configure_watchdog()
-        assert hub_instance._heartbeat_interval == 30
-        assert hub_instance._connection_timeout == 120
 
     @pytest.mark.asyncio
     async def test_connect_success(self, hub_instance):
@@ -102,7 +76,7 @@ class TestThermexHub:
         with patch("custom_components.thermex_api.hub.async_get_clientsession", return_value=mock_session):
             with patch.object(hub_instance, "_recv_loop", new_callable=AsyncMock):
                 with patch.object(hub_instance, "_watchdog_loop", new_callable=AsyncMock):
-                    with patch.object(hub_instance, "_dispatch_initial_status", new_callable=AsyncMock):
+                    with patch.object(hub_instance, "_request_initial_status", new_callable=AsyncMock):
                         with patch.object(hub_instance, "send_request", new_callable=AsyncMock, return_value={"Status": 200, "Data": {"MajorVersion": 1, "MinorVersion": 0}}):
                             await hub_instance.connect()
         
@@ -255,11 +229,8 @@ class TestThermexHub:
             mock_dispatcher.assert_called_once()
             # Verify it was called with correct arguments (using actual signal value)
             mock_dispatcher.assert_called_with(
-                hub_instance._hass, hub_instance.signal, "fan", {"Fan": {"fanonoff": 1}}
+                hub_instance._hass, hub_instance.signal, {"Fan": {"fanonoff": 1}}
             )
-            call_args = mock_dispatcher.call_args[0]
-            assert call_args[1] == hub_instance.signal
-            assert call_args[2] == "fan"
 
     @pytest.mark.asyncio
     async def test_recv_loop_handles_error_message(self, hub_instance):
@@ -372,71 +343,6 @@ class TestThermexHub:
         assert hub_instance._session is None
         assert len(hub_instance._pending) == 0
         assert fut.done()
-
-    @pytest.mark.asyncio
-    async def test_dispatch_initial_status(self, hub_instance):
-        """Test initial status dispatch."""
-        mock_response = {
-            "Status": 200,
-            "Data": {
-                "Light": {"lightonoff": 1},
-                "Fan": {"fanonoff": 0}
-            }
-        }
-        
-        with patch.object(hub_instance, "send_request", new_callable=AsyncMock, return_value=mock_response):
-            with patch("custom_components.thermex_api.hub.async_dispatcher_send") as mock_dispatcher:
-                await hub_instance._dispatch_initial_status()
-                
-                # Should dispatch for each data section
-                assert mock_dispatcher.call_count == 2
-                assert hub_instance._startup_complete is True
-
-    @pytest.mark.asyncio
-    async def test_dispatch_initial_status_failure(self, hub_instance):
-        """Test initial status dispatch handles failure."""
-        with patch.object(hub_instance, "send_request", new_callable=AsyncMock, side_effect=Exception("Failed")):
-            # Should not raise, just log
-            await hub_instance._dispatch_initial_status()
-            
-            # Startup should not be marked complete
-            assert hub_instance._startup_complete is False
-
-    @pytest.mark.asyncio
-    async def test_request_fallback_status(self, hub_instance):
-        """Test fallback status request."""
-        mock_response = {
-            "Status": 200,
-            "Data": {"Light": {"lightonoff": 1}}
-        }
-        
-        with patch.object(hub_instance, "send_request", new_callable=AsyncMock, return_value=mock_response):
-            result = await hub_instance.request_fallback_status("test_entity")
-            
-            assert result == {"Light": {"lightonoff": 1}}
-
-    @pytest.mark.asyncio
-    async def test_request_fallback_status_failure(self, hub_instance):
-        """Test fallback status request handles failure."""
-        with patch.object(hub_instance, "send_request", new_callable=AsyncMock, side_effect=Exception("Failed")):
-            result = await hub_instance.request_fallback_status("test_entity")
-            
-            assert result == {}
-
-    def test_get_coordinator_data(self, hub_instance):
-        """Test get coordinator data."""
-        hub_instance._connection_state = "connected"
-        hub_instance._last_activity = asyncio.get_event_loop().time()
-        hub_instance._protocol_version = "1.0"
-        
-        data = hub_instance.get_coordinator_data()
-        
-        assert data["connection_state"] == "connected"
-        assert data["protocol_version"] == "1.0"
-        assert "time_since_activity" in data
-        assert "watchdog_active" in data
-        assert data["heartbeat_interval"] == DEFAULT_HEARTBEAT_INTERVAL
-        assert data["connection_timeout"] == DEFAULT_CONNECTION_TIMEOUT
 
     def test_recent_messages_maxlen(self, hub_instance):
         """Test recent messages has max length."""
@@ -887,14 +793,14 @@ class TestThermexHubAvailability:
         hub._set_connection_state("disconnected")
         assert hub.available is False
 
-    def test_state_change_notifies_entities_once(self, hub):
+    def test_every_state_change_notifies_entities_once(self, hub):
         with patch("custom_components.thermex_api.hub.async_dispatcher_send") as send:
             hub._set_connection_state("connected")
             hub._set_connection_state("connected")  # no change
             hub._set_connection_state("disconnected")
-            hub._set_connection_state("error")  # still unavailable: no new signal
+            hub._set_connection_state("error")  # still unavailable, but the state shown changed
 
-        assert [c.args[1] for c in send.call_args_list] == [hub.availability_signal] * 2
+        assert [c.args[1] for c in send.call_args_list] == [hub.availability_signal] * 3
 
     def test_loss_and_recovery_logged_once(self, hub, caplog):
         import logging
@@ -1199,3 +1105,73 @@ class TestThermexHubReconnectPause:
 
         sleep.assert_awaited_once_with(5)
         hub._ensure_connected.assert_awaited_once()
+
+
+class TestThermexHubStatusFlow:
+    """Status and Notify data reach the coordinator as one dispatch."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        hass.async_create_background_task = MagicMock(side_effect=lambda coro, name=None: coro.close())
+        return ThermexHub(hass, "192.168.1.100", "pw", "entry")
+
+    @staticmethod
+    def _ws(*payloads):
+        async def gen():
+            for payload in payloads:
+                yield MagicMock(type=WSMsgType.TEXT, data=json.dumps(payload))
+
+        ws = MagicMock()
+        ws.closed = True
+        ws.close_code = 1000
+        ws.exception = MagicMock(return_value=None)
+        ws.__aiter__ = lambda self: gen().__aiter__()
+        return ws
+
+    @pytest.mark.asyncio
+    async def test_a_status_is_dispatched_once_with_all_sections(self, hub):
+        data = {"Fan": {"fanonoff": 1}, "Light": {"lightonoff": 0}, "Decolight": {"decolightonoff": 0}}
+        hub._ws = self._ws({"Response": "Status", "Status": 200, "Data": data})
+        hub._closing = True
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send") as send:
+            await hub._recv_loop()
+
+        data_calls = [c for c in send.call_args_list if c.args[1] == hub.signal]
+        assert [c.args[2] for c in data_calls] == [data]
+        assert hub.last_status["Data"] == data
+
+    @pytest.mark.asyncio
+    async def test_initial_status_is_just_a_status_request(self, hub):
+        hub.send_request = AsyncMock(return_value={"Status": 200, "Data": {}})
+
+        await hub._request_initial_status()
+
+        hub.send_request.assert_awaited_once_with("status", {})
+
+    @pytest.mark.asyncio
+    async def test_failed_initial_status_is_not_fatal(self, hub):
+        hub.send_request = AsyncMock(side_effect=TimeoutError())
+
+        await hub._request_initial_status()  # logged, not raised
+
+    def test_connection_state_and_host_are_public(self, hub):
+        assert (hub.host, hub.connection_state) == ("192.168.1.100", "disconnected")
+        hub._set_connection_state("connected")
+        assert hub.connection_state == "connected"
+
+    def test_diagnostics_never_contain_the_password(self, hub):
+        hub.recent_messages.extend(f"m{i}" for i in range(8))
+        hub._pending["status"] = MagicMock()
+        hub._protocol_version = "1.1"
+
+        info = hub.diagnostics()
+
+        assert info["host"] == "192.168.1.100"
+        assert info["pending_requests"] == ["status"]
+        assert info["protocol_version"] == "1.1"
+        assert info["websocket_connected"] is False
+        assert info["recent_messages"] == ["m3", "m4", "m5", "m6", "m7"]
+        assert "pw" not in str(info)
