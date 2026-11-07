@@ -36,9 +36,9 @@ Install through the Home Assistant **Marketplace** (Settings → Marketplace, Ho
 - **Fan Entity**: `fan.thermex_hood` with speed presets and runtime attributes
 - **Light Entities**: Main light and Decolight (if enabled)
 - **Sensors**: 
-  - Filter runtime hours
+  - Grease filter runtime hours, and hours until the next cleaning (counts down from the alert threshold)
   - Connection status (diagnostic, disabled by default)
-  - Last reset time
+  - Last reset time, and days since it
   - Delayed turn-off timer status
 - **Binary Sensor**: Filter cleaning alert (hours and days thresholds)
 - **Buttons**: 
@@ -47,7 +47,7 @@ Install through the Home Assistant **Marketplace** (Settings → Marketplace, Ho
 
 ### Services Available
 - `thermex_api.reset_runtime`: Reset filter runtime counter (also available as button entity)
-- `thermex_api.start_delayed_off`: Start delayed turn-off timer (also available as button entity)
+- `thermex_api.start_delayed_off`: Start delayed turn-off timer (also available as button entity). The optional `minutes` (1-120) sets the delay for this one run; without it the configured delay is used
 - `thermex_api.cancel_delayed_off`: Cancel active delayed turn-off
 
 All three actions target the Thermex fan entity. `start_delayed_off` returns an error if the fan is not running.
@@ -71,7 +71,7 @@ All three actions target the Thermex fan entity. `start_delayed_off` returns an 
    ![Enable API](https://github.com/user-attachments/assets/c80412a1-1f13-4f23-b347-01a2cd9c2202)
    ![Set password](https://github.com/user-attachments/assets/2bc877bb-490f-4272-afdf-2f059b35dd1c)
 Add the integration through Home Assistant UI (Settings → Devices & Services → Add Integration → Thermex Hood)
-2. Enter your extractor hood IP address and API password. If Home Assistant sees the hood on your network (it announces itself as `Thermex-ESP`), it is offered automatically under **Discovered**, and only the API password is needed.
+2. Enter your extractor hood IP address and API password, and tick **Activate Ambient light** if your model has the Decolight (it can be changed later under Configure). If Home Assistant sees the hood on your network (it announces itself as `Thermex-ESP`), it is offered automatically under **Discovered**, and only the API password is needed.
 3. Configure integration options (optional, can be changed later):
    - **Filter Alert Hours**: Runtime hours threshold for filter cleaning alert (default: 30 hours)
    - **Filter Alert Days**: Days since last reset threshold for filter alert (default: 90 days)

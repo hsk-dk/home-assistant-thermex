@@ -12,7 +12,13 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
-from .const import DELAYED_TURNOFF_COUNTDOWN_INTERVAL, DOMAIN
+from .const import (
+    DEFAULT_DELAYED_OFF_MINUTES,
+    DELAYED_TURNOFF_COUNTDOWN_INTERVAL,
+    DOMAIN,
+    MAX_DELAYED_OFF_MINUTES,
+    MIN_DELAYED_OFF_MINUTES,
+)
 
 if TYPE_CHECKING:
     from .hub import ThermexHub
@@ -52,7 +58,8 @@ class DelayedOffManager:
     @property
     def delay_minutes(self) -> int:
         """The configured delay, kept within what the options allow."""
-        return max(1, min(120, self._options().get("fan_auto_off_delay", 10)))
+        delay = self._options().get("fan_auto_off_delay", DEFAULT_DELAYED_OFF_MINUTES)
+        return max(MIN_DELAYED_OFF_MINUTES, min(MAX_DELAYED_OFF_MINUTES, delay))
 
     @callback
     def async_add_listener(self, update: Callable[[], None]) -> Callable[[], None]:
@@ -71,8 +78,11 @@ class DelayedOffManager:
         for update in list(self._listeners):
             update()
 
-    async def async_start(self) -> None:
-        """Start the timer (restarting a running one)."""
+    async def async_start(self, minutes: int | None = None) -> None:
+        """Start the timer (restarting a running one).
+
+        `minutes` overrides the configured delay for this one run.
+        """
         if not self._fan_running():
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
@@ -80,10 +90,11 @@ class DelayedOffManager:
             )
         await self.async_cancel()
 
-        scheduled = dt_util.now() + timedelta(minutes=self.delay_minutes)
+        delay = self.delay_minutes if minutes is None else minutes
+        scheduled = dt_util.now() + timedelta(minutes=delay)
         _LOGGER.info(
             "Starting delayed turn-off: %d minutes (until %s)",
-            self.delay_minutes,
+            delay,
             scheduled.strftime("%H:%M"),
         )
         # Remember it, so a reload or restart does not silently drop the timer

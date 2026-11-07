@@ -6,14 +6,16 @@
         "description": "Syötä Thermex-liesituulettimen IP-osoite ja API-salasana.",
         "data": {
           "host": "Liesituulettimen IP-osoite",
-          "api_key": "API-salasana"
+          "api_key": "API-salasana",
+          "enable_decolight": "Ota tunnelmavalaistus käyttöön"
         }
       },
       "discovery_confirm": {
         "title": "Määritä Thermex-liesituuletin",
         "description": "Thermex-liesituuletin löytyi osoitteesta {host}. Anna sen API-salasana.",
         "data": {
-          "api_key": "API-salasana"
+          "api_key": "API-salasana",
+          "enable_decolight": "Ota tunnelmavalaistus käyttöön"
         }
       },
       "reauth_confirm": {
@@ -78,6 +80,12 @@
       },
       "thermex_sensor_delayed_turn_off": {
         "name": "Viivästetyn sammutuksen aika"
+      },
+      "thermex_sensor_days_since_reset": {
+        "name": "Rasvasuodattimen päivät viimeisimmästä nollauksesta"
+      },
+      "thermex_sensor_hours_until_cleaning": {
+        "name": "Tunteja rasvasuodattimen puhdistukseen"
       }
     },
     "button": {
@@ -125,7 +133,13 @@
     },
     "start_delayed_off": {
       "name": "Käynnistä viivästetty sammutus",
-      "description": "Käynnistä viivästetyn sammutuksen ajastin Thermex-liesituulettimelle."
+      "description": "Käynnistä viivästetyn sammutuksen ajastin Thermex-liesituulettimelle.",
+      "fields": {
+        "minutes": {
+          "name": "Minuutit",
+          "description": "Odotusaika minuutteina (1-120). Jos kenttä jätetään pois, käytetään asetusten viivettä."
+        }
+      }
     },
     "cancel_delayed_off": {
       "name": "Peruuta viivästetty sammutus",

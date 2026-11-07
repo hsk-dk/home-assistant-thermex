@@ -68,6 +68,7 @@ async def test_a_new_hood_asks_for_the_password_and_is_created(hass, connects):
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"api_key": "secret"})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["options"] == {"enable_decolight": False}
     assert result["title"] == "10.0.1.203"
     assert result["data"][CONF_HOST] == "10.0.1.203"
     assert result["data"]["api_key"] == "secret"
@@ -75,6 +76,17 @@ async def test_a_new_hood_asks_for_the_password_and_is_created(hass, connects):
     assert result["data"][CONF_DEVICE_ID].startswith("thermex_")
     assert "203" not in result["data"][CONF_DEVICE_ID]
     connects.assert_awaited_once_with(hass, "10.0.1.203", "secret")
+
+
+async def test_the_decolight_can_be_chosen_while_adding_a_discovered_hood(hass, connects):
+    result = await discover(hass, seen())
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"api_key": "secret", "enable_decolight": True}
+    )
+
+    assert result["options"] == {"enable_decolight": True}
+    assert "enable_decolight" not in result["data"]
 
 
 @pytest.mark.parametrize("error", ["invalid_auth", "cannot_connect"])

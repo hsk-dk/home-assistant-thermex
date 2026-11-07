@@ -6,14 +6,16 @@
         "description": "IP-Adresse und API-Passwort der Thermex-Dunstabzugshaube eingeben.",
         "data": {
           "host": "IP-Adresse der Dunstabzugshaube",
-          "api_key": "API-Passwort"
+          "api_key": "API-Passwort",
+          "enable_decolight": "Ambientebeleuchtung aktivieren"
         }
       },
       "discovery_confirm": {
         "title": "Thermex-Dunstabzugshaube einrichten",
         "description": "Unter {host} wurde eine Thermex-Dunstabzugshaube gefunden. Gib ihr API-Passwort ein.",
         "data": {
-          "api_key": "API-Passwort"
+          "api_key": "API-Passwort",
+          "enable_decolight": "Ambientebeleuchtung aktivieren"
         }
       },
       "reauth_confirm": {
@@ -78,6 +80,12 @@
       },
       "thermex_sensor_delayed_turn_off": {
         "name": "Zeit bis zur verzögerten Abschaltung"
+      },
+      "thermex_sensor_days_since_reset": {
+        "name": "Tage seit letzter Rücksetzung des Fettfilters"
+      },
+      "thermex_sensor_hours_until_cleaning": {
+        "name": "Stunden bis zur Reinigung des Fettfilters"
       }
     },
     "button": {
@@ -125,7 +133,13 @@
     },
     "start_delayed_off": {
       "name": "Verzögerte Abschaltung starten",
-      "description": "Startet den Timer für die verzögerte Abschaltung der Thermex-Dunstabzugshaube."
+      "description": "Startet den Timer für die verzögerte Abschaltung der Thermex-Dunstabzugshaube.",
+      "fields": {
+        "minutes": {
+          "name": "Minuten",
+          "description": "Wartezeit in Minuten (1-120). Ohne Angabe gilt die Verzögerung aus den Optionen."
+        }
+      }
     },
     "cancel_delayed_off": {
       "name": "Verzögerte Abschaltung abbrechen",

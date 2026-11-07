@@ -13,16 +13,31 @@ from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from homeassistant.helpers.typing import UNDEFINED
 
-from .const import DOMAIN
+from .const import (
+    DEFAULT_ALERT_DAYS,
+    DEFAULT_ALERT_HOURS,
+    DEFAULT_DELAYED_OFF_MINUTES,
+    DOMAIN,
+    MAX_DELAYED_OFF_MINUTES,
+    MIN_DELAYED_OFF_MINUTES,
+)
 from .hub import ThermexAuthError, ThermexHub
 
 _LOGGER = logging.getLogger(__name__)
 
-STEP_USER_DATA_SCHEMA = vol.Schema({
+STEP_RECONFIGURE_DATA_SCHEMA = vol.Schema({
     vol.Required("host"): str,
     vol.Required("api_key"): str,
 })
-STEP_DISCOVERY_DATA_SCHEMA = vol.Schema({vol.Required("api_key"): str})
+# Not every model has the Decolight, so it is asked for when the hood is added
+# (the same option can be changed later under Configure).
+STEP_USER_DATA_SCHEMA = STEP_RECONFIGURE_DATA_SCHEMA.extend({
+    vol.Optional("enable_decolight", default=False): bool,
+})
+STEP_DISCOVERY_DATA_SCHEMA = vol.Schema({
+    vol.Required("api_key"): str,
+    vol.Optional("enable_decolight", default=False): bool,
+})
 
 async def _async_validate_connection(hass, host: str, api_key: str) -> str | None:
     """Try to connect; return an error key (or None on success)."""
@@ -76,7 +91,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
 
         return self.async_create_entry(
             title=user_input["host"],
-            data={**user_input, CONF_DEVICE_ID: device_id},
+            data={
+                CONF_HOST: user_input["host"],
+                "api_key": user_input["api_key"],
+                CONF_DEVICE_ID: device_id,
+            },
+            options={"enable_decolight": user_input["enable_decolight"]},
         )
 
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo) -> ConfigFlowResult:
@@ -128,6 +148,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                         CONF_DEVICE_ID: device_id,
                         CONF_MAC: self._discovered_mac,
                     },
+                    options={"enable_decolight": user_input["enable_decolight"]},
                 )
             errors["base"] = error
 
@@ -166,7 +187,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=self.add_suggested_values_to_schema(
-                STEP_USER_DATA_SCHEMA, user_input or entry.data
+                STEP_RECONFIGURE_DATA_SCHEMA, user_input or entry.data
             ),
             errors=errors,
         )
@@ -206,9 +227,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
 
 OPTIONS_SCHEMA = vol.Schema({
     vol.Optional("enable_decolight", default=False): bool,
-    vol.Optional("fan_alert_hours", default=30): vol.All(int, vol.Range(min=1, max=1000)),
-    vol.Optional("fan_alert_days", default=90): vol.All(int, vol.Range(min=1, max=365)),
-    vol.Optional("fan_auto_off_delay", default=10): vol.All(int, vol.Range(min=1, max=120)),
+    vol.Optional("fan_alert_hours", default=DEFAULT_ALERT_HOURS): vol.All(int, vol.Range(min=1, max=1000)),
+    vol.Optional("fan_alert_days", default=DEFAULT_ALERT_DAYS): vol.All(int, vol.Range(min=1, max=365)),
+    vol.Optional("fan_auto_off_delay", default=DEFAULT_DELAYED_OFF_MINUTES): vol.All(
+        int, vol.Range(min=MIN_DELAYED_OFF_MINUTES, max=MAX_DELAYED_OFF_MINUTES)
+    ),
 })
 
 

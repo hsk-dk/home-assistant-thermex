@@ -9,6 +9,8 @@ from homeassistant.const import EntityCategory, UnitOfTime
 from custom_components.thermex_api.sensor import (
     ConnectionStatusSensor,
     DelayedTurnOffSensor,
+    DaysSinceResetSensor,
+    HoursUntilCleaningSensor,
     LastResetSensor,
     RuntimeHoursSensor,
     async_setup_entry,
@@ -16,14 +18,17 @@ from custom_components.thermex_api.sensor import (
 
 
 @pytest.mark.asyncio
-async def test_setup_adds_the_four_sensors(coordinator, mock_hass, mock_config_entry):
+async def test_setup_adds_the_sensors(coordinator, mock_hass, mock_config_entry):
     mock_config_entry.runtime_data = MagicMock(coordinator=coordinator)
     add = MagicMock()
 
     await async_setup_entry(mock_hass, mock_config_entry, add)
 
     kinds = {type(e) for e in add.call_args.args[0]}
-    assert kinds == {LastResetSensor, RuntimeHoursSensor, ConnectionStatusSensor, DelayedTurnOffSensor}
+    assert kinds == {
+        LastResetSensor, DaysSinceResetSensor, RuntimeHoursSensor, HoursUntilCleaningSensor,
+        ConnectionStatusSensor, DelayedTurnOffSensor,
+    }
 
 
 class TestRuntimeHoursSensor:
@@ -171,3 +176,91 @@ class TestDelayedTurnOffSensor:
             await sensor.async_added_to_hass()
 
         delayed_off.async_add_listener.assert_called_once_with(sensor.async_write_ha_state)
+
+
+class TestHoursUntilCleaningSensor:
+    @pytest.fixture
+    def sensor(self, coordinator, mock_hass):
+        entity = HoursUntilCleaningSensor(coordinator)
+        entity.hass = mock_hass
+        entity.async_write_ha_state = MagicMock()
+        return entity
+
+    def test_modelling(self, sensor):
+        assert sensor.device_class == SensorDeviceClass.DURATION
+        assert sensor.native_unit_of_measurement == UnitOfTime.HOURS
+        assert sensor.state_class == SensorStateClass.MEASUREMENT
+        assert sensor.unique_id == "test_thermex_hub_hours_until_cleaning"
+
+    def test_counts_down_from_the_configured_threshold(self, sensor, coordinator, runtime_manager):
+        coordinator.config_entry.options = {"fan_alert_hours": 30}
+        runtime_manager.get_runtime_hours.return_value = 12.5
+
+        assert sensor.native_value == 17.5
+
+    def test_uses_the_default_threshold_without_an_option(self, sensor, coordinator, runtime_manager):
+        coordinator.config_entry.options = {}
+        runtime_manager.get_runtime_hours.return_value = 0
+
+        assert sensor.native_value == 30
+
+    def test_stays_at_zero_once_cleaning_is_due(self, sensor, coordinator, runtime_manager):
+        coordinator.config_entry.options = {"fan_alert_hours": 30}
+        runtime_manager.get_runtime_hours.return_value = 45
+
+        assert sensor.native_value == 0
+
+    def test_keeps_counting_while_the_fan_runs(self, sensor, coordinator):
+        coordinator.fan_running = True
+
+        with patch("custom_components.thermex_api.sensor.async_call_later") as later:
+            sensor._handle_coordinator_update()
+
+        later.assert_called_once()
+
+    def test_is_available_without_the_hood(self, sensor, mock_hub):
+        mock_hub.available = False
+
+        assert sensor.available is True  # stored locally
+
+
+class TestDaysSinceResetSensor:
+    @pytest.fixture
+    def sensor(self, coordinator, mock_hass):
+        entity = DaysSinceResetSensor(coordinator)
+        entity.hass = mock_hass
+        entity.async_write_ha_state = MagicMock()
+        return entity
+
+    def test_modelling(self, sensor):
+        assert sensor.device_class == SensorDeviceClass.DURATION
+        assert sensor.native_unit_of_measurement == UnitOfTime.DAYS
+        assert sensor.state_class == SensorStateClass.MEASUREMENT
+        assert sensor.unique_id == "test_thermex_hub_days_since_reset"
+
+    def test_value_is_the_stored_age(self, sensor, runtime_manager):
+        runtime_manager.get_days_since_reset.return_value = 10
+
+        assert sensor.native_value == 10
+
+    def test_never_reset_is_unknown(self, sensor, runtime_manager):
+        runtime_manager.get_days_since_reset.return_value = None
+
+        assert sensor.native_value is None
+
+    @pytest.mark.asyncio
+    async def test_is_refreshed_every_hour(self, sensor):
+        from datetime import timedelta
+
+        from custom_components.thermex_api.entity import ThermexEntity
+
+        sensor.async_on_remove = MagicMock()
+        with patch.object(ThermexEntity, "async_added_to_hass"), \
+                patch("custom_components.thermex_api.sensor.async_track_time_interval") as track:
+            await sensor.async_added_to_hass()
+
+        assert track.call_args.args[2] == timedelta(hours=1)
+        sensor.async_on_remove.assert_called_once_with(track.return_value)
+
+        sensor._hourly(None)
+        sensor.async_write_ha_state.assert_called_once()

@@ -1,6 +1,6 @@
 # File: binary_sensor.py
 """
-Thermex API binary sensor for filter-life runtime alert.
+Thermex API binary sensor for the grease filter cleaning notice.
 """
 import logging
 from typing import Any
@@ -10,7 +10,11 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 
-from .const import MINIMUM_RUNTIME_FOR_NO_RESET_ALERT
+from .const import (
+    DEFAULT_ALERT_DAYS,
+    DEFAULT_ALERT_HOURS,
+    MINIMUM_RUNTIME_FOR_NO_RESET_ALERT,
+)
 from .coordinator import ThermexCoordinator
 from .data import ThermexConfigEntry
 from .entity import ThermexEntity
@@ -26,7 +30,7 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
 
 
 class ThermexFilterAlert(ThermexEntity, BinarySensorEntity):
-    """Binary sensor that goes ON when runtime or age of the filter exceeds its threshold."""
+    """Goes ON when the runtime or the time since the last cleaning exceeds its threshold."""
 
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_translation_key = "thermex_binary_sensor_threshold_alert"
@@ -42,8 +46,8 @@ class ThermexFilterAlert(ThermexEntity, BinarySensorEntity):
         options = self.coordinator.config_entry.options
         runtime_hours = self._runtime_manager.get_runtime_hours()
         days_since_reset = self._runtime_manager.get_days_since_reset()
-        hours_threshold = options.get("fan_alert_hours", 30)
-        days_threshold = options.get("fan_alert_days", 90)
+        hours_threshold = options.get("fan_alert_hours", DEFAULT_ALERT_HOURS)
+        days_threshold = options.get("fan_alert_days", DEFAULT_ALERT_DAYS)
 
         if days_since_reset is not None:
             days_exceeded = days_since_reset >= days_threshold

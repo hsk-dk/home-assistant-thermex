@@ -476,3 +476,70 @@ async def test_notifications_arrive_after_a_reconnect(hass, entry, hood):
     await settle(hass)
 
     assert hass.states.get(fan_id).attributes["preset_mode"] == "high"
+
+
+# --- Extensions: minutes on the action, the new filter sensors ------------------------------
+
+
+async def test_start_delayed_off_with_minutes_overrides_the_option(hass, entry, hood):
+    fan_id = entity_id(hass, "fan", "fan")
+    await fan_press(hood, 1, 2)
+    await settle(hass)
+
+    await hass.services.async_call(
+        DOMAIN, "start_delayed_off", {"entity_id": fan_id, "minutes": 3}, blocking=True
+    )
+    await settle(hass)
+
+    attrs = hass.states.get(fan_id).attributes
+    assert attrs["delayed_off_active"] is True
+    assert attrs["delayed_off_remaining"] == 3
+    assert attrs["delayed_off_delay"] == 5  # the option (fan_auto_off_delay) is untouched
+
+
+async def test_start_delayed_off_without_minutes_uses_the_option(hass, entry, hood):
+    fan_id = entity_id(hass, "fan", "fan")
+    await fan_press(hood, 1, 2)
+    await settle(hass)
+
+    await hass.services.async_call(DOMAIN, "start_delayed_off", {"entity_id": fan_id}, blocking=True)
+    await settle(hass)
+
+    assert hass.states.get(fan_id).attributes["delayed_off_remaining"] == 5
+
+
+@pytest.mark.parametrize("minutes", [0, 121])
+async def test_start_delayed_off_rejects_minutes_outside_the_range(hass, entry, minutes):
+    import voluptuous as vol
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN, "start_delayed_off",
+            {"entity_id": entity_id(hass, "fan", "fan"), "minutes": minutes}, blocking=True,
+        )
+
+
+async def test_the_filter_sensors_count_from_the_reset(hass, entry, hood):
+    until = entity_id(hass, "sensor", "hours_until_cleaning")
+    days = entity_id(hass, "sensor", "days_since_reset")
+
+    # a fresh installation: no hours used, and no reset date until the fan has run or been reset
+    assert float(hass.states.get(until).state) == 30.0
+    assert hass.states.get(days).state == "unknown"
+
+    await hass.services.async_call(
+        DOMAIN, "reset_runtime", {"entity_id": entity_id(hass, "fan", "fan")}, blocking=True
+    )
+    await settle(hass)
+
+    assert float(hass.states.get(until).state) == 30.0
+    assert hass.states.get(days).state == "0"
+
+
+async def test_the_sensors_use_the_alert_hours_from_the_options(hass, entry, hood):
+    # the options flow reloads the entry when they change; do the same here
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "fan_alert_hours": 12})
+    await hass.config_entries.async_reload(entry.entry_id)
+    await settle(hass)
+
+    assert float(hass.states.get(entity_id(hass, "sensor", "hours_until_cleaning")).state) == 12.0
