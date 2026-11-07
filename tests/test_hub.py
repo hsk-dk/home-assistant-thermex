@@ -1069,3 +1069,100 @@ class TestThermexHubClose:
 
         with patch.object(hub, "_ensure_connected", AsyncMock(side_effect=ConnectionError("down"))):
             await hub._reconnect_now()  # must not raise: the watchdog retries
+
+
+class TestThermexHubDeadConnection:
+    """A hood that lost power sends no close frame: the socket looks open but nothing comes back."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        hub = ThermexHub(hass, "192.168.1.100", "pw", "entry")
+        hub._connection_state = "connected"
+        return hub
+
+    @staticmethod
+    def _open_ws():
+        ws = MagicMock()
+        ws.closed = False
+        ws.send_json = AsyncMock()
+        ws.close = AsyncMock()
+        return ws
+
+    @pytest.mark.asyncio
+    async def test_sending_does_not_count_as_activity(self, hub):
+        hub._ws = self._open_ws()
+        hub._last_activity = 5.0
+
+        with patch.object(hub, "_ensure_connected", AsyncMock()), \
+                patch("custom_components.thermex_api.hub.WEBSOCKET_REQUEST_TIMEOUT", 0.01):
+            with pytest.raises(TimeoutError):
+                await hub.send_request("status", {})
+
+        assert hub._last_activity == 5.0  # only what the hood sends counts
+
+    @pytest.mark.asyncio
+    async def test_a_silent_hood_is_marked_unavailable_and_reconnected(self, hub):
+        hub._ws = self._open_ws()
+        hub._heartbeat_interval = 0.05
+        hub._connection_timeout = 0.1
+        hub._last_activity = 0  # nothing from the hood for a long time
+        states = []
+        real_set = hub._set_connection_state
+        hub._set_connection_state = lambda s: (states.append(s), real_set(s))[1]
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"), \
+                patch.object(hub, "_ensure_connected", AsyncMock()) as ensure:
+            task = asyncio.create_task(hub._watchdog_loop())
+            await asyncio.sleep(0.2)
+            hub._closing = True
+            await task
+
+        assert states[0] == "disconnected"
+        assert "No activity from the hood" in hub.last_error
+        assert hub._ws is None  # the dead socket was dropped
+        ensure.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_unanswered_heartbeats_in_a_row_reconnect(self, hub):
+        hub._ws = self._open_ws()
+        hub._heartbeat_interval = 0.05
+        hub._last_activity = asyncio.get_event_loop().time() + 1000  # recent, so only the heartbeats count
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"), \
+                patch.object(hub, "send_request", AsyncMock(side_effect=TimeoutError("no answer"))), \
+                patch.object(hub, "_ensure_connected", AsyncMock()) as ensure:
+            task = asyncio.create_task(hub._watchdog_loop())
+            await asyncio.sleep(0.5)
+            hub._closing = True
+            await task
+
+        assert hub.available is False
+        assert "did not answer 2 heartbeats" in hub.last_error
+        ensure.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_one_missed_heartbeat_is_tolerated(self, hub):
+        hub._ws = self._open_ws()
+        hub._missed_heartbeats = 0
+        hub._heartbeat_interval = 0.05
+        hub._last_activity = asyncio.get_event_loop().time() + 1000
+        answers = iter([TimeoutError("no answer"), {"Status": 200}])
+
+        async def send_request(*args):
+            result = next(answers, {"Status": 200})
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        with patch.object(hub, "send_request", send_request), \
+                patch.object(hub, "_ensure_connected", AsyncMock()) as ensure:
+            task = asyncio.create_task(hub._watchdog_loop())
+            await asyncio.sleep(0.3)
+            hub._closing = True
+            await task
+
+        assert hub.available is True
+        assert hub._missed_heartbeats == 0
+        ensure.assert_not_awaited()

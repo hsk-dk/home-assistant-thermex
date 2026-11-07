@@ -19,6 +19,7 @@ from .const import (
     DEFAULT_PORT,
     DEFAULT_RECONNECT_DELAY,
     DOMAIN,
+    MAX_MISSED_HEARTBEATS,
     MAX_RECONNECT_ATTEMPTS,
     THERMEX_NOTIFY,
     WEBSOCKET_PATH,
@@ -86,6 +87,7 @@ class ThermexHub:
         self._watchdog_task: asyncio.Task | None = None
         self._last_activity = 0.0  # Will be set properly when loop starts
         self._heartbeat_interval = DEFAULT_HEARTBEAT_INTERVAL
+        self._missed_heartbeats = 0  # Heartbeats in a row the hood did not answer
         self._heartbeat_lock = asyncio.Lock()  # Prevent concurrent heartbeats
         self._last_heartbeat = 0.0  # Track last heartbeat time
         self._connection_timeout = DEFAULT_CONNECTION_TIMEOUT
@@ -394,6 +396,21 @@ class ThermexHub:
         except Exception as err:
             _LOGGER.debug("Immediate reconnect failed, the watchdog will retry: %s", err)
 
+    async def _reconnect_dead_connection(self, reason: str) -> None:
+        """The socket looks open but the hood is gone (power cut, network): start over.
+
+        A dead peer sends no close frame, so the socket stays "open" and the entities would
+        keep showing the last state. Mark the hood unavailable, drop the socket and reconnect.
+        """
+        self._missed_heartbeats = 0
+        self.last_error = reason
+        self._set_connection_state("disconnected")
+        try:
+            await self._close_connection()
+            await self._ensure_connected()
+        except Exception as err:
+            _LOGGER.debug("ThermexHub: Reconnecting a dead connection failed: %s", err)
+
     async def _watchdog_loop(self) -> None:
         """Watchdog loop that monitors connection health and sends periodic heartbeats."""
         _LOGGER.debug("ThermexHub: Watchdog loop started")
@@ -424,12 +441,11 @@ class ThermexHub:
                         "ThermexHub: No activity for %.1f seconds, reconnecting...", 
                         time_since_activity
                     )
-                    try:
-                        await self._ensure_connected()
-                    except Exception as e:
-                        _LOGGER.debug("ThermexHub: Timeout reconnection failed: %s", e)
+                    await self._reconnect_dead_connection(
+                        f"No activity from the hood for {time_since_activity:.0f} seconds"
+                    )
                     continue
-                
+
                 # Send heartbeat (status request) to keep connection alive - but only if not already in progress
                 async with self._heartbeat_lock:
                     current_time = asyncio.get_event_loop().time()
@@ -440,13 +456,18 @@ class ThermexHub:
                             await self.send_request("status", {})
                             _LOGGER.debug("ThermexHub: Heartbeat successful")
                             self._last_heartbeat = current_time
+                            self._missed_heartbeats = 0
                         except ConnectionError as err:
                             _LOGGER.debug("ThermexHub: Heartbeat failed due to connection: %s", err)
                             # Don't immediately reconnect on connection errors - let the next iteration handle it
                         except Exception as err:
                             _LOGGER.warning("ThermexHub: Heartbeat failed: %s", err)
-                            # Only try to reconnect for unexpected errors, not connection issues
-                    
+                            self._missed_heartbeats += 1
+                            if self._missed_heartbeats >= MAX_MISSED_HEARTBEATS:
+                                await self._reconnect_dead_connection(
+                                    f"The hood did not answer {self._missed_heartbeats} heartbeats in a row"
+                                )
+
             except asyncio.CancelledError:
                 _LOGGER.debug("ThermexHub: Watchdog loop cancelled")
                 break
@@ -500,9 +521,9 @@ class ThermexHub:
                 self._pending.pop(key, None)
                 raise ConnectionError("WebSocket connection lost before sending")
             try:
+                # Only what the hood sends counts as activity (see _recv_loop): a hood that
+                # lost power accepts our heartbeats into the socket buffer but never answers.
                 await self._ws.send_json(payload)
-                # Update activity timestamp when sending
-                self._last_activity = asyncio.get_event_loop().time()
                 _LOGGER.debug("ThermexHub: Sent %s payload: %s", request, payload)
             except Exception as exc:
                 self._pending.pop(key, None)
