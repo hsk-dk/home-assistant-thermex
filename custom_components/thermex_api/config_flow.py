@@ -6,9 +6,11 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_DEVICE_ID, CONF_HOST
+from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
+from homeassistant.const import CONF_DEVICE_ID, CONF_HOST, CONF_MAC
 from homeassistant.core import callback
+from homeassistant.helpers.device_registry import format_mac
+from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from homeassistant.helpers.typing import UNDEFINED
 
 from .const import DOMAIN
@@ -20,6 +22,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema({
     vol.Required("host"): str,
     vol.Required("api_key"): str,
 })
+STEP_DISCOVERY_DATA_SCHEMA = vol.Schema({vol.Required("api_key"): str})
 
 async def _async_validate_connection(hass, host: str, api_key: str) -> str | None:
     """Try to connect; return an error key (or None on success)."""
@@ -43,6 +46,10 @@ async def _async_validate_connection(hass, host: str, api_key: str) -> str | Non
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Handle a config flow for Thermex API."""
     VERSION = 2
+
+    def __init__(self) -> None:
+        self._discovered_host: str | None = None
+        self._discovered_mac: str | None = None
 
     async def async_step_user(self, user_input=None):
         if user_input is None:
@@ -70,6 +77,65 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         return self.async_create_entry(
             title=user_input["host"],
             data={**user_input, CONF_DEVICE_ID: device_id},
+        )
+
+    async def async_step_dhcp(self, discovery_info: DhcpServiceInfo) -> ConfigFlowResult:
+        """A device named Thermex-ESP showed up on the network.
+
+        The hood has no serial number, but its MAC address identifies it. An existing
+        hood is recognised by the MAC (and learns it the first time it is seen at its
+        known address), so a new IP address from the router is followed automatically.
+        """
+        host = discovery_info.ip
+        mac = format_mac(discovery_info.macaddress)
+
+        for entry in self._async_current_entries(include_ignore=False):
+            known_mac = entry.data.get(CONF_MAC)
+            if known_mac == mac or (known_mac is None and entry.data.get(CONF_HOST) == host):
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={CONF_HOST: host, CONF_MAC: mac},
+                    reason="already_configured",
+                    reload_even_if_entry_is_unchanged=False,
+                )
+
+        # Also stops a second flow for the same hood, and a hood the user has ignored.
+        await self.async_set_unique_id(mac)
+        self._abort_if_unique_id_configured()
+
+        self._discovered_host = host
+        self._discovered_mac = mac
+        self.context["title_placeholders"] = {"host": host}
+        return await self.async_step_discovery_confirm()
+
+    async def async_step_discovery_confirm(self, user_input=None) -> ConfigFlowResult:
+        """Ask for the API password of a discovered hood."""
+        assert self._discovered_host is not None
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            error = await _async_validate_connection(
+                self.hass, self._discovered_host, user_input["api_key"]
+            )
+            if not error:
+                device_id = f"thermex_{uuid.uuid4().hex[:12]}"
+                await self.async_set_unique_id(device_id)
+                return self.async_create_entry(
+                    title=self._discovered_host,
+                    data={
+                        CONF_HOST: self._discovered_host,
+                        "api_key": user_input["api_key"],
+                        CONF_DEVICE_ID: device_id,
+                        CONF_MAC: self._discovered_mac,
+                    },
+                )
+            errors["base"] = error
+
+        return self.async_show_form(
+            step_id="discovery_confirm",
+            data_schema=STEP_DISCOVERY_DATA_SCHEMA,
+            description_placeholders={"host": self._discovered_host},
+            errors=errors,
         )
 
     async def async_step_reconfigure(self, user_input=None):

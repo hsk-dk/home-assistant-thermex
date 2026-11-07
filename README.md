@@ -71,7 +71,7 @@ All three actions target the Thermex fan entity. `start_delayed_off` returns an 
    ![Enable API](https://github.com/user-attachments/assets/c80412a1-1f13-4f23-b347-01a2cd9c2202)
    ![Set password](https://github.com/user-attachments/assets/2bc877bb-490f-4272-afdf-2f059b35dd1c)
 Add the integration through Home Assistant UI (Settings → Devices & Services → Add Integration → Thermex Hood)
-2. Enter your extractor hood IP address and API password
+2. Enter your extractor hood IP address and API password. If Home Assistant sees the hood on your network (it announces itself as `Thermex-ESP`), it is offered automatically under **Discovered**, and only the API password is needed.
 3. Configure integration options (optional, can be changed later):
    - **Filter Alert Hours**: Runtime hours threshold for filter cleaning alert (default: 30 hours)
    - **Filter Alert Days**: Days since last reset threshold for filter alert (default: 90 days)
@@ -88,6 +88,12 @@ If the hood gets a new IP address (or you change the API password in the Thermex
 **Settings → Devices & Services → Thermex Hood → ⋮ → Reconfigure**. Entities, history and
 automations are kept: they are identified by an internal ID, not by the IP address. If the hood
 rejects the stored password, Home Assistant also offers a re-authentication prompt.
+
+A hood that was found by discovery is recognised by its MAC address, so a new IP address handed out by
+your router is picked up automatically (the integration reloads with the new address). A hood added
+by hand learns its MAC address the first time Home Assistant sees it on the network. Discovery relies
+on the DHCP messages Home Assistant can see, so it needs Home Assistant to be on the same network as
+the hood; if it is not offered, add the hood manually.
 
 
 ---

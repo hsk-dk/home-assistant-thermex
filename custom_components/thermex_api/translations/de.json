@@ -9,6 +9,13 @@
           "api_key": "API-Passwort"
         }
       },
+      "discovery_confirm": {
+        "title": "Thermex-Dunstabzugshaube einrichten",
+        "description": "Unter {host} wurde eine Thermex-Dunstabzugshaube gefunden. Gib ihr API-Passwort ein.",
+        "data": {
+          "api_key": "API-Passwort"
+        }
+      },
       "reauth_confirm": {
         "title": "Thermex-Dunstabzugshaube neu authentifizieren",
         "description": "Das API-Passwort für {host} wurde abgelehnt. Gib das aktuelle API-Passwort ein.",
@@ -33,8 +40,10 @@
     "abort": {
       "already_configured": "Diese Thermex-Dunstabzugshaube wurde bereits konfiguriert.",
       "reauth_successful": "Die erneute Authentifizierung war erfolgreich.",
-      "reconfigure_successful": "Die Neukonfiguration war erfolgreich."
-    }
+      "reconfigure_successful": "Die Neukonfiguration war erfolgreich.",
+      "already_in_progress": "Diese Thermex-Dunstabzugshaube wird bereits eingerichtet."
+    },
+    "flow_title": "Thermex-Dunstabzugshaube ({host})"
   },
   "options": {
     "step": {

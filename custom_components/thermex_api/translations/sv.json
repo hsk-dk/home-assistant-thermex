@@ -9,6 +9,13 @@
           "api_key": "API lösenord"
         }
       },
+      "discovery_confirm": {
+        "title": "Konfigurera Thermex köksfläkt",
+        "description": "En Thermex köksfläkt hittades på {host}. Ange dess API-lösenord.",
+        "data": {
+          "api_key": "API lösenord"
+        }
+      },
       "reauth_confirm": {
         "title": "Autentisera Thermex-fläkten igen",
         "description": "API-lösenordet för {host} avvisades. Ange det aktuella API-lösenordet.",
@@ -33,8 +40,10 @@
     "abort": {
       "already_configured": "Den här köksfläkten är redan konfigurerad.",
       "reauth_successful": "Ominloggningen lyckades.",
-      "reconfigure_successful": "Omkonfigureringen lyckades."
-    }
+      "reconfigure_successful": "Omkonfigureringen lyckades.",
+      "already_in_progress": "Den här köksfläkten håller redan på att konfigureras."
+    },
+    "flow_title": "Thermex köksfläkt ({host})"
   },
   "options": {
     "step": {
