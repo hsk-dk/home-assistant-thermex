@@ -10,6 +10,7 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
+from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util.color import color_hs_to_RGB, color_RGB_to_hs
 
@@ -116,7 +117,7 @@ class ThermexLightBase(ThermexEntity, LightEntity):
             data = await self._hub.request_fallback_status(self.__class__.__name__)
             self._process_fallback_data(data)
             self._got_initial_state = True
-            self.schedule_update_ha_state()
+            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("%s: fallback status failed: %s", self.__class__.__name__, err)
             self._got_initial_state = True
@@ -125,6 +126,7 @@ class ThermexLightBase(ThermexEntity, LightEntity):
         """Process fallback status data. Override in subclasses."""
         raise NotImplementedError
 
+    @callback
     def _handle_notify(self, ntf_type: str, data: dict) -> None:
         """Handle notifications from the hub. Override in subclasses."""
         raise NotImplementedError
@@ -138,6 +140,7 @@ class ThermexLight(ThermexLightBase):
     def __init__(self, hub: ThermexHub):
         super().__init__(hub, "light", "thermex_light")
 
+    @callback
     def _handle_notify(self, ntf_type: str, data: dict) -> None:
         """Handle light notifications from the hub."""
         if ntf_type.lower() != "light":
@@ -162,7 +165,7 @@ class ThermexLight(ThermexLightBase):
         if self._is_on and brightness > 0:
             self._last_brightness = brightness
 
-        self.schedule_update_ha_state()
+        self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs):
         """Turn on the light."""
@@ -222,6 +225,7 @@ class ThermexDecoLight(ThermexLightBase):
         if self._is_on and (r or g or b):
             self._hs_color = color_RGB_to_hs(r, g, b)
 
+    @callback
     def _handle_notify(self, ntf_type: str, data: dict) -> None:
         """Handle decolight notifications from the hub."""
         if ntf_type.lower() != "decolight":
@@ -242,7 +246,7 @@ class ThermexDecoLight(ThermexLightBase):
         
         self._remember_color(deco)
         self._got_initial_state = True
-        self.schedule_update_ha_state()
+        self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs):
         """Turn on the deco light."""

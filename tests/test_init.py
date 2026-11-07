@@ -104,13 +104,17 @@ class TestInit:
 
     @pytest.mark.asyncio
     async def test_async_unload_entry_success(self, mock_hass, mock_config_entry, mock_hub):
-        """Unloading closes the hub connection."""
-        mock_config_entry.runtime_data = MagicMock(hub=mock_hub)
+        """Unloading closes the open runtime session, saves it and closes the hub."""
+        runtime_manager = MagicMock()
+        runtime_manager.save = AsyncMock()
+        mock_config_entry.runtime_data = MagicMock(hub=mock_hub, runtime_manager=runtime_manager)
 
         with patch.object(mock_hass.config_entries, 'async_unload_platforms', new_callable=AsyncMock, return_value=True):
             result = await async_unload_entry(mock_hass, mock_config_entry)
 
         assert result is True
+        runtime_manager.stop.assert_called_once()
+        runtime_manager.save.assert_awaited_once()
         mock_hub.close.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -186,3 +190,71 @@ class TestMigration:
             await async_setup_entry(mock_hass, mock_config_entry)
 
         assert hub_cls.call_args.args[4] == "thermex_abc"
+
+
+class TestRuntimeCheckpoint:
+    """While the fan runs, the open session is saved regularly."""
+
+    @pytest.fixture
+    def mock_integration(self):
+        integration = MagicMock()
+        integration.version = "1.0.0"
+        return integration
+
+    @pytest.fixture
+    def mock_hub(self):
+        hub = MagicMock()
+        hub.connect = AsyncMock()
+        hub.close = AsyncMock()
+        return hub
+
+    @pytest.fixture
+    def mock_runtime_manager(self):
+        rm = MagicMock()
+        rm.load = AsyncMock()
+        return rm
+
+    @pytest.mark.asyncio
+    async def test_setup_registers_the_checkpoint_timer(
+        self, mock_hass, mock_config_entry, mock_hub, mock_runtime_manager, mock_integration
+    ):
+        from datetime import timedelta
+
+        mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
+        mock_runtime_manager.save = AsyncMock()
+        mock_runtime_manager.is_running = MagicMock(return_value=True)
+
+        with patch('custom_components.thermex_api.async_get_integration', return_value=mock_integration), \
+             patch('custom_components.thermex_api.ThermexHub', return_value=mock_hub), \
+             patch('custom_components.thermex_api.RuntimeManager', return_value=mock_runtime_manager), \
+             patch('custom_components.thermex_api.Store'), \
+             patch('custom_components.thermex_api.async_track_time_interval') as track:
+            await async_setup_entry(mock_hass, mock_config_entry)
+
+        track.assert_called_once()
+        assert track.call_args.args[2] == timedelta(seconds=600)
+        mock_config_entry.async_on_unload.assert_called_once_with(track.return_value)
+
+        callback = track.call_args.args[1]
+        await callback(None)
+        mock_runtime_manager.checkpoint.assert_called_once()
+        mock_runtime_manager.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_is_skipped_while_the_fan_is_off(
+        self, mock_hass, mock_config_entry, mock_hub, mock_runtime_manager, mock_integration
+    ):
+        mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
+        mock_runtime_manager.save = AsyncMock()
+        mock_runtime_manager.is_running = MagicMock(return_value=False)
+
+        with patch('custom_components.thermex_api.async_get_integration', return_value=mock_integration), \
+             patch('custom_components.thermex_api.ThermexHub', return_value=mock_hub), \
+             patch('custom_components.thermex_api.RuntimeManager', return_value=mock_runtime_manager), \
+             patch('custom_components.thermex_api.Store'), \
+             patch('custom_components.thermex_api.async_track_time_interval') as track:
+            await async_setup_entry(mock_hass, mock_config_entry)
+
+        await track.call_args.args[1](None)
+        mock_runtime_manager.checkpoint.assert_not_called()
+        mock_runtime_manager.save.assert_not_awaited()
