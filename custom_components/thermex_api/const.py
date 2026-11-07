@@ -21,6 +21,7 @@ DEFAULT_HEARTBEAT_INTERVAL = 30  # Seconds between heartbeat status requests
 DEFAULT_CONNECTION_TIMEOUT = 120  # Seconds before connection considered dead
 DEFAULT_RECONNECT_DELAY = 2  # Seconds between reconnection attempts
 MAX_RECONNECT_ATTEMPTS = 3  # Maximum number of consecutive reconnection attempts
+MAX_MISSED_HEARTBEATS = 2  # Unanswered heartbeats in a row before the connection is dropped
 WEBSOCKET_REQUEST_TIMEOUT = 10  # Seconds to wait for websocket response
 
 # Light settings
