@@ -300,3 +300,179 @@ async def test_unreachable_hood_is_retried(hass, enable_custom_integrations):
         assert not await hass.config_entries.async_setup(config_entry.entry_id)
 
     assert config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
+# --- The remote control, as recorded from the real hood (Notify on the wire) ----------------
+#
+# The real hood sends one Notify per button press: {"Notify": "fan", "Data": {"Fan": {...}}},
+# with the Notify name in lower case and only the section that changed. Off is reported
+# as speed 0 / brightness 0.
+
+
+async def remote(hood: FakeHood, name: str, data: dict | None) -> None:
+    """Send a Notify exactly like the real hood does, and remember it in the hood's state."""
+    if data:
+        for section, values in data.items():
+            if isinstance(values, dict) and section in hood.state:
+                hood.state[section].update(values)
+    for ws in hood.sockets:
+        if not ws.closed:
+            await ws.send_json({"Notify": name, "Data": data})
+
+
+def fan_press(hood: FakeHood, on: int, speed: int):
+    return remote(hood, "fan", {"Fan": {"fanonoff": on, "fanspeed": speed}})
+
+
+def light_press(hood: FakeHood, on: int, brightness: int):
+    return remote(hood, "light", {"Light": {"lightonoff": on, "lightbrightness": brightness}})
+
+
+# The hood's own fan sequence from the log: on starts at boost, then down and up through the levels.
+FAN_STEPS = [
+    (1, 4, "boost", 100), (1, 3, "high", 75), (1, 2, "medium", 50), (1, 1, "low", 25),
+    (1, 2, "medium", 50), (1, 3, "high", 75), (1, 4, "boost", 100),
+]
+
+
+async def test_every_fan_step_on_the_remote_is_followed(hass, entry, hood):
+    fan_id = entity_id(hass, "fan", "fan")
+
+    for on, speed, preset, percentage in FAN_STEPS:
+        await fan_press(hood, on, speed)
+        await settle(hass, 0.05)
+        fan = hass.states.get(fan_id)
+        assert (fan.state, fan.attributes["preset_mode"], fan.attributes["percentage"]) == (
+            STATE_ON, preset, percentage,
+        )
+
+    await fan_press(hood, 0, 0)
+    await settle(hass, 0.05)
+    fan = hass.states.get(fan_id)
+    assert fan.state == STATE_OFF
+    assert fan.attributes["preset_mode"] is None
+
+
+async def test_the_light_cycle_on_the_remote_is_followed(hass, entry, hood):
+    light_id = entity_id(hass, "light", "light")
+
+    for percent in (100, 75, 50, 25):
+        await light_press(hood, 1, percent)
+        await settle(hass, 0.05)
+        light = hass.states.get(light_id)
+        assert light.state == STATE_ON
+        assert light.attributes["brightness"] == round(percent * 255 / 100)
+
+    await light_press(hood, 0, 0)
+    await settle(hass, 0.05)
+    assert hass.states.get(light_id).state == STATE_OFF
+
+
+async def test_a_burst_of_presses_ends_in_the_last_state(hass, entry, hood):
+    """The remote can send several Notify within milliseconds (seen at 75 -> 50 in 10 ms)."""
+    for percent in (100, 75, 50, 25):
+        await light_press(hood, 1, percent)
+    await settle(hass)
+
+    light = hass.states.get(entity_id(hass, "light", "light"))
+    assert light.attributes["brightness"] == round(25 * 255 / 100)
+
+
+async def test_a_notify_for_one_section_leaves_the_others_alone(hass, entry, hood):
+    await fan_press(hood, 1, 2)
+    await light_press(hood, 1, 50)
+    await settle(hass)
+
+    await light_press(hood, 0, 0)
+    await settle(hass)
+
+    assert hass.states.get(entity_id(hass, "fan", "fan")).state == STATE_ON
+    assert hass.states.get(entity_id(hass, "light", "light")).state == STATE_OFF
+
+
+async def test_the_light_returns_to_the_level_the_remote_left_it_at(hass, entry, hood):
+    light_id = entity_id(hass, "light", "light")
+    await light_press(hood, 1, 25)
+    await light_press(hood, 0, 0)
+    await settle(hass)
+
+    await hass.services.async_call("light", "turn_on", {"entity_id": light_id}, blocking=True)
+    await settle(hass)
+
+    assert hood.updates[-1]["Light"] == {"lightonoff": 1, "lightbrightness": 25}
+    assert hass.states.get(light_id).state == STATE_ON
+
+
+async def test_the_remote_overrides_what_home_assistant_just_set(hass, entry, hood):
+    fan_id = entity_id(hass, "fan", "fan")
+    await hass.services.async_call(
+        "fan", "set_preset_mode", {"entity_id": fan_id, "preset_mode": "low"}, blocking=True
+    )
+    await settle(hass)
+    assert hass.states.get(fan_id).attributes["preset_mode"] == "low"
+
+    await fan_press(hood, 1, 4)
+    await settle(hass)
+
+    assert hass.states.get(fan_id).attributes["preset_mode"] == "boost"
+
+
+async def test_the_decolight_follows_the_remote(hass, entry, hood):
+    deco_id = entity_id(hass, "light", "decolight")
+
+    await remote(hood, "decolight", {"Decolight": {
+        "decolightonoff": 1, "decolightbrightness": 100,
+        "decolightr": 255, "decolightg": 0, "decolightb": 0,
+    }})
+    await settle(hass)
+    deco = hass.states.get(deco_id)
+    assert deco.state == STATE_ON
+    assert deco.attributes["hs_color"] == (0.0, 100.0)
+
+    await remote(hood, "decolight", {"Decolight": {
+        "decolightonoff": 0, "decolightbrightness": 0,
+        "decolightr": 0, "decolightg": 0, "decolightb": 0,
+    }})
+    await settle(hass)
+    assert hass.states.get(deco_id).state == STATE_OFF
+
+
+@pytest.mark.parametrize("name,data", [
+    ("fan", None),
+    ("fan", {}),
+    ("fan", {"Fan": "nonsense"}),
+    ("fan", {"Fan": {"fanonoff": "x", "fanspeed": "y"}}),
+    ("mystery", {"Mystery": {"a": 1}}),
+])
+async def test_odd_notifications_do_not_disturb_the_state(hass, entry, hood, name, data):
+    fan_id = entity_id(hass, "fan", "fan")
+    await fan_press(hood, 1, 2)
+    await settle(hass)
+
+    await remote(hood, name, data)
+    await settle(hass)
+
+    fan = hass.states.get(fan_id)
+    assert fan.state == STATE_ON
+    assert fan.attributes["preset_mode"] == "medium"
+
+
+async def test_notifications_arrive_after_a_reconnect(hass, entry, hood):
+    """After the hood drops us the integration reconnects, and the remote works again."""
+    fan_id = entity_id(hass, "fan", "fan")
+    for ws in list(hood.sockets):
+        await ws.close()
+    await settle(hass, 0.3)
+
+    for _ in range(60):
+        await asyncio.sleep(0.25)
+        await hass.async_block_till_done()
+        if hass.states.get(fan_id).state != STATE_UNAVAILABLE and any(
+            not ws.closed for ws in hood.sockets
+        ):
+            break
+
+    await fan_press(hood, 1, 3)
+    await settle(hass)
+
+    assert hass.states.get(fan_id).attributes["preset_mode"] == "high"
