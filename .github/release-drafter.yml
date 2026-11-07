@@ -72,8 +72,9 @@ template: |
   
   To install or update this integration:
   
-  1. **HACS (Recommended)**:
-     - Go to HACS → Integrations
+  1. **Marketplace / HACS (Recommended)**:
+     - Home Assistant 2026.11 and newer: go to Settings → Marketplace (Updates appear under Settings → Updates)
+     - Earlier versions: go to HACS → Integrations
      - Search for "Thermex" and update
   
   2. **Manual Installation**:
