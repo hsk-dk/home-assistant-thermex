@@ -11,14 +11,14 @@ This custom component integrates Thermex extractor hoods into Home Assistant, pr
 ## Installation
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=hsk-dk&repository=home-assistant-thermex)
 
-Install through [HACS](https://hacs.xyz/) by searching for "Thermex Hood Integration".
+Install through the Home Assistant **Marketplace** (Settings → Marketplace, Home Assistant 2026.11 and newer) by searching for "Thermex Hood Integration". On earlier versions, use [HACS](https://hacs.xyz/) the same way.
 
 ---
 
 ## Features
 
 ### Core Functionality
-- **Fan Control**: Full speed control with preset modes (Off, Low, Medium, High, Boost)
+- **Fan Control**: Full speed control with preset modes (Low, Medium, High, Boost)
 - **Light Control**: Main hood lighting and Decolight control (if supported)
 - **Filter Monitoring**: Real-time filter usage tracking with customizable alerts
 - **Connection Monitoring**: Real-time connection status with automatic reconnection

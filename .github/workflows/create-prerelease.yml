@@ -92,7 +92,7 @@ jobs:
             
             ### Installation
             
-            Download the `thermex_api.zip` file and install manually, or use HACS with the pre-release option enabled.
+            Download the `thermex_api.zip` file and install manually, or use the Marketplace (HACS on earlier Home Assistant versions) with the pre-release option enabled.
             
             ### Feedback
             
