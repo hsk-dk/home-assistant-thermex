@@ -68,6 +68,13 @@ class RuntimeManager:
             elif last_preset is not None:
                 _LOGGER.warning("Invalid last_preset format, ignoring")
             
+            # Pending delayed turn-off (ISO timestamp) so it survives a reload/restart
+            delayed_off = data.get("delayed_off_at")
+            if isinstance(delayed_off, str) and parse_datetime(delayed_off) is not None:
+                validated_data["delayed_off_at"] = delayed_off
+            elif delayed_off is not None:
+                _LOGGER.warning("Invalid delayed_off_at, ignoring")
+
             self._data = validated_data
             _LOGGER.debug("Runtime data loaded and validated successfully")
             
@@ -91,6 +98,23 @@ class RuntimeManager:
             run = now - last_start
             self._data["runtime_hours"] = self._data.get("runtime_hours", 0.0) + run / 3600.0
             self._data["last_start"] = None
+
+    def is_running(self) -> bool:
+        """Whether a runtime session is currently open."""
+        return bool(self._data.get("last_start"))
+
+    def checkpoint(self) -> None:
+        """Move the time of the open session into the total and keep the session open.
+
+        Called regularly while the fan runs, and before shutdown, so that a restart
+        or reload of Home Assistant never loses the session in progress.
+        """
+        last_start = self._data.get("last_start")
+        if not last_start:
+            return
+        now = utcnow().timestamp()
+        self._data["runtime_hours"] = self._data.get("runtime_hours", 0.0) + (now - last_start) / 3600.0
+        self._data["last_start"] = now
 
     def reset(self) -> None:
         """Reset the runtime counter to zero."""
@@ -140,6 +164,18 @@ class RuntimeManager:
         # For clarity: filter time is always runtime hours
         return self.get_runtime_hours()
     
+    def get_delayed_off(self) -> datetime | None:
+        """Return when the pending delayed turn-off is due, if any."""
+        value = self._data.get("delayed_off_at")
+        return parse_datetime(value) if value else None
+
+    def set_delayed_off(self, when: datetime | None) -> None:
+        """Remember (or clear) the pending delayed turn-off."""
+        if when is None:
+            self._data.pop("delayed_off_at", None)
+        else:
+            self._data["delayed_off_at"] = when.isoformat()
+
     def get_last_preset(self) -> str:
         """Get the last preset mode used."""
         return self._data.get("last_preset", "off")

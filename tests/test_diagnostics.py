@@ -1,76 +1,56 @@
-"""Tests for diagnostics module."""
-import pytest
+"""Tests for diagnostics."""
 from unittest.mock import MagicMock
 
-from custom_components.thermex_api.diagnostics import (
-    async_get_config_entry_diagnostics,
-)
+import pytest
+
+from custom_components.thermex_api.diagnostics import async_get_config_entry_diagnostics
+from custom_components.thermex_api.state import FanState, ThermexState
 
 
-class TestDiagnostics:
-    """Test diagnostics functionality."""
+@pytest.mark.asyncio
+async def test_diagnostics(mock_hass, mock_hub, mock_config_entry, runtime_manager, coordinator):
+    mock_hub.diagnostics.return_value = {
+        "host": "192.168.1.100",
+        "unique_id": "thermex_abc",
+        "connection_state": "connected",
+        "websocket_connected": True,
+        "pending_requests": ["status"],
+        "protocol_version": "1.1",
+        "last_error": None,
+        "last_status": {"Response": "Status"},
+        "recent_messages": ["a", "b"],
+    }
+    coordinator.data = ThermexState(fan=FanState(on=True, speed=2))
+    runtime_manager.get_runtime_hours.return_value = 50.0
+    runtime_manager.get_days_since_reset.return_value = 3
+    mock_config_entry.runtime_data = MagicMock(
+        hub=mock_hub, runtime_manager=runtime_manager, coordinator=coordinator
+    )
 
-    @pytest.mark.asyncio
-    async def test_diagnostics_success(self, mock_hass, mock_hub, mock_config_entry):
-        """Test successful diagnostics retrieval."""
-        mock_hub._host = "192.168.1.100"
-        mock_hub._connection_state = "connected"
-        mock_hub._pending = {"req1": MagicMock()}
-        mock_hub._ws = MagicMock(closed=False)
-        mock_hub.last_status = {"status": "ok"}
-        mock_hub._session = MagicMock()
-        mock_config_entry.runtime_data = MagicMock(hub=mock_hub)
+    result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
 
-        result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
+    assert result["host"] == "**REDACTED**"
+    assert result["unique_id"] == "**REDACTED**"
+    assert result["connection_state"] == "connected"
+    assert result["websocket_connected"] is True
+    assert result["state"]["fan"] == {"on": True, "speed": 2}
+    assert result["state"]["light"] is None
+    assert result["runtime_data"] == {
+        "runtime_hours": 50.0,
+        "last_reset": "2026-01-15T10:00:00+00:00",
+        "days_since_reset": 3,
+    }
+    assert "api_key" not in str(result)
 
-        assert result["host"] == "**REDACTED**"  # host is redacted
-        assert result["connection_state"] == "connected"
-        assert "req1" in result["pending_requests"]
-        assert result["websocket_connected"] is True
-        assert result["last_status"] == {"status": "ok"}
-        assert result["has_session"] is True
 
-    @pytest.mark.asyncio
-    async def test_diagnostics_with_minimal_hub(self, mock_hass, mock_config_entry):
-        """Test diagnostics with minimal hub attributes."""
-        mock_hub = MagicMock()
-        mock_hub._host = "192.168.1.1"
-        mock_hub.unique_id = "test_unique_id"
-        mock_config_entry.runtime_data = MagicMock(hub=mock_hub)
+@pytest.mark.asyncio
+async def test_diagnostics_before_the_first_state(mock_hass, mock_hub, mock_config_entry, runtime_manager, coordinator):
+    mock_hub.diagnostics.return_value = {"host": "h"}
+    coordinator.data = None
+    mock_config_entry.runtime_data = MagicMock(
+        hub=mock_hub, runtime_manager=runtime_manager, coordinator=coordinator
+    )
 
-        result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
+    result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
 
-        assert result["host"] == "**REDACTED**"
-        assert result["unique_id"] == "**REDACTED**"
-
-    @pytest.mark.asyncio
-    async def test_diagnostics_with_runtime_manager(self, mock_hass, mock_config_entry):
-        """Test diagnostics includes runtime manager data."""
-        mock_hub = MagicMock()
-        mock_hub._host = "192.168.1.100"
-        mock_hub.unique_id = "test_id"
-        mock_hub.last_status = {"status": "ok"}
-        mock_hub.last_error = None
-        mock_hub.recent_messages = ["msg1", "msg2"]
-
-        mock_runtime = MagicMock()
-        mock_runtime.get_runtime_hours.return_value = 50.0
-        mock_runtime.get_last_reset.return_value = "2026-01-15T10:00:00Z"
-        mock_runtime.get_days_since_reset.return_value = 3
-        mock_config_entry.runtime_data = MagicMock(hub=mock_hub, runtime_manager=mock_runtime)
-
-        result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
-
-        assert "runtime_data" in result
-        assert result["runtime_data"]["runtime_hours"] == 50.0
-        assert result["runtime_data"]["last_reset"] == "2026-01-15T10:00:00Z"
-        assert result["runtime_data"]["days_since_reset"] == 3
-
-    @pytest.mark.asyncio
-    async def test_diagnostics_error_handling(self, mock_hass, mock_config_entry):
-        """Diagnostics report an error instead of raising when the entry isn't loaded."""
-        mock_config_entry.runtime_data = None  # not set up
-
-        result = await async_get_config_entry_diagnostics(mock_hass, mock_config_entry)
-
-        assert "error" in result
+    assert result["state"] is None

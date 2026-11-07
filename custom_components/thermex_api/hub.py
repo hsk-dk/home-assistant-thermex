@@ -20,6 +20,8 @@ from .const import (
     DEFAULT_RECONNECT_DELAY,
     DOMAIN,
     MAX_RECONNECT_ATTEMPTS,
+    MIN_CONNECTION_LIFETIME,
+    MIN_CONNECTION_LIFETIME_PAUSE,
     THERMEX_NOTIFY,
     WEBSOCKET_PATH,
     WEBSOCKET_REQUEST_TIMEOUT,
@@ -69,13 +71,12 @@ class ThermexHub:
         # Set by the integration: called once when the hood rejects the password
         self.on_auth_failure: Callable[[], None] | None = None
         self._protocol_version: str | None = None
-        self.runtime_manager: Any = None  # Set later in __init__.py
 
         self._connection_state: str = "disconnected"
         self.last_status: dict | None = None
         self.last_error: str | None = None
         self.recent_messages: collections.deque = collections.deque(maxlen=10)
-        self._startup_complete: bool = False
+        self._connected_at = 0.0
 
         self._reconnect_lock = asyncio.Lock()
         self._reconnect_delay = DEFAULT_RECONNECT_DELAY
@@ -92,12 +93,12 @@ class ThermexHub:
 
     @property
     def signal(self) -> str:
-        """Dispatcher signal for this hood's notifications (scoped per config entry)."""
+        """Dispatcher signal for the hood's Status and Notify data (scoped per config entry)."""
         return f"{THERMEX_NOTIFY}_{self._entry_id}"
 
     @property
     def availability_signal(self) -> str:
-        """Dispatcher signal sent whenever the hood becomes (un)available."""
+        """Dispatcher signal sent whenever the connection state changes."""
         return f"{THERMEX_NOTIFY}_availability_{self._entry_id}"
 
     @property
@@ -108,32 +109,17 @@ class ThermexHub:
     def _set_connection_state(self, state: str) -> None:
         """Change the connection state; log loss/recovery once and tell the entities."""
         was_available = self.available
+        previous = self._connection_state
         self._connection_state = state
-        if was_available == self.available:
-            return
-        if not self._closing:
+        if was_available != self.available and not self._closing:
             if self.available:
                 _LOGGER.info("Connection to Thermex hood %s restored", self._host)
             else:
                 _LOGGER.warning(
                     "Connection to Thermex hood %s lost: %s", self._host, self.last_error or state
                 )
-        async_dispatcher_send(self._hass, self.availability_signal)
-
-    def configure_watchdog(self, heartbeat_interval: int = 30, connection_timeout: int = 120) -> None:
-        """Configure watchdog parameters.
-        
-        Args:
-            heartbeat_interval: Seconds between heartbeat messages (default: 30)
-            connection_timeout: Seconds to wait for activity before considering connection dead (default: 120)
-        """
-        self._heartbeat_interval = heartbeat_interval
-        self._connection_timeout = connection_timeout
-        _LOGGER.debug(
-            "ThermexHub: Watchdog configured - heartbeat: %ds, timeout: %ds", 
-            heartbeat_interval, 
-            connection_timeout
-        )
+        if state != previous:
+            async_dispatcher_send(self._hass, self.availability_signal)
 
     async def _ensure_connected(self) -> None:
         """Ensure that the WebSocket connection is alive, reconnect if needed."""
@@ -243,28 +229,31 @@ class ThermexHub:
     async def _connect(self) -> None:
         # Initialize activity timer and reset startup flag
         self._last_activity = asyncio.get_event_loop().time()
-        self._startup_complete = False
         await self._cancel_recv_task()
         
         try:
             self._session = async_get_clientsession(self._hass)
             url = f"ws://{self._host}:{DEFAULT_PORT}{WEBSOCKET_PATH}"
             _LOGGER.debug("Connecting to Thermex at %s", url)
-            self._ws = await self._session.ws_connect(url)
+            # A hood that only half answers must not block setup or the config flow
+            async with asyncio.timeout(WEBSOCKET_REQUEST_TIMEOUT):
+                self._ws = await self._session.ws_connect(url)
         except Exception as err:
-            self.last_error = str(err)
+            self.last_error = str(err) or type(err).__name__
             self._set_connection_state("error")
             raise
 
         # Authenticate
         auth_payload = {"Request": "Authenticate", "Data": {"Code": self._api_key}}
         try:
-            await self._ws.send_json(auth_payload)
-            msg = await self._ws.receive()
+            async with asyncio.timeout(WEBSOCKET_REQUEST_TIMEOUT):
+                await self._ws.send_json(auth_payload)
+                msg = await self._ws.receive()
         except Exception as err:
+            reason = str(err) or type(err).__name__
             self._set_connection_state("error")
-            self.last_error = f"Authentication send/receive failed: {err}"
-            raise ConnectionError(f"Authentication send/receive failed: {err}")
+            self.last_error = f"Authentication send/receive failed: {reason}"
+            raise ConnectionError(f"Authentication send/receive failed: {reason}") from err
             
         if msg.type != WSMsgType.TEXT:
             self._set_connection_state("error")
@@ -281,6 +270,7 @@ class ThermexHub:
                 raise ThermexAuthError(f"Authentication failed: {data}")
             raise ConnectionError(f"Authentication failed: {data}")
         _LOGGER.debug("Authenticated successfully with Thermex (status=200)")
+        self._connected_at = asyncio.get_event_loop().time()
         self._set_connection_state("connected")
 
         self._recv_task = self._hass.async_create_background_task(
@@ -316,7 +306,7 @@ class ThermexHub:
             self.last_error = f"ProtocolVersion request failed: {err}"
         await asyncio.sleep(0.1)
         self._hass.async_create_background_task(
-            self._dispatch_initial_status(), f"{DOMAIN}_initial_status_{self._entry_id}"
+            self._request_initial_status(), f"{DOMAIN}_initial_status_{self._entry_id}"
         )
 
     async def _recv_loop(self) -> None:
@@ -341,22 +331,15 @@ class ThermexHub:
 
                             if payload["Response"] == "Status":
                                 self.last_status = payload
-
                                 data = payload.get("Data", {}) or {}
-                                for ntf_type, section in data.items():
-                                    _LOGGER.debug("Status update dispatch: %s=%s", ntf_type, section)
-                                    async_dispatcher_send(
-                                        self._hass,
-                                        self.signal,
-                                        ntf_type,
-                                        {ntf_type: section},
-                                    )
+                                _LOGGER.debug("Status update dispatch: %s", data)
+                                async_dispatcher_send(self._hass, self.signal, data)
 
                         elif "Notify" in payload:
                             ntf = payload["Notify"]
                             data = payload.get("Data", {}) or {}
                             _LOGGER.debug("Received Notify '%s': %s", ntf, data)
-                            async_dispatcher_send(self._hass, self.signal, ntf, data)
+                            async_dispatcher_send(self._hass, self.signal, data)
 
                     except Exception as err:
                         self.last_error = f"Error parsing message: {err}"
@@ -383,13 +366,19 @@ class ThermexHub:
             # Reconnect right away instead of waiting for the next watchdog tick,
             # unless we are shutting down or a reconnect already replaced this socket.
             if ws is self._ws and not self._closing:
+                # A connection that was closed right after it opened is reopened
+                # after a short pause, so a misbehaving hood is not hammered.
+                lived = asyncio.get_event_loop().time() - self._connected_at
+                pause = MIN_CONNECTION_LIFETIME_PAUSE if lived < MIN_CONNECTION_LIFETIME else 0.0
                 self._hass.async_create_background_task(
-                    self._reconnect_now(), f"{DOMAIN}_reconnect_{self._entry_id}"
+                    self._reconnect_now(pause), f"{DOMAIN}_reconnect_{self._entry_id}"
                 )
 
-    async def _reconnect_now(self) -> None:
-        """Reconnect immediately after the connection was closed."""
+    async def _reconnect_now(self, pause: float = 0.0) -> None:
+        """Reconnect (almost) immediately after the connection was closed."""
         try:
+            if pause:
+                await asyncio.sleep(pause)
             await self._ensure_connected()
         except Exception as err:
             _LOGGER.debug("Immediate reconnect failed, the watchdog will retry: %s", err)
@@ -570,7 +559,14 @@ class ThermexHub:
         not assume their command was applied as sent. The Status read-back is
         dispatched to the entities by the receive loop.
         """
-        resp = await self.send_request("Update", body)
+        try:
+            resp = await self.send_request("Update", body)
+        except (ConnectionError, TimeoutError) as err:
+            raise ThermexRequestError(
+                translation_domain=DOMAIN,
+                translation_key="cannot_connect",
+                translation_placeholders={"host": self._host},
+            ) from err
         status = resp.get("Status")
         if status != 200:
             _LOGGER.debug("Update %s rejected with status %s", body, status)
@@ -586,38 +582,15 @@ class ThermexHub:
             _LOGGER.debug("Status read-back after update failed: %s", err)
         return resp
 
-    async def _dispatch_initial_status(self) -> None:
+    async def _request_initial_status(self) -> None:
+        """Ask for the full state right after (re)connecting.
+
+        The receive loop dispatches the answer like any other Status.
+        """
         try:
-            resp = await self.send_request("status", {})
-            data = resp.get("Data", {}) or {}
-            for ntf_type, section in data.items():
-                _LOGGER.debug("Initial STATUS notify: %s=%s", ntf_type, section)
-                async_dispatcher_send(self._hass, self.signal, ntf_type, {ntf_type: section})
-            # Mark startup as complete after dispatching initial status
-            self._startup_complete = True
-            _LOGGER.debug("ThermexHub: Initial status dispatch complete")
+            await self.send_request("status", {})
         except Exception as exc:
             _LOGGER.warning("Initial STATUS request failed: %s", exc)
-
-    @property
-    def name(self) -> str:
-        """Return the name of the device."""
-        return "Thermex Hood"
-
-    @property
-    def startup_complete(self) -> bool:
-        """Return whether initial startup is complete."""
-        return self._startup_complete
-
-    async def request_fallback_status(self, entity_name: str) -> dict:
-        """Request fallback status in a coordinated way to avoid duplicate requests."""
-        _LOGGER.debug("ThermexHub: %s requesting fallback status", entity_name)
-        try:
-            resp = await self.send_request("status", {})
-            return resp.get("Data", {}) or {}
-        except Exception as exc:
-            _LOGGER.error("ThermexHub: Fallback status request failed: %s", exc)
-            return {}
 
     @property
     def protocol_version(self) -> str | None:
@@ -635,22 +608,31 @@ class ThermexHub:
             sw_version=self.protocol_version
         )
 
-    def get_coordinator_data(self):
-        current_time = asyncio.get_event_loop().time()
-        time_since_activity = current_time - self._last_activity if self._last_activity > 0 else 0
-        
-        runtime_manager = self.runtime_manager
+    @property
+    def host(self) -> str:
+        """The hood's address."""
+        return self._host
+
+    @property
+    def connection_state(self) -> str:
+        """connected, disconnected, error or closed."""
+        return self._connection_state
+
+    def diagnostics(self) -> dict[str, Any]:
+        """Connection details for the diagnostics download (never the password)."""
+        ws = self._ws
         return {
-            "filtertime": runtime_manager.get_filter_time(),
+            "host": self._host,
+            "unique_id": self.unique_id,
             "connection_state": self._connection_state,
+            "websocket_connected": bool(ws and not ws.closed),
+            "pending_requests": list(self._pending),
+            "protocol_version": self._protocol_version,
             "last_error": self.last_error,
-            "watchdog_active": self._watchdog_task is not None and not self._watchdog_task.done(),
-            "time_since_activity": round(time_since_activity, 1),
-            "heartbeat_interval": self._heartbeat_interval,
-            "connection_timeout": self._connection_timeout,
-            "protocol_version": self.protocol_version,
+            "last_status": self.last_status,
+            "recent_messages": list(self.recent_messages)[-5:],
         }
-    
+
     async def close(self) -> None:
         """Cancel receive loop and close connections."""
         self._closing = True

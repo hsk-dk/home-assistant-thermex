@@ -1,6 +1,7 @@
 # File: __init__.py
 """Thermex API integration."""
 import logging
+from datetime import datetime, timedelta
 
 from homeassistant.components.fan import DOMAIN as FAN_DOMAIN
 from homeassistant.const import CONF_DEVICE_ID
@@ -8,11 +9,19 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import service
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
-from .const import DOMAIN, RUNTIME_STORAGE_FILE, STARTUP, STORAGE_VERSION
+from .const import (
+    DOMAIN,
+    RUNTIME_CHECKPOINT_INTERVAL,
+    RUNTIME_STORAGE_FILE,
+    STARTUP,
+    STORAGE_VERSION,
+)
+from .coordinator import ThermexCoordinator
 from .data import ThermexConfigEntry, ThermexData
 from .hub import ThermexAuthError, ThermexHub
 from .runtime_manager import RuntimeManager
@@ -103,12 +112,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> b
         )
         runtime_manager = RuntimeManager(store)
         await runtime_manager.load()
-        hub.runtime_manager = runtime_manager
 
-        # 3) Share hub + runtime manager with the platforms
-        entry.runtime_data = ThermexData(hub=hub, runtime_manager=runtime_manager)
+        # 3) The coordinator holds the hood's state; the first refresh fetches it
+        coordinator = ThermexCoordinator(hass, entry, hub, runtime_manager)
+        await coordinator.async_config_entry_first_refresh()
+        coordinator.delayed_off.restore()
 
-        # 4) Forward setup to all platforms (the options flow reloads the entry itself)
+        # 4) Share everything with the platforms
+        entry.runtime_data = ThermexData(
+            hub=hub, runtime_manager=runtime_manager, coordinator=coordinator
+        )
+
+        # While the fan runs, regularly move the open session into the saved total
+        async def _checkpoint(_now: datetime) -> None:
+            if runtime_manager.is_running():
+                runtime_manager.checkpoint()
+                await runtime_manager.save()
+
+        entry.async_on_unload(
+            async_track_time_interval(
+                hass, _checkpoint, timedelta(seconds=RUNTIME_CHECKPOINT_INTERVAL)
+            )
+        )
+
+        # 5) Forward setup to all platforms (the options flow reloads the entry itself)
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     except BaseException:
         await hub.close()
@@ -120,5 +147,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> 
     """Unload a config entry and clean up the hub."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
+        # Close the open session so a reload or restart does not lose the time
+        # the fan has been running since it started (a new session begins with
+        # the first status after the reload).
+        runtime_manager = entry.runtime_data.runtime_manager
+        runtime_manager.stop()
+        await runtime_manager.save()
         await entry.runtime_data.hub.close()
     return unload_ok
