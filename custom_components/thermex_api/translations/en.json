@@ -6,14 +6,16 @@
         "description": "Enter Thermex hood IP and API password.",
         "data": {
           "host": "Hood IP address",
-          "api_key": "API password"
+          "api_key": "API password",
+          "enable_decolight": "Activate Ambient light"
         }
       },
       "discovery_confirm": {
         "title": "Set up Thermex Hood",
         "description": "A Thermex hood was found at {host}. Enter its API password.",
         "data": {
-          "api_key": "API password"
+          "api_key": "API password",
+          "enable_decolight": "Activate Ambient light"
         }
       },
       "reauth_confirm": {
@@ -78,6 +80,12 @@
       },
       "thermex_sensor_delayed_turn_off": {
         "name": "Delayed Turn-Off Time"
+      },
+      "thermex_sensor_days_since_reset": {
+        "name": "Grease filter days since last reset"
+      },
+      "thermex_sensor_hours_until_cleaning": {
+        "name": "Hours until grease filter cleaning"
       }
     },
     "button": {
@@ -125,7 +133,13 @@
     },
     "start_delayed_off": {
       "name": "Start delayed turn-off",
-      "description": "Start delayed turn-off timer for the Thermex fan."
+      "description": "Start delayed turn-off timer for the Thermex fan.",
+      "fields": {
+        "minutes": {
+          "name": "Minutes",
+          "description": "How long to wait, in minutes (1-120). The delay from the options is used when left out."
+        }
+      }
     },
     "cancel_delayed_off": {
       "name": "Cancel delayed turn-off",

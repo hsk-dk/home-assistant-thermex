@@ -1,13 +1,13 @@
 # File: custom_components/thermex_api/sensor.py
 """
 Thermex API sensors:
- - filter runtime (hours)
- - last reset of the runtime counter
+ - grease filter runtime (hours) and hours until the next cleaning
+ - last reset of the runtime counter and days since it
  - connection status (diagnostic)
  - scheduled delayed turn-off
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -17,10 +17,10 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import callback
-from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.util.dt import parse_datetime
 
-from .const import RUNTIME_UPDATE_INTERVAL
+from .const import DEFAULT_ALERT_HOURS, RUNTIME_UPDATE_INTERVAL
 from .coordinator import ThermexCoordinator
 from .data import ThermexConfigEntry
 from .entity import ThermexEntity
@@ -38,25 +38,24 @@ async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities)
 
     async_add_entities([
         LastResetSensor(coordinator),
+        DaysSinceResetSensor(coordinator),
         RuntimeHoursSensor(coordinator),
+        HoursUntilCleaningSensor(coordinator),
         ConnectionStatusSensor(coordinator),
         DelayedTurnOffSensor(coordinator),
     ])
 
 
-class RuntimeHoursSensor(ThermexEntity, SensorEntity):
-    """Sensor for the cumulative runtime hours of the Thermex fan."""
+class _RuntimeSensor(ThermexEntity, SensorEntity):
+    """A sensor derived from the runtime, which grows between two updates from the hood."""
 
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.HOURS
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING  # a drop = the filter was reset
     _attr_suggested_display_precision = 1
-    _attr_translation_key = "thermex_sensor_runtime_hours"
 
     def __init__(self, coordinator: ThermexCoordinator):
         super().__init__(coordinator)
         self._runtime_manager = coordinator.runtime_manager
-        self._attr_unique_id = f"{self._hub.unique_id}_runtime_hours"
         self._update_timer = None
 
     async def async_will_remove_from_hass(self):
@@ -92,9 +91,69 @@ class RuntimeHoursSensor(ThermexEntity, SensorEntity):
         if self.coordinator.fan_running:
             self._schedule_update()
 
+
+
+class RuntimeHoursSensor(_RuntimeSensor):
+    """Sensor for the cumulative runtime hours of the Thermex fan."""
+
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING  # a drop = the filter was reset
+    _attr_translation_key = "thermex_sensor_runtime_hours"
+
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self._hub.unique_id}_runtime_hours"
+
     @property
     def native_value(self):
         return self._runtime_manager.get_runtime_hours()
+
+
+class HoursUntilCleaningSensor(_RuntimeSensor):
+    """Runtime hours left before the grease filter should be cleaned (0 once it is due)."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_translation_key = "thermex_sensor_hours_until_cleaning"
+    _requires_connection = False  # computed from locally stored runtime
+
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self._hub.unique_id}_hours_until_cleaning"
+
+    @property
+    def native_value(self):
+        threshold = self.coordinator.config_entry.options.get("fan_alert_hours", DEFAULT_ALERT_HOURS)
+        return max(0.0, threshold - self._runtime_manager.get_runtime_hours())
+
+
+class DaysSinceResetSensor(ThermexEntity, SensorEntity):
+    """Days since the filter was last cleaned (the runtime counter was reset)."""
+
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.DAYS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+    _attr_translation_key = "thermex_sensor_days_since_reset"
+    _requires_connection = False  # computed from locally stored data
+
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._runtime_manager = coordinator.runtime_manager
+        self._attr_unique_id = f"{self._hub.unique_id}_days_since_reset"
+
+    async def async_added_to_hass(self) -> None:
+        """The value changes with the calendar, not with anything the hood sends."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._hourly, timedelta(hours=1))
+        )
+
+    @callback
+    def _hourly(self, _now: datetime) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self):
+        return self._runtime_manager.get_days_since_reset()
 
 
 class LastResetSensor(ThermexEntity, SensorEntity):

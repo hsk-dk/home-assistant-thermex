@@ -144,8 +144,14 @@ class TestActions:
         await fan.start_delayed_off()
         await fan.cancel_delayed_off()
 
-        delayed_off.async_start.assert_awaited_once()
+        delayed_off.async_start.assert_awaited_once_with(None)
         delayed_off.async_cancel.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_start_delayed_off_passes_the_minutes_on(self, fan, delayed_off):
+        await fan.start_delayed_off(minutes=7)
+
+        delayed_off.async_start.assert_awaited_once_with(7)
 
     @pytest.mark.asyncio
     async def test_follows_the_delayed_off_timer(self, fan, delayed_off, mock_hass):

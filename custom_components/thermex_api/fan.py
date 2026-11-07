@@ -141,8 +141,8 @@ class ThermexFan(ThermexEntity, FanEntity):
     async def async_reset(self, **kwargs) -> None:
         await self.coordinator.async_reset_runtime()
 
-    async def start_delayed_off(self) -> None:
-        await self._delayed_off.async_start()
+    async def start_delayed_off(self, minutes: int | None = None) -> None:
+        await self._delayed_off.async_start(minutes)
 
     async def cancel_delayed_off(self) -> None:
         await self._delayed_off.async_cancel()

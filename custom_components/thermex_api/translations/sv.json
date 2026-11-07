@@ -6,14 +6,16 @@
         "description": "Fyll i Thermex köksfläkt IP och API lösenord.",
         "data": {
           "host": "Köksfläktens IP address",
-          "api_key": "API lösenord"
+          "api_key": "API lösenord",
+          "enable_decolight": "Aktivera DecoLight"
         }
       },
       "discovery_confirm": {
         "title": "Konfigurera Thermex köksfläkt",
         "description": "En Thermex köksfläkt hittades på {host}. Ange dess API-lösenord.",
         "data": {
-          "api_key": "API lösenord"
+          "api_key": "API lösenord",
+          "enable_decolight": "Aktivera DecoLight"
         }
       },
       "reauth_confirm": {
@@ -78,6 +80,12 @@
       },
       "thermex_sensor_delayed_turn_off": {
         "name": "Fördröjd avstängning tid"
+      },
+      "thermex_sensor_days_since_reset": {
+        "name": "Filter dagar sedan senaste nollställning"
+      },
+      "thermex_sensor_hours_until_cleaning": {
+        "name": "Timmar till rengöring av fettfilter"
       }
     },
     "button": {
@@ -125,7 +133,13 @@
     },
     "start_delayed_off": {
       "name": "Starta fördröjd avstängning",
-      "description": "Starta timer för fördröjd avstängning av Thermex-fläkten."
+      "description": "Starta timer för fördröjd avstängning av Thermex-fläkten.",
+      "fields": {
+        "minutes": {
+          "name": "Minuter",
+          "description": "Hur länge det väntas, i minuter (1-120). Fördröjningen från inställningarna används om fältet utelämnas."
+        }
+      }
     },
     "cancel_delayed_off": {
       "name": "Avbryt fördröjd avstängning",

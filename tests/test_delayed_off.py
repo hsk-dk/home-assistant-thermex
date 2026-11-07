@@ -193,3 +193,16 @@ async def test_listeners_can_unsubscribe(manager, timers):
     await manager.async_start()
 
     listener.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_minutes_override_the_configured_delay_for_one_run(manager, running, timers):
+    await manager.async_start(minutes=5)
+
+    assert manager.remaining == 5
+    assert timers[0][0] == pytest.approx(5 * 60, abs=2)
+    assert manager.delay_minutes == 15  # the option is untouched
+
+    await manager.async_start()
+
+    assert manager.remaining == 15  # the next run is back to the option

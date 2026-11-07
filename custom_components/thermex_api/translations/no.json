@@ -6,14 +6,16 @@
         "description": "Angi IP-adresse og API-passord for Thermex-hette.",
         "data": {
           "host": "IP-adresse for hetten",
-          "api_key": "API-passord"
+          "api_key": "API-passord",
+          "enable_decolight": "Aktiver stemningslys"
         }
       },
       "discovery_confirm": {
         "title": "Sett opp Thermex-hette",
         "description": "En Thermex-hette ble funnet på {host}. Skriv inn API-passordet.",
         "data": {
-          "api_key": "API-passord"
+          "api_key": "API-passord",
+          "enable_decolight": "Aktiver stemningslys"
         }
       },
       "reauth_confirm": {
@@ -78,6 +80,12 @@
       },
       "thermex_sensor_delayed_turn_off": {
         "name": "Forsinket avslåingstid"
+      },
+      "thermex_sensor_days_since_reset": {
+        "name": "Dager siden siste tilbakestilling av fettfilter"
+      },
+      "thermex_sensor_hours_until_cleaning": {
+        "name": "Timer til rengjøring av fettfilter"
       }
     },
     "button": {
@@ -125,7 +133,13 @@
     },
     "start_delayed_off": {
       "name": "Start forsinket avslåing",
-      "description": "Start timer for forsinket avslåing av Thermex-hetten."
+      "description": "Start timer for forsinket avslåing av Thermex-hetten.",
+      "fields": {
+        "minutes": {
+          "name": "Minutter",
+          "description": "Hvor lenge det ventes, i minutter (1-120). Forsinkelsen fra innstillingene brukes hvis feltet utelates."
+        }
+      }
     },
     "cancel_delayed_off": {
       "name": "Avbryt forsinket avslåing",

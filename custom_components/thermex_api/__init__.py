@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime, timedelta
 
+import voluptuous as vol
 from homeassistant.components.fan import DOMAIN as FAN_DOMAIN
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant
@@ -16,6 +17,8 @@ from homeassistant.loader import async_get_integration
 
 from .const import (
     DOMAIN,
+    MAX_DELAYED_OFF_MINUTES,
+    MIN_DELAYED_OFF_MINUTES,
     RUNTIME_CHECKPOINT_INTERVAL,
     RUNTIME_STORAGE_FILE,
     STARTUP,
@@ -32,23 +35,27 @@ PLATFORMS = ["light", "fan", "sensor", "binary_sensor", "button"]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-# action name -> method on the fan entity
-FAN_ACTIONS = {
-    "reset_runtime": "async_reset",
-    "start_delayed_off": "start_delayed_off",
-    "cancel_delayed_off": "cancel_delayed_off",
+# action name -> (method on the fan entity, schema of the action's own fields)
+FAN_ACTIONS: dict[str, tuple[str, dict | None]] = {
+    "reset_runtime": ("async_reset", None),
+    "start_delayed_off": ("start_delayed_off", {
+        vol.Optional("minutes"): vol.All(
+            vol.Coerce(int), vol.Range(min=MIN_DELAYED_OFF_MINUTES, max=MAX_DELAYED_OFF_MINUTES)
+        ),
+    }),
+    "cancel_delayed_off": ("cancel_delayed_off", None),
 }
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the actions once, so they exist even before an entry is loaded."""
-    for name, method in FAN_ACTIONS.items():
+    for name, (method, schema) in FAN_ACTIONS.items():
         service.async_register_platform_entity_service(
             hass,
             DOMAIN,
             name,
             entity_domain=FAN_DOMAIN,
-            schema=None,
+            schema=schema,
             func=method,
         )
     return True
