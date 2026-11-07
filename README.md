@@ -30,7 +30,7 @@ Install through the Home Assistant **Marketplace** (Settings → Marketplace, Ho
 - **Automatic Reconnection**: Built-in watchdog monitors connection and automatically reconnects on failures
 - **Real-time Updates**: Push notifications for all state changes via WebSocket
 - **Diagnostic Support**: Built-in diagnostics for troubleshooting (Settings → Devices → Thermex Hood → Download Diagnostics)
-- **Multi-language Support**: Full localisation in English, Danish, Swedish, Norwegian, Finnish and German
+- **Multi-language Support**: Full localisation in English, Danish, Swedish, Norwegian, Finnish, German and Spanish
 
 ### Entities Created
 - **Fan Entity**: `fan.thermex_hood` with speed presets and runtime attributes
