@@ -61,7 +61,7 @@ Proper labeling is crucial for automatic release note generation:
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.13 (the version Home Assistant 2025.8 and newer runs on)
 - Home Assistant development environment
 - Access to Thermex hood with API enabled
 
@@ -82,7 +82,7 @@ Proper labeling is crucial for automatic release note generation:
    venv\Scripts\activate     # Windows
    
    # Install dependencies
-   pip install -r requirements-dev.txt
+   pip install -r requirements_test.txt
    ```
 
 3. **Run tests:**
@@ -90,10 +90,10 @@ Proper labeling is crucial for automatic release note generation:
    pytest
    ```
 
-4. **Code formatting:**
+4. **Linting** (must pass in CI):
    ```bash
-   black custom_components/
-   isort custom_components/
+   pip install ruff
+   ruff check custom_components/thermex_api
    ```
 
 ## Testing
@@ -125,8 +125,7 @@ pytest tests/
 ### Python Code
 
 - Follow [PEP 8](https://pep8.org/) style guidelines
-- Use [Black](https://black.readthedocs.io/) for code formatting
-- Use [isort](https://isort.readthedocs.io/) for import sorting
+- Use [Ruff](https://docs.astral.sh/ruff/) for linting and import sorting (configuration in `ruff.toml`)
 - Add type hints where appropriate
 - Write docstrings for public methods
 
