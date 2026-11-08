@@ -8,7 +8,7 @@ This guide explains how to use the GitHub workflows in this repository for relea
 - [Workflows](#workflows)
   - [Release Drafter](#release-drafter)
   - [Create Release](#create-release)
-  - [Create Pre-release](#create-prerelease)
+  - [Pre-releases](#pre-releases)
 - [Issue and Pull Request Labeling](#issue-and-pull-request-labeling)
 - [Release Process](#release-process)
 - [Best Practices](#best-practices)
@@ -16,11 +16,10 @@ This guide explains how to use the GitHub workflows in this repository for relea
 
 ## Overview
 
-This repository uses automated workflows to manage releases and generate release notes. The system consists of three main workflows:
+This repository uses automated workflows to manage releases and generate release notes. The system consists of two workflows:
 
 1. **Release Drafter** - Automatically creates and updates draft releases
-2. **Create Release** - Publishes final releases
-3. **Create Pre-release** - Creates pre-release versions for testing
+2. **Create Release** - Publishes releases, including pre-releases (alpha, beta and release candidates)
 
 ## Workflows
 
@@ -47,10 +46,11 @@ This repository uses automated workflows to manage releases and generate release
 **Trigger:** Manual workflow dispatch
 
 **Inputs:**
-- `tag` (required): Release tag (e.g., `v2.10.3`)
+- `tag` (required): Release tag (e.g., `v3.4.1`, or `v3.5.0-rc1` for a pre-release; the suffix may not contain dots)
 - `release_notes` (optional): Custom release notes (overrides draft if provided)
 - `use_draft` (optional, default: true): Use existing draft release notes
 - `prerelease` (optional, default: false): Mark as pre-release
+- `cleanup_old_drafts` (optional, default: false): Delete the other draft releases afterwards
 
 **What it does:**
 1. Validates tag format
@@ -59,7 +59,9 @@ This repository uses automated workflows to manage releases and generate release
 4. Commits version changes
 5. Creates git tag
 6. Publishes release (using draft notes or custom notes)
-7. Cleans up old draft releases
+7. Cleans up old draft releases (only if `cleanup_old_drafts` is ticked)
+
+**Check the draft before using it.** `use_draft` publishes the newest draft release as it is. The draft is generated from PR labels and does not know about things users must be told before updating (breaking changes, migrations). For releases with such changes, write the notes yourself and pass them in `release_notes`.
 
 **Process Flow:**
 ```mermaid
@@ -81,19 +83,9 @@ graph TD
     M --> N[Complete]
 ```
 
-### Create Pre-release
+### Pre-releases
 
-**Trigger:** Manual workflow dispatch
-
-**Inputs:**
-- `version_bump` (required): Type of version bump (patch/minor/major)
-- `prerelease_type` (required): Pre-release type (alpha/beta/rc)
-
-**What it does:**
-1. Calculates next version based on current version
-2. Adds pre-release suffix (e.g., `v2.10.4-beta.1`)
-3. Calls the main release workflow with pre-release flag
-4. Creates pre-release with testing warnings
+There is no separate pre-release workflow. Run **Create Release** with a pre-release tag and `prerelease` ticked (see [Pre-release Process](#2-pre-release-process)).
 
 ## Issue and Pull Request Labeling
 
@@ -214,7 +206,7 @@ These labels will NOT appear in release notes:
 1. Go to **Actions** → **Create Release**
 2. Fill in the form:
    ```
-   Tag: v2.10.4
+   Tag: v3.4.1
    Use draft: ✓ (checked)
    Pre-release: ☐ (unchecked)
    Release notes: (leave empty to use draft)
@@ -233,16 +225,22 @@ Use pre-releases for:
 - Beta versions
 - Release candidates
 
+Users only see them if they enable pre-releases for the integration in the Marketplace (HACS on earlier Home Assistant versions).
+
 #### Steps:
-1. Go to **Actions** → **Create Pre-release**
+1. Go to **Actions** → **Create Release**
 2. Fill in the form:
    ```
-   Version bump: patch/minor/major
-   Pre-release type: beta
+   Tag: v3.5.0-rc1   (letters and digits only after the dash, no dots)
+   Use draft: ☐ (unchecked)
+   Pre-release: ✓ (checked)
+   Release notes: write them yourself
    ```
 3. Click **Run workflow**
 
-This creates a version like `v2.10.4-beta.1`
+The workflow sets the version in `manifest.json`, commits it to `main`, tags the commit and attaches `thermex_api.zip`. The next pre-release is the next suffix, e.g. `v3.5.0-rc2`.
+
+The stable release is made the same way with the plain tag (`v3.5.0`) and `Pre-release` unchecked.
 
 ### 3. Hotfix Process
 
@@ -254,7 +252,7 @@ For urgent bug fixes:
 4. Merge PR
 5. Create patch release immediately:
    ```
-   Tag: v2.10.4
+   Tag: v3.4.1
    Use draft: ✓
    ```
 
@@ -356,13 +354,14 @@ Follow semantic versioning:
 **Solutions:**
 ```bash
 # Delete existing tag if needed
-git tag -d v2.10.4
-git push origin :refs/tags/v2.10.4
+git tag -d v3.4.1
+git push origin :refs/tags/v3.4.1
 
 # Use correct tag format
-v2.10.4  ✓
-2.10.4   ✓
-v2.10.4-beta.1  ✓
+v3.4.1  ✓
+3.4.1    ✓
+v3.4.0-rc2  ✓
+v3.4.0-beta.1  ✗ (no dots after the dash)
 ```
 
 #### 4. Draft Release Has Wrong Version
@@ -384,7 +383,7 @@ v2.10.4-beta.1  ✓
 #### Common Error Messages
 
 ```
-Error: Tag v2.10.4 already exists
+Error: Tag v3.4.1 already exists
 ```
 **Solution:** Use a different tag or delete existing tag
 
@@ -425,7 +424,7 @@ git commit -m "feat: add outdoor temperature sensor support"
 # - Add outdoor temperature sensor support @username (#123)
 
 # 5. Create release
-# Tag: v2.11.0 (minor bump for new feature)
+# Tag: v3.5.0 (minor bump for new feature)
 ```
 
 ### Example 2: Fixing a Bug
@@ -446,7 +445,7 @@ git commit -m "fix: correct temperature sensor reading conversion"
 # - Fix temperature sensor reading conversion @username (#124)
 
 # 5. Create release
-# Tag: v2.10.5 (patch bump for bug fix)
+# Tag: v3.4.2 (patch bump for bug fix)
 ```
 
 ### Example 3: Breaking Change
