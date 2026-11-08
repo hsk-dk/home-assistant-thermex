@@ -68,17 +68,16 @@ All three actions target the Thermex fan entity. `start_delayed_off` returns an 
 
    ![Enable API](https://github.com/user-attachments/assets/c80412a1-1f13-4f23-b347-01a2cd9c2202)
    ![Set password](https://github.com/user-attachments/assets/2bc877bb-490f-4272-afdf-2f059b35dd1c)
-Add the integration through Home Assistant UI (Settings → Devices & Services → Add Integration → Thermex Hood)
-2. Enter your extractor hood IP address and API password
-3. Configure integration options (optional, can be changed later):
-   - **Filter Alert Hours**: Runtime hours threshold for filter cleaning alert (default: 30 hours)
-   - **Filter Alert Days**: Days since last reset threshold for filter alert (default: 90 days)
-   - **Enable Decolight**: Activate ambient lighting controls (if your model supports it)
-   - **Delayed Turn-Off Timer**: Configure automatic turn-off delay (1-120 minutes, default: 10)
-   - **Watchdog Settings**: Heartbeat interval and connection timeout (advanced users only
-   - **Filter Alert Hours**: Set filter cleaning interval (default: 30 hours)
-   - **Enable Decolight**: Activate ambient lighting controls (if supported)
-   - **Delayed Turn-Off Timer**: Configure automatic turn-off delay (1-120 minutes, default: 10)
+
+### Adding the integration
+
+1. Go to Settings → Devices & Services → Add Integration → **Thermex Hood**.
+2. Enter your extractor hood IP address and API password, and tick **Activate Ambient light** if your model has the Decolight (it can be changed later under Configure). If Home Assistant sees the hood on your network (it announces itself as `Thermex-ESP`), it is offered automatically under **Discovered**, and only the API password is needed.
+3. Optionally change the options later under **Configure** on the integration entry:
+   - **Activate Ambient light**: turns the Decolight controls on (if your model supports it)
+   - **Grease filter cleaning notice after (runtime hours)**: 1-1000 hours (default: 30)
+   - **Grease filter cleaning notice after (days since reset)**: 1-365 days (default: 90)
+   - **Delayed turn-off timer (minutes)**: 1-120 minutes (default: 10)
 
 ### Changing the IP address or password
 
@@ -94,7 +93,6 @@ rejects the stored password, Home Assistant also offers a re-authentication prom
 
 - **Home Assistant**: Version **2025.8.0** or later
 - **Thermex API**: Version **1.1** (WebSocket protocol)
-- **Integration Version**: **3.3.0-beta6** (see [manifest.json](custom_components/thermex_api/manifest.json))
 
 ## Known Supported Models
 
@@ -105,21 +103,21 @@ rejects the stored password, Home Assistant also offers a re-authentication prom
 
 ### Common Issues
 
-1. **Connection Failed**: 
-   - Verify hood IP address and API password
-   - Check network connectivity
-   - Connection Drops**: 
-   - Integration includes automatic reconnection (up to 3 attempts)
-   - Entities will become unavailable during disconnection and recover automatically
-   - Check Home Assistant logs for connection issues (set to debug level for details
-   - Integration includes a connection watchdog for automatic recovery
-   - Check hood software versionnd days are configured in integration options
-   - Check that runtime tracking is active (fan has been used)
-   - Filter alert triggers when EITHER hours threshold OR days threshold is exceeded
-   - Use button entity or service to reset filter runtime after cleaning
-3. **Filter Alerts Not Working**:
-   - Verify filter alert hours are configured in integration options
-   - Check that runtime tracking is active (fan has been used)
+1. **Connection failed when adding the hood**:
+   - Verify the hood IP address and the API password
+   - Check that the API is enabled in the Thermex app
+   - Check that Home Assistant can reach the hood on port 9999 (same network or routed)
+   - Check that the hood software is at least version 1.30/1.10
+2. **Entities unavailable or connection drops**:
+   - Entities become unavailable while the hood is offline and recover automatically; the integration reconnects by itself
+   - A hood that loses power or drops off the network without closing the connection is detected by the connection watchdog, marked unavailable and reconnected (v3.4.0-rc2 and later)
+   - The *Connection status* sensor (diagnostic, disabled by default) shows the state and why the last connection was lost
+   - Set the log level to debug (see below) and check the Home Assistant log for details
+3. **Filter alert not working**:
+   - Check the hours and days limits in the integration options
+   - Runtime is only counted while the fan runs
+   - The alert triggers when EITHER the hours OR the days limit is exceeded
+   - Use the reset button or the `thermex_api.reset_runtime` action after you have cleaned the filter
 
 ### Debug Information
 
@@ -162,7 +160,7 @@ See [tests/README.md](tests/README.md) for detailed testing documentation.
 The project uses GitHub Actions for automated testing:
 - **Tests**: Run on every push and PR
 - **Coverage**: Automatic coverage reports on PRs
-- **Code Validation**: Ruff and mypy checks
+- **Code Validation**: Ruff (must pass), mypy (advisory), Hassfest and HACS validation
 
 ---
 
