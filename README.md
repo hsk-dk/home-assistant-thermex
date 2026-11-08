@@ -1,6 +1,4 @@
-[![home-assistant-thermex](https://img.shields.io/github/v/release/hsk-dk/home-assistant-thermex?display_name=release&style=plastic&labelColor=green)](https://github.com/hsk-dk/home-assistant-thermex) [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=plastic)](https://github.com/hacs/integration) [![downloads](https://img.shields.io/github/downloads/hsk-dk/home-assistant-thermex/total?style=plastic&label=Total%20downloads)](https://github.com/hsk-dk/home-assistant-thermex) 
-
-<a href="https://www.buymeacoffee.com/hskdk" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+[![home-assistant-thermex](https://img.shields.io/github/v/release/hsk-dk/home-assistant-thermex?display_name=release&style=plastic&labelColor=green)](https://github.com/hsk-dk/home-assistant-thermex) [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=plastic)](https://github.com/hacs/integration) [![downloads](https://img.shields.io/github/downloads/hsk-dk/home-assistant-thermex/total?style=plastic&label=Total%20downloads)](https://github.com/hsk-dk/home-assistant-thermex) [![Buy me a coffee](https://img.shields.io/static/v1?label=Buy%20me%20a%20coffee&message=and%20say%20thanks&color=orange&logo=buymeacoffee&logoColor=white&style=plastic)](https://www.buymeacoffee.com/hskdk)
 
 # Thermex Hood Integration Custom Component
 
@@ -192,5 +190,7 @@ This repository uses automated workflows for release management:
 See the [workflows documentation](WORKFLOWS_GUIDE.md) for complete details on labeling, branching, and release processes.
 
 ## Support
+
+This integration is maintained in my spare time and tested on my own hood. If it is useful to you, a coffee is a nice way to say thanks. Bug reports and test results are just as welcome.
 
 [![Buy me a coffee](https://img.shields.io/static/v1?label=Buy%20me%20a%20coffee&message=and%20say%20thanks&color=orange&logo=buymeacoffee&logoColor=white&style=plastic)](https://www.buymeacoffee.com/hskdk)
