@@ -4,15 +4,16 @@
 
 ### Regular Release
 1. Go to **Actions** → **Create Release**
-2. Enter tag: `v2.10.4`
+2. Enter tag: `v3.4.1`
 3. Check **Use draft** ✓
 4. Click **Run workflow**
 
 ### Pre-release
-1. Go to **Actions** → **Create Pre-release**
-2. Select version bump: `patch`/`minor`/`major`
-3. Select type: `alpha`/`beta`/`rc`
-4. Click **Run workflow**
+1. Go to **Actions** → **Create Release**
+2. Enter tag with a suffix: `v3.5.0-rc1` (letters and digits only after the dash)
+3. Check **Pre-release** ✓ and uncheck **Use draft**
+4. Paste your own release notes
+5. Click **Run workflow**
 
 ## 🏷️ Labels for PRs
 
@@ -47,8 +48,8 @@ chore: bump dependency versions
 ## 🔢 Version Bumping
 
 - **Major** (v3.0.0): Breaking changes
-- **Minor** (v2.1.0): New features
-- **Patch** (v2.0.1): Bug fixes
+- **Minor** (v3.1.0): New features
+- **Patch** (v3.0.1): Bug fixes
 
 ## ❌ Exclude from Release Notes
 
@@ -58,7 +59,7 @@ Add label `skip-changelog` to exclude from release notes.
 
 | Issue | Solution |
 |-------|----------|
-| Tag already exists | Delete tag: `git tag -d v2.10.4 && git push origin :refs/tags/v2.10.4` |
+| Tag already exists | Delete tag: `git tag -d v3.4.1 && git push origin :refs/tags/v3.4.1` |
 | No draft release | Check PR has proper labels |
 | Changes not in notes | Verify labels on merged PR |
 | Wrong version bump | Check version resolver labels |

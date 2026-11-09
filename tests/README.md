@@ -6,12 +6,22 @@ This directory contains comprehensive tests for the Thermex API Home Assistant c
 
 ```
 tests/
-├── __init__.py                   # Test package initialization
-├── conftest.py                   # Shared pytest fixtures
-├── test_runtime_manager.py       # RuntimeManager unit tests
-├── test_config_flow.py           # Configuration flow tests
-├── test_fan.py                   # Fan entity tests
-└── test_light.py                 # Light entity tests
+├── __init__.py                       # Test package initialization
+├── conftest.py                       # Shared pytest fixtures
+├── test_actions.py                   # Entity actions (reset_runtime, delayed off)
+├── test_binary_sensor.py             # Filter cleaning notice
+├── test_button.py                    # Reset and delayed turn-off buttons
+├── test_config_flow.py               # Config, reauth, reconfigure and options flows
+├── test_diagnostics.py               # Diagnostics download
+├── test_entity.py                    # Shared entity base class
+├── test_fan.py                       # Fan entity
+├── test_hub.py                       # WebSocket hub, reconnects and watchdog
+├── test_init.py                      # Setup, unload and migration
+├── test_light.py                     # Light and Decolight
+├── test_light_brightness_conversion.py  # API <-> Home Assistant brightness
+├── test_modelling.py                 # Entity classes, units and unique ids
+├── test_runtime_manager.py           # RuntimeManager (filter runtime)
+└── test_sensor.py                    # Sensors
 ```
 
 ## Running Tests

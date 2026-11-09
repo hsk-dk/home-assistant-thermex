@@ -88,8 +88,9 @@ template: |
   
   ## 📝 Notes
   
-  - This release is compatible with Home Assistant Core 2024.1.0+
+  - This release requires Home Assistant Core 2025.8.0 or newer
   - Please restart Home Assistant after updating
+  - Make a backup before updating: a release can migrate your config entries, and a migrated entry cannot be downgraded
   - Check the [documentation](https://github.com/$OWNER/$REPOSITORY#readme) for configuration details
   
   ## Say thanks
