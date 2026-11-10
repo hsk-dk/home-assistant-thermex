@@ -594,6 +594,11 @@ class ThermexHub:
         resp = await self.send_request("Update", body)
         status = resp.get("Status")
         if status != 200:
+            if await self._fan_update_applied(body):
+                _LOGGER.debug(
+                    "Update %s answered status %s but the hood applied it", body, status
+                )
+                return resp
             _LOGGER.debug("Update %s rejected with status %s", body, status)
             raise ThermexRequestError(
                 translation_domain=DOMAIN,
@@ -606,6 +611,26 @@ class ThermexHub:
             # Not fatal: the 30 s heartbeat will refresh the state anyway
             _LOGGER.debug("Status read-back after update failed: %s", err)
         return resp
+
+    async def _fan_update_applied(self, body: dict[str, Any]) -> bool:
+        """Tell whether a fan Update the hood answered with an error was applied anyway.
+
+        The hood answers status 400 to every Update that turns the fan on or
+        changes its speed, but carries the command out. Only the fan is checked
+        this way: for anything else an error status is taken at its word.
+        """
+        fan = body.get("Fan")
+        if set(body) != {"Fan"} or not isinstance(fan, dict):
+            return False
+        try:
+            resp = await self.send_request("status", {})
+        except Exception as err:
+            _LOGGER.debug("Status read-back after a rejected fan update failed: %s", err)
+            return False
+        state = (resp.get("Data") or {}).get("Fan")
+        if not isinstance(state, dict):
+            return False
+        return all(state.get(key) == value for key, value in fan.items())
 
     async def _dispatch_initial_status(self) -> None:
         try:

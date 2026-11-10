@@ -829,6 +829,69 @@ class TestThermexHubUpdates:
         assert calls == ["Update"]  # no read-back after a rejected update
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("fan", [{"fanonoff": 1, "fanspeed": 1}, {"fanonoff": 1, "fanspeed": 3}])
+    async def test_fan_on_answered_400_but_applied_is_accepted(self, hub, fan):
+        """Real hood: every Update that turns the fan on or sets a speed answers 400 but is carried out."""
+        calls = []
+
+        async def fake_send(request, body):
+            calls.append(request)
+            if request == "Update":
+                return {"Response": "Update", "Status": 400}
+            return {"Response": "Status", "Status": 200, "Data": {"Fan": dict(fan)}}
+
+        hub.send_request = fake_send
+        resp = await hub.send_update({"Fan": dict(fan)})
+
+        assert resp["Status"] == 400
+        assert calls == ["Update", "status"]
+
+    @pytest.mark.asyncio
+    async def test_fan_400_not_applied_still_raises(self, hub):
+        from custom_components.thermex_api.hub import ThermexRequestError
+
+        async def fake_send(request, body):
+            if request == "Update":
+                return {"Status": 400}
+            return {"Status": 200, "Data": {"Fan": {"fanonoff": 0, "fanspeed": 0}}}
+
+        hub.send_request = fake_send
+        with pytest.raises(ThermexRequestError):
+            await hub.send_update({"Fan": {"fanonoff": 1, "fanspeed": 2}})
+
+    @pytest.mark.asyncio
+    async def test_fan_400_with_failed_readback_raises(self, hub):
+        from custom_components.thermex_api.hub import ThermexRequestError
+
+        async def fake_send(request, body):
+            if request == "status":
+                raise TimeoutError
+            return {"Status": 400}
+
+        hub.send_request = fake_send
+        with pytest.raises(ThermexRequestError):
+            await hub.send_update({"Fan": {"fanonoff": 1, "fanspeed": 2}})
+
+    @pytest.mark.asyncio
+    async def test_light_400_is_never_second_guessed(self, hub):
+        """Other devices keep the strict rule: the fan exemption does not apply to a mixed or light update."""
+        from custom_components.thermex_api.hub import ThermexRequestError
+
+        calls = []
+
+        async def fake_send(request, body):
+            calls.append(request)
+            return {"Status": 400, "Data": {"Fan": {"fanonoff": 1, "fanspeed": 1}, "Light": {"lightonoff": 1}}}
+
+        hub.send_request = fake_send
+        with pytest.raises(ThermexRequestError):
+            await hub.send_update({"Light": {"lightonoff": 1}})
+        with pytest.raises(ThermexRequestError):
+            await hub.send_update({"Fan": {"fanonoff": 1, "fanspeed": 1}, "Light": {"lightonoff": 1}})
+
+        assert "status" not in calls
+
+    @pytest.mark.asyncio
     async def test_readback_failure_is_not_fatal(self, hub):
         async def fake_send(request, body):
             if request == "status":
