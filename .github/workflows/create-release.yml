@@ -300,6 +300,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Release Drafter keeps a draft for the next version, and softprops/action-gh-release
+      # reuses a draft with the same tag instead of the release it just created, which
+      # replaced the intended notes with the drafter's. Put the intended notes back and
+      # remove any leftover draft for this tag.
+      - name: Make sure the release carries the intended notes
+        if: ${{ steps.create_release.outcome == 'success' && steps.prepare_notes.outputs.notes_source != 'auto' }}
+        run: |
+          gh release edit "${{ env.TAG_NAME }}" --notes-file release_notes.md
+
+          gh api "repos/${{ github.repository }}/releases" --paginate             --jq '.[] | select(.draft == true and .tag_name == "${{ env.TAG_NAME }}") | .id' |
+          while read -r id; do
+            echo "🗑️  Removing leftover draft $id for ${{ env.TAG_NAME }}"
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$id"
+          done
+
+          echo "✅ Release notes set from ${{ steps.prepare_notes.outputs.notes_source }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Resolve release URL output
         id: finalize
         run: |
