@@ -977,6 +977,121 @@ class TestThermexHubClose:
             await hub._reconnect_now()  # must not raise: the watchdog retries
 
 
+class TestPendingRequestsOnReconnect:
+    """A request sent on a socket that closes is re-sent on the new one at once."""
+
+    @pytest.fixture
+    def hub(self, event_loop):
+        hass = MagicMock()
+        hass.loop = event_loop
+        hass.async_create_background_task = MagicMock(side_effect=lambda coro, name=None: coro.close())
+        return ThermexHub(hass, "192.168.1.100", "pw", "entry")
+
+    @staticmethod
+    def _ws():
+        ws = MagicMock()
+        ws.closed = False
+        ws.send_json = AsyncMock()
+        return ws
+
+    @pytest.mark.asyncio
+    async def test_request_is_resent_without_waiting_for_the_timeout(self, hub):
+        old_ws, new_ws = self._ws(), self._ws()
+        hub._ws = old_ws
+        hub._closing = False
+
+        calls = []
+
+        async def reconnect():
+            calls.append(1)
+            if len(calls) > 1:  # the first call is the plain "is it open" check
+                hub._ws = new_ws
+
+        hub._ensure_connected = AsyncMock(side_effect=reconnect)
+
+        async def drop_then_answer():
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            hub._release_pending()
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            hub._pending["status"].set_result({"Response": "Status", "Status": 200})
+
+        task = asyncio.ensure_future(drop_then_answer())
+        with patch("custom_components.thermex_api.hub.WEBSOCKET_REQUEST_TIMEOUT", 5):
+            resp = await asyncio.wait_for(hub._send_request("status", {}), timeout=1)
+        await task
+
+        assert resp["Status"] == 200
+        assert old_ws.send_json.await_count == 1
+        assert new_ws.send_json.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_second_loss_gives_up_with_connection_error(self, hub):
+        hub._ws = self._ws()
+        hub._closing = False
+        hub._ensure_connected = AsyncMock()
+
+        async def drop_twice():
+            for _ in range(2):
+                for _ in range(4):
+                    await asyncio.sleep(0)
+                hub._release_pending()
+
+        task = asyncio.ensure_future(drop_twice())
+        with pytest.raises(ConnectionError, match="Connection lost"):
+            await asyncio.wait_for(hub._send_request("status", {}), timeout=1)
+        await task
+
+        assert hub._pending == {}
+
+    @pytest.mark.asyncio
+    async def test_recv_loop_releases_requests_of_its_own_socket(self, hub):
+        async def gen():
+            return
+            yield
+
+        ws = MagicMock()
+        ws.closed = True
+        ws.close_code = 1006
+        ws.exception = MagicMock(return_value=None)
+        ws.__aiter__ = lambda self: gen().__aiter__()
+        hub._ws = ws
+        fut = asyncio.get_running_loop().create_future()
+        hub._pending["status"] = fut
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            await hub._recv_loop()
+
+        assert fut.done()
+        with pytest.raises(Exception) as exc:
+            fut.result()
+        assert type(exc.value).__name__ == "_ConnectionLost"
+
+    @pytest.mark.asyncio
+    async def test_recv_loop_of_a_replaced_socket_leaves_new_requests_alone(self, hub):
+        newer = MagicMock()
+
+        async def gen():
+            hub._ws = newer  # a reconnect replaced this socket while it was closing
+            return
+            yield
+
+        old = MagicMock()
+        old.closed = True
+        old.close_code = 1006
+        old.exception = MagicMock(return_value=None)
+        old.__aiter__ = lambda self: gen().__aiter__()
+        hub._ws = old
+        fut = asyncio.get_running_loop().create_future()
+        hub._pending["status"] = fut
+
+        with patch("custom_components.thermex_api.hub.async_dispatcher_send"):
+            await hub._recv_loop()
+
+        assert not fut.done()
+
+
 class TestThermexHubTimeouts:
     """A hood that stops answering must not block setup or the config flow."""
 

@@ -40,6 +40,10 @@ class ThermexAuthError(ConnectionError):
     """The hood rejected the API password."""
 
 
+class _ConnectionLost(Exception):
+    """Raised into a waiting request when the socket it was sent on has closed."""
+
+
 class ThermexRequestError(HomeAssistantError):
     """The hood answered an Update with an error status."""
 
@@ -366,6 +370,9 @@ class ThermexHub:
             # Reconnect right away instead of waiting for the next watchdog tick,
             # unless we are shutting down or a reconnect already replaced this socket.
             if ws is self._ws and not self._closing:
+                # Requests sent on this socket will never be answered: release them now so
+                # they are re-sent on the new connection instead of waiting out the timeout.
+                self._release_pending()
                 # A connection that was closed right after it opened is reopened
                 # after a short pause, so a misbehaving hood is not hammered.
                 lived = asyncio.get_event_loop().time() - self._connected_at
@@ -373,6 +380,12 @@ class ThermexHub:
                 self._hass.async_create_background_task(
                     self._reconnect_now(pause), f"{DOMAIN}_reconnect_{self._entry_id}"
                 )
+
+    def _release_pending(self) -> None:
+        """Wake every request that is waiting on the connection that just closed."""
+        for fut in self._pending.values():
+            if not fut.done():
+                fut.set_exception(_ConnectionLost())
 
     async def _reconnect_now(self, pause: float = 0.0) -> None:
         """Reconnect (almost) immediately after the connection was closed."""
@@ -497,12 +510,50 @@ class ThermexHub:
                 self._pending.pop(key, None)
                 raise ConnectionError(f"Failed to send WebSocket message: {exc}")
 
+        async def resend(label: str) -> None:
+            """Register a fresh future and send the payload again."""
+            nonlocal fut
+            if self._closing:
+                raise ConnectionError("Hub is closing")
+            fut = loop.create_future()
+            self._pending[key] = fut
+            async with self._ws_lock:
+                # Double-check connection before re-sending
+                if self._closing:
+                    self._pending.pop(key, None)
+                    raise ConnectionError("Hub is closing")
+                if self._ws is None or self._ws.closed:
+                    self._pending.pop(key, None)
+                    raise ConnectionError(f"WebSocket connection lost during {label}")
+                try:
+                    await self._ws.send_json(payload)
+                    _LOGGER.debug("ThermexHub: Retrying %s payload: %s", request, payload)
+                except Exception as exc:
+                    self._pending.pop(key, None)
+                    raise ConnectionError(f"Failed to retry WebSocket message: {exc}")
+
         try:
             # Try up to 2 attempts
             for attempt in (1, 2):
                 try:
                     # Wait for matching response
                     return await asyncio.wait_for(fut, timeout=WEBSOCKET_REQUEST_TIMEOUT)
+                except _ConnectionLost:
+                    # The socket closed under us: do not wait out the timeout, send the
+                    # request again as soon as the connection is back.
+                    _LOGGER.debug(
+                        "ThermexHub: Connection lost while waiting for '%s' (attempt %d/2)",
+                        request,
+                        attempt,
+                    )
+                    self._pending.pop(key, None)
+                    if attempt == 2:
+                        raise ConnectionError(
+                            f"Connection lost while waiting for '{request}'"
+                        ) from None
+                    await self._ensure_connected()
+                    await resend("retry")
+                    continue
                 except TimeoutError:
                     # Timeout: either retry or give up (don't cascade reconnections)
                     _LOGGER.debug(
@@ -515,28 +566,7 @@ class ThermexHub:
 
                     if attempt == 1:
                         # First timeout → retry: recreate future, re-send
-                        if self._closing:
-                            raise ConnectionError("Hub is closing")
-                            
-                        fut = loop.create_future()
-                        self._pending[key] = fut
-                        async with self._ws_lock:
-                            # Double-check connection before retry
-                            if self._closing:
-                                self._pending.pop(key, None)
-                                raise ConnectionError("Hub is closing")
-                                
-                            if self._ws is None or self._ws.closed:
-                                self._pending.pop(key, None)
-                                raise ConnectionError("WebSocket connection lost during retry")
-                            try:
-                                await self._ws.send_json(payload)
-                                _LOGGER.debug(
-                                    "ThermexHub: Retrying %s payload: %s", request, payload
-                                )
-                            except Exception as exc:
-                                self._pending.pop(key, None)
-                                raise ConnectionError(f"Failed to retry WebSocket message: {exc}")
+                        await resend("retry")
                         continue
 
                     # Second timeout → give up (don't trigger cascading reconnections)
@@ -544,7 +574,7 @@ class ThermexHub:
                         "ThermexHub: Second timeout for '%s', giving up", request
                     )
                     raise TimeoutError(f"Request '{request}' timed out after 2 attempts")
-            
+
             # This should never be reached, but satisfies mypy
             raise RuntimeError(f"Unexpected exit from retry loop for request '{request}'")
 
