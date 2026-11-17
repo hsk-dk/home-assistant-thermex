@@ -184,5 +184,11 @@
     "fan_entity_not_found": {
       "message": "Thermex-vifteentiteten ble ikke funnet."
     }
+  },
+  "issues": {
+    "hood_offline": {
+      "title": "Thermex-hetten er frakoblet",
+      "description": "Thermex-hetten på {host} har ikke svart på over en time. Sjekk at hetten har strøm og er koblet til nettverket ditt, at API-et er slått på i Thermex-appen, og at IP-adressen ikke er endret (bruk i så fall Konfigurer på nytt på integrasjonen). Varselet forsvinner av seg selv når hetten er tilkoblet igjen."
+    }
   }
 }

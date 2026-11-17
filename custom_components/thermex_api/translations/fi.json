@@ -184,5 +184,11 @@
     "fan_entity_not_found": {
       "message": "Thermex-tuuletinentiteettiä ei löytynyt."
     }
+  },
+  "issues": {
+    "hood_offline": {
+      "title": "Thermex-liesituuletin on offline-tilassa",
+      "description": "Thermex-liesituuletin osoitteessa {host} ei ole vastannut yli tuntiin. Tarkista, että liesituulettimessa on virta ja että se on yhdistetty verkkoosi, että API on otettu käyttöön Thermex-sovelluksessa ja että IP-osoite ei ole muuttunut (jos on, käytä integraation Määritä uudelleen -toimintoa). Ilmoitus poistuu itsestään, kun liesituuletin on taas yhteydessä."
+    }
   }
 }

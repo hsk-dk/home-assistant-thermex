@@ -184,5 +184,11 @@
     "fan_entity_not_found": {
       "message": "Thermex-fläktentiteten hittades inte."
     }
+  },
+  "issues": {
+    "hood_offline": {
+      "title": "Thermex-köksfläkten är offline",
+      "description": "Thermex-köksfläkten på {host} har inte svarat på över en timme. Kontrollera att fläkten har ström och är ansluten till ditt nätverk, att API:et är aktiverat i Thermex-appen och att IP-adressen inte har ändrats (använd i så fall Konfigurera om på integrationen). Meddelandet försvinner av sig självt när fläkten är ansluten igen."
+    }
   }
 }

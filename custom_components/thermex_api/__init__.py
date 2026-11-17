@@ -28,6 +28,7 @@ from .const import (
 from .coordinator import ThermexCoordinator
 from .data import ThermexConfigEntry, ThermexData
 from .hub import ThermexAuthError, ThermexHub
+from .repairs import OfflineIssue
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -125,6 +126,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> b
         coordinator = ThermexCoordinator(hass, entry, hub, runtime_manager)
         await coordinator.async_config_entry_first_refresh()
         coordinator.delayed_off.restore()
+        OfflineIssue(hass, entry, hub).start()
 
         # 4) Share everything with the platforms
         entry.runtime_data = ThermexData(

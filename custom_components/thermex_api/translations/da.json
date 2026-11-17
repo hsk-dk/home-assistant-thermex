@@ -184,5 +184,11 @@
     "fan_entity_not_found": {
       "message": "Thermex-emhætteentiteten blev ikke fundet."
     }
+  },
+  "issues": {
+    "hood_offline": {
+      "title": "Thermex-emhætten er offline",
+      "description": "Thermex-emhætten på {host} har ikke svaret i over en time. Tjek, at emhætten har strøm og er forbundet til dit netværk, at API'et er slået til i Thermex-appen, og at IP-adressen ikke er ændret (brug i så fald Genkonfigurer på integrationen). Beskeden forsvinder af sig selv, når emhætten er forbundet igen."
+    }
   }
 }

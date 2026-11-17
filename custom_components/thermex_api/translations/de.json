@@ -184,5 +184,11 @@
     "fan_entity_not_found": {
       "message": "Die Thermex-Lüfterentität wurde nicht gefunden."
     }
+  },
+  "issues": {
+    "hood_offline": {
+      "title": "Thermex-Dunstabzugshaube ist offline",
+      "description": "Die Thermex-Dunstabzugshaube unter {host} ist seit mehr als einer Stunde nicht erreichbar. Prüfe, ob die Haube mit Strom versorgt und mit deinem Netzwerk verbunden ist, ob die API in der Thermex-App aktiviert ist und ob sich die IP-Adresse geändert hat (dann die Integration neu konfigurieren). Dieser Hinweis verschwindet von selbst, sobald die Haube wieder verbunden ist."
+    }
   }
 }

@@ -184,5 +184,11 @@
     "fan_entity_not_found": {
       "message": "No se encontró la entidad del ventilador Thermex."
     }
+  },
+  "issues": {
+    "hood_offline": {
+      "title": "La campana Thermex está sin conexión",
+      "description": "La campana Thermex en {host} no responde desde hace más de una hora. Comprueba que la campana tiene corriente y está conectada a tu red, que la API está activada en la aplicación de Thermex y que su dirección IP no ha cambiado (si ha cambiado, usa Reconfigurar en la integración). Este aviso desaparece solo cuando la campana vuelve a conectarse."
+    }
   }
 }

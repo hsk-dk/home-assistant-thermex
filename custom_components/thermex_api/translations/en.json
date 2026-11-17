@@ -184,5 +184,11 @@
     "fan_entity_not_found": {
       "message": "The Thermex fan entity could not be found."
     }
+  },
+  "issues": {
+    "hood_offline": {
+      "title": "Thermex hood is offline",
+      "description": "The Thermex hood at {host} has been unreachable for more than an hour. Check that the hood is powered and connected to your network, that the API is enabled in the Thermex app, and that its IP address has not changed (use Reconfigure on the integration if it has). This issue disappears by itself when the hood is connected again."
+    }
   }
 }
