@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 class RuntimeManager:
     """Manages persistent runtime tracking for the Thermex fan."""
     
-    def __init__(self, store: Store) -> None:
+    def __init__(self, store: Store[dict[str, Any]]) -> None:
         self._store = store
         self._data: dict[str, Any] = {}
 
@@ -34,7 +34,7 @@ class RuntimeManager:
                 return
             
             # Validate and sanitize data types
-            validated_data = {}
+            validated_data: dict[str, Any] = {}
             
             # Validate runtime_hours (should be float >= 0)
             runtime_hours = data.get("runtime_hours")
@@ -125,7 +125,7 @@ class RuntimeManager:
 
     def get_runtime_hours(self) -> float:
         """Get total runtime hours, including current session if fan is running."""
-        total_hours = self._data.get("runtime_hours", 0.0)
+        total_hours: float = self._data.get("runtime_hours", 0.0)
         
         # If fan is currently running, add current session time
         last_start = self._data.get("last_start")
@@ -178,7 +178,8 @@ class RuntimeManager:
 
     def get_last_preset(self) -> str:
         """Get the last preset mode used."""
-        return self._data.get("last_preset", "off")
+        preset: str = self._data.get("last_preset", "off")
+        return preset
 
     def set_last_preset(self, mode: str) -> None:
         """Set the last preset mode."""

@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -38,7 +38,7 @@ class DelayedOffManager:
     def __init__(
         self,
         hass: HomeAssistant,
-        options: Callable[[], dict],
+        options: Callable[[], Mapping[str, Any]],
         hub: ThermexHub,
         runtime_manager: RuntimeManager,
         fan_running: Callable[[], bool],
@@ -58,7 +58,7 @@ class DelayedOffManager:
     @property
     def delay_minutes(self) -> int:
         """The configured delay, kept within what the options allow."""
-        delay = self._options().get("fan_auto_off_delay", DEFAULT_DELAYED_OFF_MINUTES)
+        delay: int = self._options().get("fan_auto_off_delay", DEFAULT_DELAYED_OFF_MINUTES)
         return max(MIN_DELAYED_OFF_MINUTES, min(MAX_DELAYED_OFF_MINUTES, delay))
 
     @callback

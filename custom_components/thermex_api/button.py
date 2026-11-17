@@ -4,6 +4,8 @@ import logging
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ThermexCoordinator
 from .data import ThermexConfigEntry
@@ -14,7 +16,9 @@ _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1
 
 
-async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ThermexConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
+) -> None:
     """Set up the buttons for Thermex API."""
     coordinator = entry.runtime_data.coordinator
     async_add_entities([
