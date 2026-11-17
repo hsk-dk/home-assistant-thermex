@@ -1,6 +1,7 @@
 """Tests for __init__ setup functions."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
 from custom_components.thermex_api import async_setup_entry, async_unload_entry

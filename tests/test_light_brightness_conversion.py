@@ -1,5 +1,4 @@
 """Tests for brightness conversion functions in light.py."""
-import pytest
 from custom_components.thermex_api.light import _to_api_brightness, _to_ha_brightness
 
 

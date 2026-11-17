@@ -1,7 +1,8 @@
 """Fixtures for Thermex API integration tests."""
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 import asyncio
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from custom_components.thermex_api.const import DOMAIN
 

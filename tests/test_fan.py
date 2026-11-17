@@ -1,5 +1,5 @@
 """Tests for the fan entity."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -193,7 +193,7 @@ class TestAttributes:
     def test_delayed_off_attributes(self, fan, delayed_off):
         delayed_off.active = True
         delayed_off.remaining = 7
-        delayed_off.scheduled_time = datetime(2026, 11, 7, 12, 0, tzinfo=timezone.utc)
+        delayed_off.scheduled_time = datetime(2026, 11, 7, 12, 0, tzinfo=UTC)
 
         attrs = fan.extra_state_attributes
 
