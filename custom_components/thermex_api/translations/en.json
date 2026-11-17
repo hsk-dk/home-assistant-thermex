@@ -8,6 +8,11 @@
           "host": "Hood IP address",
           "api_key": "API password",
           "enable_decolight": "Activate Ambient light"
+        },
+        "data_description": {
+          "host": "The IP address of the hood on your network.",
+          "api_key": "The API password set in the Thermex app.",
+          "enable_decolight": "Turn on if your hood model has the Decolight ambient light."
         }
       },
       "discovery_confirm": {
@@ -16,6 +21,10 @@
         "data": {
           "api_key": "API password",
           "enable_decolight": "Activate Ambient light"
+        },
+        "data_description": {
+          "api_key": "The API password set in the Thermex app.",
+          "enable_decolight": "Turn on if your hood model has the Decolight ambient light."
         }
       },
       "reauth_confirm": {
@@ -23,6 +32,9 @@
         "description": "The API password for {host} was rejected. Enter the current API password.",
         "data": {
           "api_key": "API password"
+        },
+        "data_description": {
+          "api_key": "The current API password of the hood."
         }
       },
       "reconfigure": {
@@ -31,6 +43,10 @@
         "data": {
           "host": "Hood IP address",
           "api_key": "API password"
+        },
+        "data_description": {
+          "host": "The new IP address of the hood.",
+          "api_key": "The API password set in the Thermex app."
         }
       }
     },
@@ -56,6 +72,12 @@
           "fan_alert_hours": "Grease filter cleaning notice after (runtime hours)",
           "fan_alert_days": "Grease filter cleaning notice after (days since reset)",
           "fan_auto_off_delay": "Delayed turn-off timer (minutes)"
+        },
+        "data_description": {
+          "enable_decolight": "Turn on if your hood model has the Decolight ambient light.",
+          "fan_alert_hours": "Runtime hours of the fan after which the cleaning notice is raised.",
+          "fan_alert_days": "Days since the filter time was last reset after which the cleaning notice is raised.",
+          "fan_auto_off_delay": "Default delay, in minutes, for the delayed turn-off button and action."
         },
         "description": "Filter alert triggers when EITHER runtime hours OR days since reset threshold is exceeded."
       }

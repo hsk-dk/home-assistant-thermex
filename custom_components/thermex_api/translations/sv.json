@@ -8,6 +8,11 @@
           "host": "Köksfläktens IP-adress",
           "api_key": "API-lösenord",
           "enable_decolight": "Aktivera dekorationsljus"
+        },
+        "data_description": {
+          "host": "Köksfläktens IP-adress i ditt nätverk.",
+          "api_key": "API-lösenordet som är inställt i Thermex-appen.",
+          "enable_decolight": "Slå på om din köksfläktsmodell har dekorationsljus (Decolight)."
         }
       },
       "discovery_confirm": {
@@ -16,6 +21,10 @@
         "data": {
           "api_key": "API-lösenord",
           "enable_decolight": "Aktivera dekorationsljus"
+        },
+        "data_description": {
+          "api_key": "API-lösenordet som är inställt i Thermex-appen.",
+          "enable_decolight": "Slå på om din köksfläktsmodell har dekorationsljus (Decolight)."
         }
       },
       "reauth_confirm": {
@@ -23,6 +32,9 @@
         "description": "API-lösenordet för {host} avvisades. Ange det aktuella API-lösenordet.",
         "data": {
           "api_key": "API-lösenord"
+        },
+        "data_description": {
+          "api_key": "Köksfläktens nuvarande API-lösenord."
         }
       },
       "reconfigure": {
@@ -31,6 +43,10 @@
         "data": {
           "host": "Köksfläktens IP address",
           "api_key": "API-lösenord"
+        },
+        "data_description": {
+          "host": "Köksfläktens nya IP-adress.",
+          "api_key": "API-lösenordet som är inställt i Thermex-appen."
         }
       }
     },
@@ -56,6 +72,12 @@
           "fan_alert_hours": "Notis för rengöring av fettfilter efter (driftstimmar)",
           "fan_alert_days": "Notis för rengöring av fettfilter efter (dagar sedan nollställning)",
           "fan_auto_off_delay": "Timer för fördröjd avstängning (minuter)"
+        },
+        "data_description": {
+          "enable_decolight": "Slå på om din köksfläktsmodell har dekorationsljus (Decolight).",
+          "fan_alert_hours": "Antal driftstimmar för fläkten, därefter visas rengöringsnotisen.",
+          "fan_alert_days": "Antal dagar sedan filtertiden senast nollställdes, därefter visas rengöringsnotisen.",
+          "fan_auto_off_delay": "Standardfördröjning i minuter för knappen och åtgärden för fördröjd avstängning."
         },
         "description": "Filteralarm utlöses när ANTINGEN driftstimmar ELLER dagar sedan nollställning överskrids."
       }

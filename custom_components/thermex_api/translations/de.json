@@ -8,6 +8,11 @@
           "host": "IP-Adresse der Dunstabzugshaube",
           "api_key": "API-Passwort",
           "enable_decolight": "Ambientebeleuchtung aktivieren"
+        },
+        "data_description": {
+          "host": "Die IP-Adresse der Dunstabzugshaube in deinem Netzwerk.",
+          "api_key": "Das in der Thermex-App festgelegte API-Passwort.",
+          "enable_decolight": "Aktivieren, wenn dein Modell die Ambientebeleuchtung (Decolight) hat."
         }
       },
       "discovery_confirm": {
@@ -16,6 +21,10 @@
         "data": {
           "api_key": "API-Passwort",
           "enable_decolight": "Ambientebeleuchtung aktivieren"
+        },
+        "data_description": {
+          "api_key": "Das in der Thermex-App festgelegte API-Passwort.",
+          "enable_decolight": "Aktivieren, wenn dein Modell die Ambientebeleuchtung (Decolight) hat."
         }
       },
       "reauth_confirm": {
@@ -23,6 +32,9 @@
         "description": "Das API-Passwort für {host} wurde abgelehnt. Gib das aktuelle API-Passwort ein.",
         "data": {
           "api_key": "API-Passwort"
+        },
+        "data_description": {
+          "api_key": "Das aktuelle API-Passwort der Dunstabzugshaube."
         }
       },
       "reconfigure": {
@@ -31,6 +43,10 @@
         "data": {
           "host": "IP-Adresse der Dunstabzugshaube",
           "api_key": "API-Passwort"
+        },
+        "data_description": {
+          "host": "Die neue IP-Adresse der Dunstabzugshaube.",
+          "api_key": "Das in der Thermex-App festgelegte API-Passwort."
         }
       }
     },
@@ -56,6 +72,12 @@
           "fan_alert_hours": "Hinweis zur Reinigung des Fettfilters nach (Betriebsstunden)",
           "fan_alert_days": "Hinweis zur Reinigung des Fettfilters nach (Tage seit Zurücksetzen)",
           "fan_auto_off_delay": "Verzögerte Abschaltung (Minuten)"
+        },
+        "data_description": {
+          "enable_decolight": "Aktivieren, wenn dein Modell die Ambientebeleuchtung (Decolight) hat.",
+          "fan_alert_hours": "Betriebsstunden des Lüfters, nach denen der Reinigungshinweis erscheint.",
+          "fan_alert_days": "Tage seit dem letzten Zurücksetzen der Filterzeit, nach denen der Reinigungshinweis erscheint.",
+          "fan_auto_off_delay": "Standardverzögerung in Minuten für die Schaltfläche und die Aktion zur verzögerten Abschaltung."
         },
         "description": "Der Filterhinweis wird ausgelöst, wenn ENTWEDER die Grenze der Betriebsstunden ODER der Tage seit dem Zurücksetzen überschritten wird."
       }

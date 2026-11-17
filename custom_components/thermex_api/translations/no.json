@@ -8,6 +8,11 @@
           "host": "IP-adresse for hetten",
           "api_key": "API-passord",
           "enable_decolight": "Aktiver dekorasjonslys"
+        },
+        "data_description": {
+          "host": "Hettens IP-adresse på nettverket ditt.",
+          "api_key": "API-passordet som er satt i Thermex-appen.",
+          "enable_decolight": "Slå på hvis hettemodellen din har dekorasjonslys (Decolight)."
         }
       },
       "discovery_confirm": {
@@ -16,6 +21,10 @@
         "data": {
           "api_key": "API-passord",
           "enable_decolight": "Aktiver dekorasjonslys"
+        },
+        "data_description": {
+          "api_key": "API-passordet som er satt i Thermex-appen.",
+          "enable_decolight": "Slå på hvis hettemodellen din har dekorasjonslys (Decolight)."
         }
       },
       "reauth_confirm": {
@@ -23,6 +32,9 @@
         "description": "API-passordet for {host} ble avvist. Skriv inn gjeldende API-passord.",
         "data": {
           "api_key": "API-passord"
+        },
+        "data_description": {
+          "api_key": "Hettens nåværende API-passord."
         }
       },
       "reconfigure": {
@@ -31,6 +43,10 @@
         "data": {
           "host": "IP-adresse for hetten",
           "api_key": "API-passord"
+        },
+        "data_description": {
+          "host": "Hettens nye IP-adresse.",
+          "api_key": "API-passordet som er satt i Thermex-appen."
         }
       }
     },
@@ -56,6 +72,12 @@
           "fan_alert_hours": "Varsel for rengjøring av fettfilter etter (driftstimer)",
           "fan_alert_days": "Varsel for rengjøring av fettfilter etter (dager siden tilbakestilling)",
           "fan_auto_off_delay": "Forsinket avslåing (minutter)"
+        },
+        "data_description": {
+          "enable_decolight": "Slå på hvis hettemodellen din har dekorasjonslys (Decolight).",
+          "fan_alert_hours": "Antall driftstimer for viften, deretter vises rengjøringsvarselet.",
+          "fan_alert_days": "Antall dager siden filtertiden sist ble tilbakestilt, deretter vises rengjøringsvarselet.",
+          "fan_auto_off_delay": "Standard forsinkelse i minutter for knappen og handlingen for forsinket avslåing."
         },
         "description": "Filtervarsel utløses når ENTEN grense for driftstimer ELLER dager siden tilbakestilling overskrides."
       }
