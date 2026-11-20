@@ -28,15 +28,15 @@ Install through the Home Assistant **Marketplace** (Settings → Marketplace, Ho
 - **Automatic Reconnection**: Built-in watchdog monitors connection and automatically reconnects on failures
 - **Real-time Updates**: Push notifications for all state changes via WebSocket
 - **Diagnostic Support**: Built-in diagnostics for troubleshooting (Settings → Devices → Thermex Hood → Download Diagnostics)
-- **Multi-language Support**: Full localisation in English, Danish, Swedish, Norwegian, Finnish and German
+- **Multi-language Support**: Full localisation in English, Danish, Swedish, Norwegian, Finnish, German and Spanish
 
 ### Entities Created
 - **Fan Entity**: `fan.thermex_hood` with speed presets and runtime attributes
 - **Light Entities**: Main light and Decolight (if enabled)
 - **Sensors**: 
-  - Filter runtime hours
+  - Grease filter runtime hours, and hours until the next cleaning (counts down from the alert threshold)
   - Connection status (diagnostic, disabled by default)
-  - Last reset time
+  - Last reset time, and days since it
   - Delayed turn-off timer status
 - **Binary Sensor**: Filter cleaning alert (hours and days thresholds)
 - **Buttons**: 
@@ -45,7 +45,7 @@ Install through the Home Assistant **Marketplace** (Settings → Marketplace, Ho
 
 ### Services Available
 - `thermex_api.reset_runtime`: Reset filter runtime counter (also available as button entity)
-- `thermex_api.start_delayed_off`: Start delayed turn-off timer (also available as button entity)
+- `thermex_api.start_delayed_off`: Start delayed turn-off timer (also available as button entity). The optional `minutes` (1-120) sets the delay for this one run; without it the configured delay is used
 - `thermex_api.cancel_delayed_off`: Cancel active delayed turn-off
 
 All three actions target the Thermex fan entity. `start_delayed_off` returns an error if the fan is not running.
@@ -85,6 +85,12 @@ If the hood gets a new IP address (or you change the API password in the Thermex
 **Settings → Devices & Services → Thermex Hood → ⋮ → Reconfigure**. Entities, history and
 automations are kept: they are identified by an internal ID, not by the IP address. If the hood
 rejects the stored password, Home Assistant also offers a re-authentication prompt.
+
+A hood that was found by discovery is recognised by its MAC address, so a new IP address handed out by
+your router is picked up automatically (the integration reloads with the new address). A hood added
+by hand learns its MAC address the first time Home Assistant sees it on the network. Discovery relies
+on the DHCP messages Home Assistant can see, so it needs Home Assistant to be on the same network as
+the hood; if it is not offered, add the hood manually.
 
 
 ---

@@ -1,182 +1,91 @@
-"""Tests for binary sensor entities."""
+"""Tests for the filter alert binary sensor."""
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
-from custom_components.thermex_api.binary_sensor import (
-    ThermexFilterAlert,
-    async_setup_entry,
-)
+from custom_components.thermex_api.binary_sensor import ThermexFilterAlert, async_setup_entry
 
 
-class TestBinarySensorSetup:
-    """Test binary sensor setup."""
-
-    @pytest.mark.asyncio
-    async def test_async_setup_entry(self, mock_hass, mock_hub, mock_config_entry):
-        """Test binary sensor setup from config entry."""
-        runtime_manager = MagicMock()
-        mock_hass.data = {
-            "thermex_api": {
-                mock_config_entry.entry_id: {
-                    "hub": mock_hub,
-                    "runtime_manager": runtime_manager,
-                }
-            }
-        }
-        
-        async_add_entities = AsyncMock()
-        
-        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
-        
-        async_add_entities.assert_called_once()
-        entities = async_add_entities.call_args[0][0]
-        assert len(entities) == 1
-        assert isinstance(entities[0], ThermexFilterAlert)
+@pytest.fixture
+def alert(coordinator):
+    # thresholds from the config entry: 100 hours / 90 days
+    return ThermexFilterAlert(coordinator)
 
 
-class TestThermexFilterAlert:
-    """Test ThermexFilterAlert binary sensor."""
+@pytest.mark.asyncio
+async def test_setup(coordinator, mock_hass, mock_config_entry):
+    mock_config_entry.runtime_data = MagicMock(coordinator=coordinator)
+    add = MagicMock()
 
-    @pytest.fixture
-    def filter_alert(self, mock_hub, mock_hass):
-        """Create a ThermexFilterAlert entity."""
-        runtime_manager = MagicMock()
-        runtime_manager.get_runtime_hours = MagicMock(return_value=10.0)
-        runtime_manager.get_days_since_reset = MagicMock(return_value=5)
-        
-        options = {
-            "fan_alert_hours": 30,
-            "fan_alert_days": 90,
-        }
-        
-        sensor = ThermexFilterAlert(
-            mock_hub,
-            runtime_manager,
-            options,
-        )
-        sensor.hass = mock_hass
-        return sensor
+    await async_setup_entry(mock_hass, mock_config_entry, add)
 
-    def test_sensor_initialization(self, filter_alert, mock_hub):
-        """Test sensor entity initialization."""
-        assert filter_alert._hub == mock_hub
-        assert filter_alert._options["fan_alert_hours"] == 30
-        assert filter_alert._options["fan_alert_days"] == 90
+    assert [type(e) for e in add.call_args.args[0]] == [ThermexFilterAlert]
 
-    def test_sensor_not_triggered_below_thresholds(self, filter_alert):
-        """Test sensor is off when below both thresholds."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 10.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = 5
-        
-        assert filter_alert.is_on is False
 
-    def test_sensor_triggered_by_hours_threshold(self, filter_alert):
-        """Test sensor is on when runtime hours exceed threshold."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 35.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = 5
-        
-        assert filter_alert.is_on is True
+def test_modelling(alert, mock_hub):
+    mock_hub.available = False
 
-    def test_sensor_triggered_by_days_threshold(self, filter_alert):
-        """Test sensor is on when days since reset exceed threshold."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 10.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = 95
-        
-        assert filter_alert.is_on is True
+    assert alert.device_class == BinarySensorDeviceClass.PROBLEM
+    assert alert.unique_id == "test_thermex_hub_threshold_alert"
+    assert alert.available is True  # computed from stored data
 
-    def test_sensor_triggered_by_both_thresholds(self, filter_alert):
-        """Test sensor is on when both thresholds exceeded."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 50.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = 100
-        
-        assert filter_alert.is_on is True
 
-    def test_sensor_with_no_reset_date_low_runtime(self, filter_alert):
-        """Test sensor behavior with no reset date and low runtime."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 2.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = None
-        
-        assert filter_alert.is_on is False
+def test_off_below_both_thresholds(alert):
+    assert alert.is_on is False
 
-    def test_sensor_with_no_reset_date_high_runtime(self, filter_alert):
-        """Test sensor behavior with no reset date and high runtime."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 10.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = None
-        
-        assert filter_alert.is_on is True
 
-    def test_sensor_extra_state_attributes(self, filter_alert):
-        """Test sensor returns correct extra state attributes."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 20.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = 15
-        
-        attrs = filter_alert.extra_state_attributes
-        
-        assert "runtime_hours" in attrs
-        assert "days_since_reset" in attrs
-        assert "hours_threshold" in attrs
-        assert "days_threshold" in attrs
-        assert attrs["runtime_hours"] == 20.0
-        assert attrs["days_since_reset"] == 15
-        assert attrs["hours_threshold"] == 30
-        assert attrs["days_threshold"] == 90
+def test_on_when_the_hours_threshold_is_reached(alert, runtime_manager):
+    runtime_manager.get_runtime_hours.return_value = 100
 
-    def test_sensor_device_class(self, filter_alert):
-        """Test sensor has correct device class."""
-        assert filter_alert.device_class == "problem"
+    assert alert.is_on is True
+    assert alert.extra_state_attributes["hours_exceeded"] is True
+    assert alert.extra_state_attributes["days_exceeded"] is False
 
-    def test_sensor_name(self, filter_alert):
-        """Test sensor name property."""
-        # Entity uses translation key, not name property
-        assert filter_alert._attr_translation_key == "thermex_binary_sensor_threshold_alert"
 
-    def test_sensor_high_runtime_no_days(self, filter_alert):
-        """Test sensor triggers on high runtime even without days."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 50.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = None
-        
-        # Should trigger based on runtime alone
-        assert filter_alert.is_on is True
+def test_on_when_the_filter_is_too_old(alert, runtime_manager):
+    runtime_manager.get_days_since_reset.return_value = 90
 
-    def test_sensor_alert_reason_hours_only(self, filter_alert):
-        """Test alert reason when only hours threshold exceeded."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 100.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = 30
-        filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
-        
-        reason = filter_alert._get_trigger_reason(True, False, 30)
-        
-        assert "Runtime hours exceeded" in reason
-        assert "Days since reset exceeded" not in reason
+    assert alert.is_on is True
+    assert alert.extra_state_attributes["days_exceeded"] is True
+    assert alert.extra_state_attributes["hours_exceeded"] is False
 
-    def test_sensor_alert_reason_days_only(self, filter_alert):
-        """Test alert reason when only days threshold exceeded."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 10.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = 100
-        filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
-        
-        reason = filter_alert._get_trigger_reason(False, True, 100)
-        
-        assert "Days since reset exceeded" in reason
-        assert "Runtime hours exceeded" not in reason
 
-    def test_sensor_alert_reason_both(self, filter_alert):
-        """Test alert reason when both thresholds exceeded."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 100.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = 100
-        filter_alert._options = {"fan_alert_hours": 50, "fan_alert_days": 90}
-        
-        reason = filter_alert._get_trigger_reason(True, True, 100)
-        
-        assert "Runtime hours exceeded" in reason
-        assert "Days since reset exceeded" in reason
+def test_without_a_reset_date_a_little_use_does_not_alert(alert, runtime_manager):
+    runtime_manager.get_days_since_reset.return_value = None
+    runtime_manager.get_runtime_hours.return_value = 2
 
-    def test_sensor_alert_reason_no_reset_date(self, filter_alert):
-        """Test alert reason when no reset date recorded."""
-        filter_alert._runtime_manager.get_runtime_hours.return_value = 50.0
-        filter_alert._runtime_manager.get_days_since_reset.return_value = None
-        filter_alert._options = {"fan_alert_hours": 100, "fan_alert_days": 90}
-        
-        reason = filter_alert._get_trigger_reason(False, True, None)
-        
-        assert "No filter reset date recorded" in reason
+    assert alert.is_on is False
+
+
+def test_without_a_reset_date_real_use_alerts(alert, runtime_manager):
+    runtime_manager.get_days_since_reset.return_value = None
+    runtime_manager.get_runtime_hours.return_value = 6
+
+    assert alert.is_on is True
+
+
+def test_attributes_use_none_for_unknown_values(alert, runtime_manager):
+    runtime_manager.get_days_since_reset.return_value = None
+    runtime_manager.get_last_reset.return_value = None
+
+    attrs = alert.extra_state_attributes
+
+    assert attrs["days_since_reset"] is None
+    assert attrs["last_reset"] is None
+    assert "trigger_reason" not in attrs
+
+
+def test_attributes_show_the_thresholds(alert):
+    attrs = alert.extra_state_attributes
+
+    assert attrs["runtime_hours"] == 12.5
+    assert attrs["hours_threshold"] == 100
+    assert attrs["days_threshold"] == 90
+    assert attrs["days_since_reset"] == 10
+
+
+def test_thresholds_follow_the_options(alert, mock_config_entry):
+    mock_config_entry.options = {**mock_config_entry.options, "fan_alert_hours": 10}
+
+    assert alert.is_on is True  # 12.5 h >= 10 h

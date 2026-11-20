@@ -2,63 +2,32 @@
 
 from __future__ import annotations
 
-import logging
+from dataclasses import asdict
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
 from .data import ThermexConfigEntry
-from .hub import ThermexHub
-
-_LOGGER = logging.getLogger(__name__)
 
 TO_REDACT = {"host", "api_key", "unique_id"}
+
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ThermexConfigEntry
 ) -> dict[str, Any]:
-    """Return diagnostics for a config entry."""
+    """Return diagnostics for a config entry (never the API password)."""
+    data = entry.runtime_data
+    runtime_manager = data.runtime_manager
+    state = data.coordinator.data
 
-    try:
-        hub: ThermexHub = entry.runtime_data.hub
-
-        # Gather diagnostic info with safe attribute access
-        recv_task = getattr(hub, "_recv_task", None)
-        ws = getattr(hub, "_ws", None)
-        diagnostics: dict[str, Any] = {
-            "host": getattr(hub, "_host", "unknown"),
-            "unique_id": getattr(hub, "unique_id", None),
-            "connection_state": getattr(hub, "_connection_state", "unknown"),
-            "pending_requests": list(hub._pending.keys()) if hasattr(hub, "_pending") else [],
-            "websocket_connected": bool(ws and not ws.closed),
-            "last_status": getattr(hub, "last_status", None),
-            "has_session": bool(getattr(hub, "_session", None) is not None),
-            "has_recv_task": bool(recv_task is not None and not recv_task.done()),
-            "protocol_version": getattr(hub, "_protocol_version", "unknown"),
-            "startup_complete": getattr(hub, "_startup_complete", False),
-        }
-
-        # Optionally include additional debug info if available
-        # But NEVER include sensitive info such as API keys
-        if hasattr(hub, "last_error") and hub.last_error:
-            diagnostics["last_error"] = hub.last_error
-
-        # If you store recent messages or state in hub, include a sample (not the full history)
-        if hasattr(hub, "recent_messages") and hub.recent_messages:
-            diagnostics["recent_messages"] = list(hub.recent_messages)[-5:]
-        
-        # Include runtime manager data if available
-        runtime_manager = entry.runtime_data.runtime_manager
-        if runtime_manager:
-            diagnostics["runtime_data"] = {
-                "runtime_hours": runtime_manager.get_runtime_hours(),
-                "last_reset": runtime_manager.get_last_reset(),
-                "days_since_reset": runtime_manager.get_days_since_reset(),
-            }
-
-        return async_redact_data(diagnostics, TO_REDACT)
-    
-    except Exception as err:
-        _LOGGER.exception("Error generating diagnostics")
-        return {"error": f"Failed to generate diagnostics: {err}"}
+    diagnostics = {
+        **data.hub.diagnostics(),
+        "state": asdict(state) if state else None,
+        "runtime_data": {
+            "runtime_hours": runtime_manager.get_runtime_hours(),
+            "last_reset": runtime_manager.get_last_reset(),
+            "days_since_reset": runtime_manager.get_days_since_reset(),
+        },
+    }
+    return async_redact_data(diagnostics, TO_REDACT)

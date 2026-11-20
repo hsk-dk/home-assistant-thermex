@@ -21,7 +21,8 @@ async def test_actions_are_registered_once_in_async_setup(mock_hass):
     for call in register.call_args_list:
         assert call.args[1] == "thermex_api"
         assert call.kwargs["entity_domain"] == "fan"
-        assert call.kwargs["func"] == FAN_ACTIONS[call.args[2]]
+        assert call.kwargs["func"] == FAN_ACTIONS[call.args[2]][0]
+        assert call.kwargs["schema"] is FAN_ACTIONS[call.args[2]][1]
 
 
 def test_every_registered_action_targets_fan_entities_of_this_integration():
@@ -46,5 +47,34 @@ def test_actions_and_errors_are_translated(path):
 def test_fan_methods_exist_for_every_action():
     from custom_components.thermex_api.fan import ThermexFan
 
-    for method in FAN_ACTIONS.values():
+    for method, _schema in FAN_ACTIONS.values():
         assert callable(getattr(ThermexFan, method)), method
+
+
+def test_start_delayed_off_takes_an_optional_number_of_minutes():
+    services = yaml.safe_load((COMPONENT / "services.yaml").read_text(encoding="utf-8"))
+    field = services["start_delayed_off"]["fields"]["minutes"]
+
+    assert field["required"] is False
+    assert (field["selector"]["number"]["min"], field["selector"]["number"]["max"]) == (1, 120)
+    assert "fields" not in services["cancel_delayed_off"]
+
+
+@pytest.mark.parametrize("path", sorted((COMPONENT / "translations").glob("*.json")), ids=lambda p: p.name)
+def test_the_minutes_field_is_translated(path):
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
+
+    field = data["services"]["start_delayed_off"]["fields"]["minutes"]
+    assert field["name"] and field["description"]
+
+
+def test_minutes_are_limited_to_what_the_options_allow():
+    import voluptuous as vol
+
+    schema = vol.Schema(FAN_ACTIONS["start_delayed_off"][1])
+
+    assert schema({}) == {}
+    assert schema({"minutes": "15"}) == {"minutes": 15}
+    for bad in (0, 121, "soon"):
+        with pytest.raises(vol.Invalid):
+            schema({"minutes": bad})

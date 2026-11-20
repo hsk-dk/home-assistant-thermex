@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
 
+from .coordinator import ThermexCoordinator
 from .hub import ThermexHub
 from .runtime_manager import RuntimeManager
 
@@ -13,6 +14,7 @@ class ThermexData:
 
     hub: ThermexHub
     runtime_manager: RuntimeManager
+    coordinator: ThermexCoordinator
 
 
 type ThermexConfigEntry = ConfigEntry[ThermexData]

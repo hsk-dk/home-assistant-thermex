@@ -9,6 +9,15 @@ start_delayed_off:
     entity:
       integration: thermex_api
       domain: fan
+  fields:
+    minutes:
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 120
+          unit_of_measurement: min
+          mode: box
 
 cancel_delayed_off:
   target:

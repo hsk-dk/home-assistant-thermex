@@ -24,7 +24,7 @@ class TestConfigFlow:
         with patch("custom_components.thermex_api.hub.ThermexHub.connect") as connect:
             with pytest.raises(AbortFlow):
                 await flow.async_step_user(
-                    user_input={CONF_HOST: "192.168.1.100", "api_key": "k"}
+                    user_input={CONF_HOST: "192.168.1.100", "api_key": "k", "enable_decolight": False}
                 )
 
         flow._async_abort_entries_match.assert_called_once_with({CONF_HOST: "192.168.1.100"})
@@ -41,7 +41,7 @@ class TestConfigFlow:
 
         with patch("custom_components.thermex_api.hub.ThermexHub.connect", return_value=None):
             result = await flow.async_step_user(
-                user_input={CONF_HOST: "192.168.1.100", "api_key": "k"}
+                user_input={CONF_HOST: "192.168.1.100", "api_key": "k", "enable_decolight": False}
             )
 
         device_id = result["data"]["device_id"]
@@ -49,6 +49,32 @@ class TestConfigFlow:
         assert "192" not in device_id
         flow.async_set_unique_id.assert_awaited_once_with(device_id)
         assert result["data"]["host"] == "192.168.1.100"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("decolight", [True, False])
+    async def test_the_decolight_is_chosen_when_the_hood_is_added(self, mock_hass, decolight):
+        flow = ConfigFlow()
+        flow.hass = mock_hass
+        flow.async_set_unique_id = AsyncMock()
+        flow._async_abort_entries_match = MagicMock()
+
+        with patch("custom_components.thermex_api.hub.ThermexHub.connect", return_value=None):
+            result = await flow.async_step_user(
+                user_input={CONF_HOST: "192.168.1.100", "api_key": "k", "enable_decolight": decolight}
+            )
+
+        assert result["options"] == {"enable_decolight": decolight}
+        assert "enable_decolight" not in result["data"]
+
+    def test_the_decolight_is_off_unless_asked_for(self):
+        from custom_components.thermex_api.config_flow import STEP_USER_DATA_SCHEMA
+
+        assert STEP_USER_DATA_SCHEMA({CONF_HOST: "h", "api_key": "k"})["enable_decolight"] is False
+
+    def test_reconfigure_does_not_ask_for_the_decolight(self):
+        from custom_components.thermex_api.config_flow import STEP_RECONFIGURE_DATA_SCHEMA
+
+        assert "enable_decolight" not in {str(k) for k in STEP_RECONFIGURE_DATA_SCHEMA.schema}
 
     @pytest.fixture
     def mock_setup_entry(self):
@@ -90,6 +116,7 @@ class TestConfigFlow:
                 user_input={
                     CONF_HOST: "192.168.1.100",
                     "api_key": "test_api_key",
+                    "enable_decolight": False,
                 }
             )
         
@@ -115,6 +142,7 @@ class TestConfigFlow:
                 user_input={
                     CONF_HOST: "192.168.1.100",
                     "api_key": "test_api_key",
+                    "enable_decolight": False,
                 }
             )
         
@@ -145,6 +173,7 @@ class TestConfigFlow:
                 user_input={
                     CONF_HOST: "192.168.1.100",
                     "api_key": "test_api_key",
+                    "enable_decolight": False,
                 }
             )
         
@@ -177,6 +206,7 @@ class TestConfigFlow:
                 user_input={
                     CONF_HOST: "192.168.1.100",
                     "api_key": "test_api_key",
+                    "enable_decolight": False,
                 }
             )
         

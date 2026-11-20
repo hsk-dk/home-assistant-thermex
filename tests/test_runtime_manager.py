@@ -253,3 +253,77 @@ class TestRuntimeDowntime:
 
         assert runtime_manager._data.get("last_start") is None
         assert runtime_manager.get_runtime_hours() == 3.0
+
+
+class _Clock:
+    """utcnow() stand-in with a settable time."""
+
+    def __init__(self, t=1_000_000.0):
+        self.t = t
+
+    def __call__(self):
+        return MagicMock(timestamp=lambda: self.t)
+
+
+class TestRuntimeCheckpoint:
+    """The open session is moved into the total, so a reload/restart loses nothing."""
+
+    @pytest.fixture
+    def clock(self):
+        from unittest.mock import patch
+
+        clock = _Clock()
+        with patch("custom_components.thermex_api.runtime_manager.utcnow", clock):
+            yield clock
+
+    @pytest.fixture
+    def manager(self):
+        store = MagicMock()
+        store.async_save = AsyncMock()
+        return RuntimeManager(store)
+
+    def test_checkpoint_keeps_the_session_open_and_the_total_unchanged(self, manager, clock):
+        manager.start()
+        clock.t += 3600.0
+
+        before = manager.get_runtime_hours()
+        manager.checkpoint()
+
+        assert manager.is_running()
+        assert manager.get_runtime_hours() == before == 1.0
+
+    def test_time_after_a_checkpoint_is_still_counted(self, manager, clock):
+        manager.start()
+        clock.t += 3600.0
+        manager.checkpoint()
+        clock.t += 1800.0
+        manager.stop()
+
+        assert manager.get_runtime_hours() == 1.5
+        assert not manager.is_running()
+
+    def test_checkpoint_without_a_session_does_nothing(self, manager, clock):
+        manager.checkpoint()
+
+        assert manager.get_runtime_hours() == 0.0
+        assert not manager.is_running()
+
+    def test_delayed_off_roundtrip(self, manager):
+        from homeassistant.util.dt import parse_datetime
+
+        when = parse_datetime("2026-11-07T12:00:00+00:00")
+        manager.set_delayed_off(when)
+        assert manager.get_delayed_off() == when
+
+        manager.set_delayed_off(None)
+        assert manager.get_delayed_off() is None
+
+    @pytest.mark.asyncio
+    async def test_delayed_off_survives_load_and_bad_values_are_dropped(self, manager):
+        manager._store.async_load = AsyncMock(return_value={"delayed_off_at": "2026-11-07T12:00:00+00:00"})
+        await manager.load()
+        assert manager.get_delayed_off() is not None
+
+        manager._store.async_load = AsyncMock(return_value={"delayed_off_at": "not a date"})
+        await manager.load()
+        assert manager.get_delayed_off() is None

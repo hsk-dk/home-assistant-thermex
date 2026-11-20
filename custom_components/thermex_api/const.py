@@ -21,6 +21,8 @@ DEFAULT_HEARTBEAT_INTERVAL = 30  # Seconds between heartbeat status requests
 DEFAULT_CONNECTION_TIMEOUT = 120  # Seconds before connection considered dead
 DEFAULT_RECONNECT_DELAY = 2  # Seconds between reconnection attempts
 MAX_RECONNECT_ATTEMPTS = 3  # Maximum number of consecutive reconnection attempts
+MIN_CONNECTION_LIFETIME = 5  # A connection closed sooner than this (s) is reopened after a pause
+MIN_CONNECTION_LIFETIME_PAUSE = 5  # Seconds to wait before reopening such a connection
 MAX_MISSED_HEARTBEATS = 2  # Unanswered heartbeats in a row before the connection is dropped
 WEBSOCKET_REQUEST_TIMEOUT = 10  # Seconds to wait for websocket response
 
@@ -32,5 +34,11 @@ FALLBACK_STATUS_TIMEOUT = 15  # Seconds to wait before requesting fallback statu
 
 # Runtime tracking settings
 RUNTIME_UPDATE_INTERVAL = 30  # Seconds between runtime sensor updates
+RUNTIME_CHECKPOINT_INTERVAL = 600  # Seconds between saves of the running session (limits loss on a crash)
 DELAYED_TURNOFF_COUNTDOWN_INTERVAL = 60  # Seconds between countdown updates (1 minute)
+DEFAULT_ALERT_HOURS = 30  # Filter cleaning notice after this many runtime hours
+DEFAULT_ALERT_DAYS = 90  # ...or this many days since the last reset
+MIN_DELAYED_OFF_MINUTES = 1
+MAX_DELAYED_OFF_MINUTES = 120
+DEFAULT_DELAYED_OFF_MINUTES = 10
 MINIMUM_RUNTIME_FOR_NO_RESET_ALERT = 5  # Minimum runtime hours to trigger alert when no reset date exists

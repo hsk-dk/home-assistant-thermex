@@ -1,24 +1,23 @@
 """Shared base entity for the Thermex integration."""
-from typing import Any
-
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import DeviceInfo, Entity
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .hub import ThermexHub
+from .coordinator import ThermexCoordinator
 
 
-class ThermexEntity(Entity):
-    """Base class: device info, per-hood notifications and availability."""
+class ThermexEntity(CoordinatorEntity[ThermexCoordinator]):
+    """Base class: device info, shared state and availability."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = False
     # Entities that only use locally stored data (filter counters, ...) stay
     # available while the hood is offline.
     _requires_connection = True
 
-    def __init__(self, hub: ThermexHub) -> None:
-        self._hub = hub
+    def __init__(self, coordinator: ThermexCoordinator) -> None:
+        super().__init__(coordinator)
+        self._hub = coordinator.hub
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -29,11 +28,8 @@ class ThermexEntity(Entity):
         return not self._requires_connection or self._hub.available
 
     async def async_added_to_hass(self) -> None:
-        """Subscribe to this hood's notifications and availability changes."""
+        """Follow the shared state, and the hood going offline or coming back."""
         await super().async_added_to_hass()
-        self.async_on_remove(
-            async_dispatcher_connect(self.hass, self._hub.signal, self._handle_notify)
-        )
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass, self._hub.availability_signal, self._handle_availability
@@ -44,7 +40,3 @@ class ThermexEntity(Entity):
     def _handle_availability(self) -> None:
         """The hood went offline or came back."""
         self.async_write_ha_state()
-
-    @callback
-    def _handle_notify(self, ntf_type: str, data: dict[str, Any]) -> None:
-        """Handle a notification from the hood (override in subclasses)."""

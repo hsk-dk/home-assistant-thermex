@@ -1,11 +1,13 @@
 # File: custom_components/thermex_api/sensor.py
 """
-Thermex API sensors for runtime tracking of the Thermex Fan.
-Creates persistent sensors for:
- - last_reset
- - filter_time
+Thermex API sensors:
+ - grease filter runtime (hours) and hours until the next cleaning
+ - last reset of the runtime counter and days since it
+ - connection status (diagnostic)
+ - scheduled delayed turn-off
 """
 import logging
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -15,14 +17,13 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import callback
-from homeassistant.helpers.event import async_call_later
-from homeassistant.util import dt as dt_util
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.util.dt import parse_datetime
 
-from .const import RUNTIME_UPDATE_INTERVAL
+from .const import DEFAULT_ALERT_HOURS, RUNTIME_UPDATE_INTERVAL
+from .coordinator import ThermexCoordinator
 from .data import ThermexConfigEntry
 from .entity import ThermexEntity
-from .entity_lookup import find_fan_entity_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,122 +31,143 @@ PARALLEL_UPDATES = 0
 
 CONNECTION_STATES = ["connected", "disconnected", "error", "closed"]
 
+
 async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
-    """Set up persistent runtime-tracking sensors for the Thermex fan."""
-    hub = entry.runtime_data.hub
-    runtime_manager = entry.runtime_data.runtime_manager
+    """Set up the Thermex sensors."""
+    coordinator = entry.runtime_data.coordinator
 
     async_add_entities([
-        LastResetSensor(hub, runtime_manager),
-        RuntimeHoursSensor(hub, runtime_manager),
-        ConnectionStatusSensor(hub, runtime_manager),
-        DelayedTurnOffSensor(hub, runtime_manager, entry.entry_id),
+        LastResetSensor(coordinator),
+        DaysSinceResetSensor(coordinator),
+        RuntimeHoursSensor(coordinator),
+        HoursUntilCleaningSensor(coordinator),
+        ConnectionStatusSensor(coordinator),
+        DelayedTurnOffSensor(coordinator),
     ])
 
 
-class BaseRuntimeSensor(ThermexEntity, SensorEntity):
-    """Base class for sensors that refresh on fan notifications."""
+class _RuntimeSensor(ThermexEntity, SensorEntity):
+    """A sensor derived from the runtime, which grows between two updates from the hood."""
 
-    def __init__(self, hub, runtime_manager):
-        super().__init__(hub)
-        self._runtime_manager = runtime_manager
-
-    async def async_added_to_hass(self):
-        await super().async_added_to_hass()
-        self.async_write_ha_state()
-
-    @callback
-    def _handle_notify(self, ntf_type, data):
-        """On any fan notify, refresh this sensor."""
-        if ntf_type.lower() == "fan":
-            self.async_write_ha_state()
-
-
-class RuntimeHoursSensor(BaseRuntimeSensor):
-    """Sensor for the cumulative runtime hours of the Thermex fan."""
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.HOURS
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING  # a drop = the filter was reset
     _attr_suggested_display_precision = 1
 
-    def __init__(self, hub, runtime_manager):
-        super().__init__(hub, runtime_manager)
-        self._attr_unique_id = f"{hub.unique_id}_runtime_hours"
-        self._attr_translation_key = "thermex_sensor_runtime_hours"
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._runtime_manager = coordinator.runtime_manager
         self._update_timer = None
-        self._fan_is_running = False
-        
-    async def async_added_to_hass(self):
-        """Set up the sensor and start periodic updates."""
-        await super().async_added_to_hass()
-        # Updates will be scheduled when fan starts running
-        
+
     async def async_will_remove_from_hass(self):
         """Clean up when removing sensor."""
         await super().async_will_remove_from_hass()
+        self._stop_timer()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """While the fan runs, the counter grows between two updates from the hood."""
+        if self.coordinator.fan_running:
+            if self._update_timer is None:
+                self._schedule_update()
+        else:
+            self._stop_timer()
+        super()._handle_coordinator_update()
+
+    def _stop_timer(self) -> None:
         if self._update_timer:
             self._update_timer()
             self._update_timer = None
-    
+
+    def _schedule_update(self) -> None:
+        self._update_timer = async_call_later(
+            self.hass, RUNTIME_UPDATE_INTERVAL, self._periodic_update
+        )
+
     @callback
-    def _handle_notify(self, ntf_type, data):
-        """Handle fan state changes and update scheduling."""
-        if ntf_type.lower() != "fan":
-            return
-        
-        # Check if fan is running
-        fan_data = data.get("Fan", {})
-        fan_speed = fan_data.get("fanspeed", 0)
-        fan_on = bool(fan_data.get("fanonoff", 0)) and fan_speed != 0
-        
-        # Update state
+    def _periodic_update(self, _now: datetime) -> None:
+        """Show the time that has passed since the last update."""
+        self._update_timer = None
         self.async_write_ha_state()
-        
-        # Manage periodic updates based on fan state
-        if fan_on and not self._fan_is_running:
-            # Fan just turned on - start periodic updates
-            self._fan_is_running = True
+        if self.coordinator.fan_running:
             self._schedule_update()
-        elif not fan_on and self._fan_is_running:
-            # Fan just turned off - stop periodic updates
-            self._fan_is_running = False
-            if self._update_timer:
-                self._update_timer()
-                self._update_timer = None
-            
-    def _schedule_update(self):
-        """Schedule the next update (only when fan is running)."""
-        if self._update_timer:
-            self._update_timer()
-        
-        # Only schedule if fan is still running
-        if self._fan_is_running:
-            self._update_timer = async_call_later(
-                self.hass, RUNTIME_UPDATE_INTERVAL, self._periodic_update
-            )
-    
-    async def _periodic_update(self, _):
-        """Periodic update callback to track runtime accumulation."""
-        self.async_write_ha_state()
-        # Schedule the next update (will check if fan is still running)
-        self._schedule_update()
- 
+
+
+
+class RuntimeHoursSensor(_RuntimeSensor):
+    """Sensor for the cumulative runtime hours of the Thermex fan."""
+
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING  # a drop = the filter was reset
+    _attr_translation_key = "thermex_sensor_runtime_hours"
+
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self._hub.unique_id}_runtime_hours"
+
     @property
     def native_value(self):
         return self._runtime_manager.get_runtime_hours()
 
 
-class LastResetSensor(BaseRuntimeSensor):
+class HoursUntilCleaningSensor(_RuntimeSensor):
+    """Runtime hours left before the grease filter should be cleaned (0 once it is due)."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_translation_key = "thermex_sensor_hours_until_cleaning"
+    _requires_connection = False  # computed from locally stored runtime
+
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self._hub.unique_id}_hours_until_cleaning"
+
+    @property
+    def native_value(self):
+        threshold = self.coordinator.config_entry.options.get("fan_alert_hours", DEFAULT_ALERT_HOURS)
+        return max(0.0, threshold - self._runtime_manager.get_runtime_hours())
+
+
+class DaysSinceResetSensor(ThermexEntity, SensorEntity):
+    """Days since the filter was last cleaned (the runtime counter was reset)."""
+
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.DAYS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+    _attr_translation_key = "thermex_sensor_days_since_reset"
+    _requires_connection = False  # computed from locally stored data
+
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._runtime_manager = coordinator.runtime_manager
+        self._attr_unique_id = f"{self._hub.unique_id}_days_since_reset"
+
+    async def async_added_to_hass(self) -> None:
+        """The value changes with the calendar, not with anything the hood sends."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._hourly, timedelta(hours=1))
+        )
+
+    @callback
+    def _hourly(self, _now: datetime) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self):
+        return self._runtime_manager.get_days_since_reset()
+
+
+class LastResetSensor(ThermexEntity, SensorEntity):
     """Timestamp when the runtime counter was last reset."""
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "thermex_sensor_last_reset"
     _requires_connection = False  # stored locally
 
-    def __init__(self, hub, runtime_manager):
-        super().__init__(hub, runtime_manager)
-        self._attr_unique_id = f"{hub.unique_id}_last_reset"
-        self._attr_translation_key = "thermex_sensor_last_reset"
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._runtime_manager = coordinator.runtime_manager
+        self._attr_unique_id = f"{self._hub.unique_id}_last_reset"
 
     @property
     def native_value(self):
@@ -155,83 +177,60 @@ class LastResetSensor(BaseRuntimeSensor):
         return None
 
 
-class ConnectionStatusSensor(BaseRuntimeSensor):
+class ConnectionStatusSensor(ThermexEntity, SensorEntity):
     """Connection state of the hood (diagnostic)."""
 
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = CONNECTION_STATES
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
+    _attr_translation_key = "thermex_sensor_connection_status"
     _requires_connection = False  # it exists to show that the hood is offline
 
-    def __init__(self, hub, runtime_manager):
-        super().__init__(hub, runtime_manager)
-        self._attr_unique_id = f"{hub.unique_id}_connection_status"
-        self._attr_translation_key = "thermex_sensor_connection_status"
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self._hub.unique_id}_connection_status"
 
     @property
     def native_value(self):
         """Return the connection state."""
-        state = self._hub.get_coordinator_data().get("connection_state", "disconnected")
+        state = self._hub.connection_state
         return state if state in CONNECTION_STATES else "disconnected"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Only slowly changing details; the old counters changed on every update."""
+        """Only slowly changing details."""
         return {
             "last_error": self._hub.last_error,
             "protocol_version": self._hub.protocol_version,
         }
 
-    @callback
-    def _handle_notify(self, ntf_type, data):
-        """Update on any notification to refresh connection status."""
-        self.async_write_ha_state()
 
-
-class DelayedTurnOffSensor(BaseRuntimeSensor):
+class DelayedTurnOffSensor(ThermexEntity, SensorEntity):
     """Sensor that shows the scheduled turn-off time for the fan."""
-    
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-    
-    def __init__(self, hub, runtime_manager, entry_id):
-        super().__init__(hub, runtime_manager)
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{hub.unique_id}_delayed_turn_off_time"
-        self._attr_translation_key = "thermex_sensor_delayed_turn_off"
-        
-    @callback
-    def _handle_notify(self, ntf_type, data):
-        """Update on delayed turn-off changes and on fan state changes."""
-        if ntf_type == "delayed_turn_off" or ntf_type.lower() == "fan":
-            self.async_write_ha_state()
 
-    def _fan_state(self):
-        """Return the fan's state object, found via the entity registry."""
-        fan_entity_id = find_fan_entity_id(self.hass, self._hub.unique_id)
-        return self.hass.states.get(fan_entity_id) if fan_entity_id else None
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_translation_key = "thermex_sensor_delayed_turn_off"
+
+    def __init__(self, coordinator: ThermexCoordinator):
+        super().__init__(coordinator)
+        self._delayed_off = coordinator.delayed_off
+        self._attr_unique_id = f"{self._hub.unique_id}_delayed_turn_off_time"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(self._delayed_off.async_add_listener(self.async_write_ha_state))
 
     @property
     def native_value(self):
         """Return the scheduled turn-off time."""
-        fan_state = self._fan_state()
-        if not fan_state:
-            return None
-        scheduled_time = fan_state.attributes.get("delayed_off_scheduled_time")
-        if not scheduled_time:
-            return None
-        parsed_dt = parse_datetime(scheduled_time)
-        if parsed_dt and parsed_dt.tzinfo is None:
-            parsed_dt = parsed_dt.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
-        return parsed_dt
+        return self._delayed_off.scheduled_time
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional delayed turn-off information."""
-        fan_state = self._fan_state()
-        attrs = fan_state.attributes if fan_state else {}
         return {
-            "delayed_off_active": attrs.get("delayed_off_active", False),
-            "delayed_off_remaining": attrs.get("delayed_off_remaining", 0),
-            "delayed_off_delay": attrs.get("delayed_off_delay", 10),
+            "delayed_off_active": self._delayed_off.active,
+            "delayed_off_remaining": self._delayed_off.remaining,
+            "delayed_off_delay": self._delayed_off.delay_minutes,
         }
