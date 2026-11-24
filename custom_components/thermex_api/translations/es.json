@@ -8,6 +8,11 @@
           "host": "Dirección IP de la campana",
           "api_key": "Contraseña de la API",
           "enable_decolight": "Activar luz decorativa"
+        },
+        "data_description": {
+          "host": "La dirección IP de la campana en tu red.",
+          "api_key": "La contraseña de la API establecida en la aplicación de Thermex.",
+          "enable_decolight": "Actívalo si tu modelo de campana tiene luz decorativa (Decolight)."
         }
       },
       "discovery_confirm": {
@@ -16,6 +21,10 @@
         "data": {
           "api_key": "Contraseña de la API",
           "enable_decolight": "Activar luz decorativa"
+        },
+        "data_description": {
+          "api_key": "La contraseña de la API establecida en la aplicación de Thermex.",
+          "enable_decolight": "Actívalo si tu modelo de campana tiene luz decorativa (Decolight)."
         }
       },
       "reauth_confirm": {
@@ -23,6 +32,9 @@
         "description": "La contraseña de la API de {host} fue rechazada. Introduce la contraseña actual de la API.",
         "data": {
           "api_key": "Contraseña de la API"
+        },
+        "data_description": {
+          "api_key": "La contraseña actual de la API de la campana."
         }
       },
       "reconfigure": {
@@ -31,6 +43,10 @@
         "data": {
           "host": "Dirección IP de la campana",
           "api_key": "Contraseña de la API"
+        },
+        "data_description": {
+          "host": "La nueva dirección IP de la campana.",
+          "api_key": "La contraseña de la API establecida en la aplicación de Thermex."
         }
       }
     },
@@ -56,6 +72,12 @@
           "fan_alert_hours": "Aviso de limpieza del filtro de grasa tras (horas de funcionamiento)",
           "fan_alert_days": "Aviso de limpieza del filtro de grasa tras (días desde el restablecimiento)",
           "fan_auto_off_delay": "Temporizador de apagado diferido (minutos)"
+        },
+        "data_description": {
+          "enable_decolight": "Actívalo si tu modelo de campana tiene luz decorativa (Decolight).",
+          "fan_alert_hours": "Horas de funcionamiento del ventilador tras las cuales aparece el aviso de limpieza.",
+          "fan_alert_days": "Días desde el último restablecimiento del tiempo del filtro tras los cuales aparece el aviso de limpieza.",
+          "fan_auto_off_delay": "Retardo predeterminado, en minutos, del botón y la acción de apagado diferido."
         },
         "description": "El aviso del filtro se activa cuando se supera el límite de horas de funcionamiento O el de días desde el restablecimiento."
       }
@@ -161,6 +183,12 @@
     },
     "fan_entity_not_found": {
       "message": "No se encontró la entidad del ventilador Thermex."
+    }
+  },
+  "issues": {
+    "hood_offline": {
+      "title": "La campana Thermex está sin conexión",
+      "description": "La campana Thermex en {host} no responde desde hace más de una hora. Comprueba que la campana tiene corriente y está conectada a tu red, que la API está activada en la aplicación de Thermex y que su dirección IP no ha cambiado (si ha cambiado, usa Reconfigurar en la integración). Este aviso desaparece solo cuando la campana vuelve a conectarse."
     }
   }
 }

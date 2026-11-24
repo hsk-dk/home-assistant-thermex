@@ -10,8 +10,8 @@ from aiohttp import ClientWebSocketResponse, WSMsgType
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.entity import DeviceInfo
 
 from .const import (
     DEFAULT_CONNECTION_TIMEOUT,
@@ -61,12 +61,12 @@ class ThermexHub:
         # Stable id used for the device and entity unique ids. It must not depend
         # on the IP address (which can change); the config entry stores it.
         self.unique_id = device_id or f"thermex_{host.replace('.', '_')}"
-        self._pending: dict[str, asyncio.Future] = {}
+        self._pending: dict[str, asyncio.Future[dict[str, Any]]] = {}
         # Responses are matched by name only, so allow one in-flight request per type
         self._request_locks: dict[str, asyncio.Lock] = {}
         self._ws_lock = asyncio.Lock()
         self._ws: ClientWebSocketResponse | None = None
-        self._recv_task: asyncio.Task | None = None
+        self._recv_task: asyncio.Task[None] | None = None
         self._session: aiohttp.ClientSession | None = None  # HA's shared session; never closed here
         self._auth_failed = False
         # Set by the integration: called once when the hood rejects the password
@@ -74,9 +74,9 @@ class ThermexHub:
         self._protocol_version: str | None = None
 
         self._connection_state: str = "disconnected"
-        self.last_status: dict | None = None
+        self.last_status: dict[str, Any] | None = None
         self.last_error: str | None = None
-        self.recent_messages: collections.deque = collections.deque(maxlen=10)
+        self.recent_messages: collections.deque[Any] = collections.deque(maxlen=10)
         self._connected_at = 0.0
 
         self._reconnect_lock = asyncio.Lock()
@@ -85,7 +85,7 @@ class ThermexHub:
         self._closing = False  # Flag to prevent operations during close
         
         # Watchdog settings
-        self._watchdog_task: asyncio.Task | None = None
+        self._watchdog_task: asyncio.Task[None] | None = None
         self._last_activity = 0.0  # Will be set properly when loop starts
         self._heartbeat_interval = DEFAULT_HEARTBEAT_INTERVAL
         self._missed_heartbeats = 0  # Heartbeats in a row the hood did not answer

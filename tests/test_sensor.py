@@ -1,5 +1,5 @@
 """Tests for the sensors."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,8 +8,8 @@ from homeassistant.const import EntityCategory, UnitOfTime
 
 from custom_components.thermex_api.sensor import (
     ConnectionStatusSensor,
-    DelayedTurnOffSensor,
     DaysSinceResetSensor,
+    DelayedTurnOffSensor,
     HoursUntilCleaningSensor,
     LastResetSensor,
     RuntimeHoursSensor,
@@ -72,7 +72,7 @@ class TestRuntimeHoursSensor:
         coordinator.fan_running = True
 
         with patch("custom_components.thermex_api.sensor.async_call_later") as later:
-            sensor._periodic_update(datetime.now(timezone.utc))
+            sensor._periodic_update(datetime.now(UTC))
 
         sensor.async_write_ha_state.assert_called_once()
         later.assert_called_once()
@@ -81,7 +81,7 @@ class TestRuntimeHoursSensor:
         coordinator.fan_running = False
 
         with patch("custom_components.thermex_api.sensor.async_call_later") as later:
-            sensor._periodic_update(datetime.now(timezone.utc))
+            sensor._periodic_update(datetime.now(UTC))
 
         later.assert_not_called()
 
@@ -101,7 +101,7 @@ class TestLastResetSensor:
         return LastResetSensor(coordinator)
 
     def test_value_is_a_timestamp(self, sensor):
-        assert sensor.native_value == datetime(2026, 1, 15, 10, 0, tzinfo=timezone.utc)
+        assert sensor.native_value == datetime(2026, 1, 15, 10, 0, tzinfo=UTC)
 
     def test_never_reset(self, sensor, runtime_manager):
         runtime_manager.get_last_reset.return_value = None
@@ -161,7 +161,7 @@ class TestDelayedTurnOffSensor:
         }
 
     def test_active_timer(self, sensor, delayed_off):
-        when = datetime(2026, 11, 7, 12, 0, tzinfo=timezone.utc)
+        when = datetime(2026, 11, 7, 12, 0, tzinfo=UTC)
         delayed_off.active, delayed_off.remaining, delayed_off.scheduled_time = True, 5, when
 
         assert sensor.native_value == when

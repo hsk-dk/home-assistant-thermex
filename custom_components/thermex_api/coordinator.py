@@ -16,7 +16,7 @@ from .runtime_manager import RuntimeManager
 from .state import PRESET_BY_SPEED, FanState, ThermexState, merge_status
 
 if TYPE_CHECKING:
-    from homeassistant.config_entries import ConfigEntry
+    from .data import ThermexConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,10 +29,12 @@ class ThermexCoordinator(DataUpdateCoordinator[ThermexState]):
     entity), so it works whichever entities the user has enabled.
     """
 
+    config_entry: ThermexConfigEntry
+
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: ConfigEntry,
+        entry: ThermexConfigEntry,
         hub: ThermexHub,
         runtime_manager: RuntimeManager,
     ) -> None:

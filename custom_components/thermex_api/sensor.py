@@ -16,7 +16,8 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import EntityCategory, UnitOfTime
-from homeassistant.core import callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.util.dt import parse_datetime
 
@@ -32,7 +33,9 @@ PARALLEL_UPDATES = 0
 CONNECTION_STATES = ["connected", "disconnected", "error", "closed"]
 
 
-async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ThermexConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
+) -> None:
     """Set up the Thermex sensors."""
     coordinator = entry.runtime_data.coordinator
 
@@ -56,9 +59,9 @@ class _RuntimeSensor(ThermexEntity, SensorEntity):
     def __init__(self, coordinator: ThermexCoordinator):
         super().__init__(coordinator)
         self._runtime_manager = coordinator.runtime_manager
-        self._update_timer = None
+        self._update_timer: CALLBACK_TYPE | None = None
 
-    async def async_will_remove_from_hass(self):
+    async def async_will_remove_from_hass(self) -> None:
         """Clean up when removing sensor."""
         await super().async_will_remove_from_hass()
         self._stop_timer()
@@ -104,7 +107,7 @@ class RuntimeHoursSensor(_RuntimeSensor):
         self._attr_unique_id = f"{self._hub.unique_id}_runtime_hours"
 
     @property
-    def native_value(self):
+    def native_value(self) -> float:
         return self._runtime_manager.get_runtime_hours()
 
 
@@ -120,8 +123,8 @@ class HoursUntilCleaningSensor(_RuntimeSensor):
         self._attr_unique_id = f"{self._hub.unique_id}_hours_until_cleaning"
 
     @property
-    def native_value(self):
-        threshold = self.coordinator.config_entry.options.get("fan_alert_hours", DEFAULT_ALERT_HOURS)
+    def native_value(self) -> float:
+        threshold: float = self.coordinator.config_entry.options.get("fan_alert_hours", DEFAULT_ALERT_HOURS)
         return max(0.0, threshold - self._runtime_manager.get_runtime_hours())
 
 
@@ -152,7 +155,7 @@ class DaysSinceResetSensor(ThermexEntity, SensorEntity):
         self.async_write_ha_state()
 
     @property
-    def native_value(self):
+    def native_value(self) -> int | None:
         return self._runtime_manager.get_days_since_reset()
 
 
@@ -170,7 +173,7 @@ class LastResetSensor(ThermexEntity, SensorEntity):
         self._attr_unique_id = f"{self._hub.unique_id}_last_reset"
 
     @property
-    def native_value(self):
+    def native_value(self) -> datetime | None:
         iso = self._runtime_manager.get_last_reset()
         if iso:
             return parse_datetime(iso)
@@ -192,7 +195,7 @@ class ConnectionStatusSensor(ThermexEntity, SensorEntity):
         self._attr_unique_id = f"{self._hub.unique_id}_connection_status"
 
     @property
-    def native_value(self):
+    def native_value(self) -> str:
         """Return the connection state."""
         state = self._hub.connection_state
         return state if state in CONNECTION_STATES else "disconnected"
@@ -222,7 +225,7 @@ class DelayedTurnOffSensor(ThermexEntity, SensorEntity):
         self.async_on_remove(self._delayed_off.async_add_listener(self.async_write_ha_state))
 
     @property
-    def native_value(self):
+    def native_value(self) -> datetime | None:
         """Return the scheduled turn-off time."""
         return self._delayed_off.scheduled_time
 

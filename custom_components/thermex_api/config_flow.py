@@ -8,7 +8,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 from homeassistant.const import CONF_DEVICE_ID, CONF_HOST, CONF_MAC
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from homeassistant.helpers.typing import UNDEFINED
@@ -39,7 +39,7 @@ STEP_DISCOVERY_DATA_SCHEMA = vol.Schema({
     vol.Optional("enable_decolight", default=False): bool,
 })
 
-async def _async_validate_connection(hass, host: str, api_key: str) -> str | None:
+async def _async_validate_connection(hass: HomeAssistant, host: str, api_key: str) -> str | None:
     """Try to connect; return an error key (or None on success)."""
     hub = ThermexHub(hass, host, api_key, "config_flow")
     try:
@@ -58,7 +58,7 @@ async def _async_validate_connection(hass, host: str, api_key: str) -> str | Non
     return None
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
+class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Thermex API."""
     VERSION = 2
 
@@ -66,7 +66,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._discovered_host: str | None = None
         self._discovered_mac: str | None = None
 
-    async def async_step_user(self, user_input=None):
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         if user_input is None:
             return self.async_show_form(
                 step_id="user", data_schema=STEP_USER_DATA_SCHEMA
@@ -128,7 +130,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self.context["title_placeholders"] = {"host": host}
         return await self.async_step_discovery_confirm()
 
-    async def async_step_discovery_confirm(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_discovery_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Ask for the API password of a discovered hood."""
         assert self._discovered_host is not None
         errors: dict[str, str] = {}
@@ -159,7 +163,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             errors=errors,
         )
 
-    async def async_step_reconfigure(self, user_input=None):
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Change the host and/or API password of an existing hood."""
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
@@ -192,11 +198,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             errors=errors,
         )
 
-    async def async_step_reauth(self, entry_data: Mapping[str, Any]):
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         """Start reauthentication when the hood rejects the API password."""
         return await self.async_step_reauth_confirm()
 
-    async def async_step_reauth_confirm(self, user_input=None):
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Ask for a new API password."""
         reauth_entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
@@ -238,7 +246,9 @@ OPTIONS_SCHEMA = vol.Schema({
 class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
     """Options; Home Assistant reloads the entry when they change."""
 
-    async def async_step_init(self, user_input=None):
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Manage options for Thermex integration."""
         if user_input is not None:
             return self.async_create_entry(title="Options", data=user_input)

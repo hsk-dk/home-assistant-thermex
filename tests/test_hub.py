@@ -1,17 +1,15 @@
 """Tests for ThermexHub WebSocket communication."""
-import pytest
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from aiohttp import WSMsgType
 
-from custom_components.thermex_api.hub import ThermexAuthError, ThermexHub
 from custom_components.thermex_api.const import (
     DOMAIN,
-    THERMEX_NOTIFY,
-    DEFAULT_HEARTBEAT_INTERVAL,
-    DEFAULT_CONNECTION_TIMEOUT,
 )
+from custom_components.thermex_api.hub import ThermexAuthError, ThermexHub
 
 
 class TestThermexHub:
@@ -367,7 +365,7 @@ class TestThermexHub:
         # Mock send_request
         with patch.object(hub_instance, "send_request", new_callable=AsyncMock):
             # Run watchdog for a short time
-            watchdog_task = asyncio.create_task(hub_instance._watchdog_loop())
+            asyncio.create_task(hub_instance._watchdog_loop())
             await asyncio.sleep(0.3)
             hub_instance._closing = True
             await asyncio.sleep(0.1)
@@ -388,7 +386,7 @@ class TestThermexHub:
         # Mock ensure_connected
         with patch.object(hub_instance, "_ensure_connected", new_callable=AsyncMock):
             # Run watchdog briefly
-            watchdog_task = asyncio.create_task(hub_instance._watchdog_loop())
+            asyncio.create_task(hub_instance._watchdog_loop())
             await asyncio.sleep(0.3)
             hub_instance._closing = True
             await asyncio.sleep(0.1)
@@ -406,7 +404,7 @@ class TestThermexHub:
         hub_instance._last_activity = asyncio.get_event_loop().time()
         
         with patch.object(hub_instance, "_ensure_connected", new_callable=AsyncMock):
-            watchdog_task = asyncio.create_task(hub_instance._watchdog_loop())
+            asyncio.create_task(hub_instance._watchdog_loop())
             await asyncio.sleep(0.2)
             hub_instance._closing = True
             await asyncio.sleep(0.1)

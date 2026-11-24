@@ -8,6 +8,11 @@
           "host": "Liesituulettimen IP-osoite",
           "api_key": "API-salasana",
           "enable_decolight": "Ota tunnelmavalo käyttöön"
+        },
+        "data_description": {
+          "host": "Liesituulettimen IP-osoite verkossasi.",
+          "api_key": "Thermex-sovelluksessa asetettu API-salasana.",
+          "enable_decolight": "Ota käyttöön, jos liesituulettimessasi on tunnelmavalo (Decolight)."
         }
       },
       "discovery_confirm": {
@@ -16,6 +21,10 @@
         "data": {
           "api_key": "API-salasana",
           "enable_decolight": "Ota tunnelmavalo käyttöön"
+        },
+        "data_description": {
+          "api_key": "Thermex-sovelluksessa asetettu API-salasana.",
+          "enable_decolight": "Ota käyttöön, jos liesituulettimessasi on tunnelmavalo (Decolight)."
         }
       },
       "reauth_confirm": {
@@ -23,6 +32,9 @@
         "description": "API-salasana laitteelle {host} hylättiin. Anna nykyinen API-salasana.",
         "data": {
           "api_key": "API-salasana"
+        },
+        "data_description": {
+          "api_key": "Liesituulettimen nykyinen API-salasana."
         }
       },
       "reconfigure": {
@@ -31,6 +43,10 @@
         "data": {
           "host": "Liesituulettimen IP-osoite",
           "api_key": "API-salasana"
+        },
+        "data_description": {
+          "host": "Liesituulettimen uusi IP-osoite.",
+          "api_key": "Thermex-sovelluksessa asetettu API-salasana."
         }
       }
     },
@@ -56,6 +72,12 @@
           "fan_alert_hours": "Rasvasuodattimen puhdistusilmoitus (käyttötunnit)",
           "fan_alert_days": "Rasvasuodattimen puhdistusilmoitus (päiviä nollauksesta)",
           "fan_auto_off_delay": "Viivästetty sammutus (minuutit)"
+        },
+        "data_description": {
+          "enable_decolight": "Ota käyttöön, jos liesituulettimessasi on tunnelmavalo (Decolight).",
+          "fan_alert_hours": "Puhaltimen käyttötunnit, joiden jälkeen puhdistusilmoitus annetaan.",
+          "fan_alert_days": "Päivien määrä suodatinajan viimeisestä nollauksesta, jonka jälkeen puhdistusilmoitus annetaan.",
+          "fan_auto_off_delay": "Viivästetyn sammutuksen painikkeen ja toiminnon oletusviive minuutteina."
         },
         "description": "Suodatinilmoitus aktivoituu, kun JOKO käyttötuntien raja TAI päivien määrä nollauksesta ylittyy."
       }
@@ -161,6 +183,12 @@
     },
     "fan_entity_not_found": {
       "message": "Thermex-tuuletinentiteettiä ei löytynyt."
+    }
+  },
+  "issues": {
+    "hood_offline": {
+      "title": "Thermex-liesituuletin on offline-tilassa",
+      "description": "Thermex-liesituuletin osoitteessa {host} ei ole vastannut yli tuntiin. Tarkista, että liesituulettimessa on virta ja että se on yhdistetty verkkoosi, että API on otettu käyttöön Thermex-sovelluksessa ja että IP-osoite ei ole muuttunut (jos on, käytä integraation Määritä uudelleen -toimintoa). Ilmoitus poistuu itsestään, kun liesituuletin on taas yhteydessä."
     }
   }
 }

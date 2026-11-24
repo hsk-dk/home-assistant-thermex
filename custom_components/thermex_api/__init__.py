@@ -2,6 +2,7 @@
 """Thermex API integration."""
 import logging
 from datetime import datetime, timedelta
+from typing import Any
 
 import voluptuous as vol
 from homeassistant.components.fan import DOMAIN as FAN_DOMAIN
@@ -27,6 +28,7 @@ from .const import (
 from .coordinator import ThermexCoordinator
 from .data import ThermexConfigEntry, ThermexData
 from .hub import ThermexAuthError, ThermexHub
+from .repairs import OfflineIssue
 from .runtime_manager import RuntimeManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,7 +38,7 @@ PLATFORMS = ["light", "fan", "sensor", "binary_sensor", "button"]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 # action name -> (method on the fan entity, schema of the action's own fields)
-FAN_ACTIONS: dict[str, tuple[str, dict | None]] = {
+FAN_ACTIONS: dict[str, tuple[str, dict[Any, Any] | None]] = {
     "reset_runtime": ("async_reset", None),
     "start_delayed_off": ("start_delayed_off", {
         vol.Optional("minutes"): vol.All(
@@ -112,7 +114,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> b
     # Anything below can fail; never leave the websocket open if setup aborts
     try:
         # 2) Initialize & load the shared RuntimeManager
-        store: Store = Store(
+        store: Store[dict[str, Any]] = Store(
             hass,
             STORAGE_VERSION,
             RUNTIME_STORAGE_FILE.format(entry_id=entry.entry_id),
@@ -124,6 +126,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ThermexConfigEntry) -> b
         coordinator = ThermexCoordinator(hass, entry, hub, runtime_manager)
         await coordinator.async_config_entry_first_refresh()
         coordinator.delayed_off.restore()
+        OfflineIssue(hass, entry, hub).start()
 
         # 4) Share everything with the platforms
         entry.runtime_data = ThermexData(

@@ -1,16 +1,17 @@
 # File: custom_components/thermex_api/light.py
 
 import logging
-from typing import ClassVar
+from typing import Any
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_HS_COLOR,
     ATTR_RGB_COLOR,
-    ColorMode,
     LightEntity,
 )
-from homeassistant.core import callback
+from homeassistant.components.light.const import ColorMode
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util.color import color_hs_to_RGB, color_RGB_to_hs
 
 from .const import (
@@ -55,7 +56,9 @@ def _to_ha_brightness(api_brightness: int) -> int:
     """
     return round(api_brightness / 100 * 255)
 
-async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ThermexConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
+) -> None:
     """Setup Thermex main and deco lights."""
     coordinator = entry.runtime_data.coordinator
 
@@ -112,17 +115,16 @@ class ThermexLightBase(ThermexEntity, LightEntity):
 
 class ThermexLight(ThermexLightBase):
     """Main light entity for Thermex hood."""
-    _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.BRIGHTNESS}
-    _attr_color_mode = ColorMode.BRIGHTNESS
-
-    def __init__(self, coordinator: ThermexCoordinator):
+    def __init__(self, coordinator: ThermexCoordinator) -> None:
         super().__init__(coordinator, "light", "thermex_light")
+        self._attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+        self._attr_color_mode = ColorMode.BRIGHTNESS
 
     @property
     def _section(self) -> LightState | None:
         return self.coordinator.data.light if self.coordinator.data else None
 
-    async def async_turn_on(self, **kwargs):
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the light."""
         brightness = _clamp_brightness(kwargs.get(ATTR_BRIGHTNESS, self._last_brightness))
         api_brightness = _to_api_brightness(brightness)
@@ -134,7 +136,7 @@ class ThermexLight(ThermexLightBase):
             "Light": {"lightonoff": 1, "lightbrightness": api_brightness}
         })
 
-    async def async_turn_off(self, **kwargs):
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the light."""
         await self._hub.send_update({
             "Light": {"lightonoff": 0, "lightbrightness": 1}
@@ -144,12 +146,11 @@ class ThermexLight(ThermexLightBase):
 class ThermexDecoLight(ThermexLightBase):
     """Deco light entity for Thermex hood."""
     # HS already implies brightness support; HA rejects HS combined with BRIGHTNESS
-    _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.HS}
-    _attr_color_mode = ColorMode.HS
-
-    def __init__(self, coordinator: ThermexCoordinator):
+    def __init__(self, coordinator: ThermexCoordinator) -> None:
         self._hs_color: tuple[float, float] = (0.0, 0.0)
         super().__init__(coordinator, "decolight", "thermex_decolight")
+        self._attr_supported_color_modes = {ColorMode.HS}
+        self._attr_color_mode = ColorMode.HS
 
     @property
     def _section(self) -> DecolightState | None:
@@ -166,7 +167,7 @@ class ThermexDecoLight(ThermexLightBase):
         if section and section.on and any(section.rgb):
             self._hs_color = color_RGB_to_hs(*section.rgb)
 
-    async def async_turn_on(self, **kwargs):
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the deco light."""
         brightness = _clamp_brightness(kwargs.get(ATTR_BRIGHTNESS, self._last_brightness))
 
@@ -188,7 +189,7 @@ class ThermexDecoLight(ThermexLightBase):
         }
         await self._hub.send_update({"Decolight": payload})
 
-    async def async_turn_off(self, **kwargs):
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the deco light."""
         await self._hub.send_update({
             "Decolight": {"decolightonoff": 0, "decolightbrightness": 1}

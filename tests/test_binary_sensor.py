@@ -4,7 +4,10 @@ from unittest.mock import MagicMock
 import pytest
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
-from custom_components.thermex_api.binary_sensor import ThermexFilterAlert, async_setup_entry
+from custom_components.thermex_api.binary_sensor import (
+    ThermexFilterAlert,
+    async_setup_entry,
+)
 
 
 @pytest.fixture

@@ -1,6 +1,7 @@
 """Tests for RuntimeManager."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from homeassistant.util.dt import utcnow
 
 from custom_components.thermex_api.runtime_manager import RuntimeManager

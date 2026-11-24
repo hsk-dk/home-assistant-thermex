@@ -1,6 +1,7 @@
 """Tests for __init__ setup functions."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
 from custom_components.thermex_api import async_setup_entry, async_unload_entry
@@ -12,8 +13,10 @@ def mock_coordinator():
     """The coordinator is tested on its own; here it only has to be wired up."""
     coordinator = MagicMock()
     coordinator.async_config_entry_first_refresh = AsyncMock()
-    with patch('custom_components.thermex_api.ThermexCoordinator', return_value=coordinator) as cls:
+    with patch('custom_components.thermex_api.ThermexCoordinator', return_value=coordinator) as cls, \
+         patch('custom_components.thermex_api.OfflineIssue') as offline:
         coordinator.cls = cls
+        coordinator.offline_issue = offline
         yield coordinator
 
 
@@ -67,6 +70,17 @@ class TestInit:
             mock_config_entry, mock_hub, mock_runtime_manager
         )
         mock_hass.config_entries.async_forward_entry_setups.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_setup_watches_for_a_long_offline_hood(
+        self, mock_hass, mock_config_entry, setup_patches, mock_hub, mock_coordinator
+    ):
+        mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
+
+        await async_setup_entry(mock_hass, mock_config_entry)
+
+        mock_coordinator.offline_issue.assert_called_once_with(mock_hass, mock_config_entry, mock_hub)
+        mock_coordinator.offline_issue.return_value.start.assert_called_once_with()
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_connection_failure(

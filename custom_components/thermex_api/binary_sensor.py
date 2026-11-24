@@ -9,6 +9,8 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
     DEFAULT_ALERT_DAYS,
@@ -24,7 +26,9 @@ _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
 
 
-async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ThermexConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
+) -> None:
     """Set up the Thermex filter-alert binary sensor."""
     async_add_entities([ThermexFilterAlert(entry.runtime_data.coordinator)])
 
@@ -70,7 +74,7 @@ class ThermexFilterAlert(ThermexEntity, BinarySensorEntity):
     def is_on(self) -> bool:
         """Return True if filter alert should be triggered."""
         result = self._evaluate()
-        return result["hours_exceeded"] or result["days_exceeded"]
+        return bool(result["hours_exceeded"] or result["days_exceeded"])
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

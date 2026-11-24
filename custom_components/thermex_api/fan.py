@@ -3,7 +3,8 @@ import logging
 from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util.percentage import (
     ordered_list_item_to_percentage,
     percentage_to_ordered_list_item,
@@ -19,7 +20,9 @@ _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 1
 
 
-async def async_setup_entry(hass, entry: ThermexConfigEntry, async_add_entities) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ThermexConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
+) -> None:
     """Set up the Thermex fan."""
     async_add_entities([ThermexFan(entry.runtime_data.coordinator)])
 
@@ -124,7 +127,12 @@ class ThermexFan(ThermexEntity, FanEntity):
         # 1-25% low, 26-50% medium, 51-75% high, 76-100% boost
         await self.async_set_preset_mode(percentage_to_ordered_list_item(PRESET_MODES, percentage))
 
-    async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs) -> None:
+    async def async_turn_on(
+        self,
+        percentage: int | None = None,
+        preset_mode: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         if percentage is not None:
             await self.async_set_percentage(percentage)
         elif preset_mode:
@@ -132,13 +140,13 @@ class ThermexFan(ThermexEntity, FanEntity):
         else:
             await self.async_set_preset_mode(self._last_active_preset)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await self._delayed_off.async_cancel()
         await self.async_set_preset_mode("off")
 
     # Entity actions (see __init__.FAN_ACTIONS)
 
-    async def async_reset(self, **kwargs) -> None:
+    async def async_reset(self, **kwargs: Any) -> None:
         await self.coordinator.async_reset_runtime()
 
     async def start_delayed_off(self, minutes: int | None = None) -> None:
