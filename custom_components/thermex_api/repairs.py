@@ -21,7 +21,9 @@ class OfflineIssue:
     A hood that is switched off at the mains, or that is restarting, is back soon and needs
     no attention, so the issue only appears after OFFLINE_ISSUE_DELAY seconds. It tells the
     user what can be checked (power, Wi-Fi, the API setting, a new IP address) and goes away
-    by itself as soon as the hood is connected again.
+    by itself as soon as the hood is connected again. A hood that rejected the API password is
+    not reported: the reauthentication flow already asks for a new password, and the offline
+    advice (power, Wi-Fi, IP address) would mislead.
     """
 
     def __init__(self, hass: HomeAssistant, entry: ThermexConfigEntry, hub: ThermexHub) -> None:
@@ -44,13 +46,18 @@ class OfflineIssue:
     def _handle_availability(self) -> None:
         if self._hub.available:
             self._clear()
-        elif self._hub.connection_state != "closed" and self._timer is None and not self._raised:
+        elif (
+            self._hub.connection_state != "closed"
+            and not self._hub.auth_failed
+            and self._timer is None
+            and not self._raised
+        ):
             self._timer = async_call_later(self._hass, OFFLINE_ISSUE_DELAY, self._raise_issue)
 
     @callback
     def _raise_issue(self, _now: object) -> None:
         self._timer = None
-        if self._hub.available:
+        if self._hub.available or self._hub.auth_failed:
             return
         self._raised = True
         ir.async_create_issue(

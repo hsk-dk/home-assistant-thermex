@@ -112,6 +112,11 @@ class ThermexHub:
         """Whether we are connected and authenticated."""
         return self._connection_state == "connected"
 
+    @property
+    def auth_failed(self) -> bool:
+        """Whether the hood rejected the API password (reauthentication is needed)."""
+        return self._auth_failed
+
     def _set_connection_state(self, state: str) -> None:
         """Change the connection state; log loss/recovery once and tell the entities."""
         was_available = self.available

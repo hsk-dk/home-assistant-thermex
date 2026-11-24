@@ -1448,3 +1448,12 @@ class TestThermexHubDeadConnection:
         assert hub.available is True
         assert hub._missed_heartbeats == 0
         ensure.assert_not_awaited()
+
+
+def test_auth_failed_reflects_a_rejected_password():
+    hub = ThermexHub(MagicMock(), "192.168.1.100", "pw", "entry")
+    assert hub.auth_failed is False
+
+    hub._auth_failed = True
+
+    assert hub.auth_failed is True

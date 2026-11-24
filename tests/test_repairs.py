@@ -31,6 +31,7 @@ def hub():
         connection_state="disconnected",
         availability_signal="thermex_test_availability",
         host="10.0.1.203",
+        auth_failed=False,
     )
 
 
@@ -127,3 +128,21 @@ async def test_unloading_the_entry_removes_the_issue(hass, entry, hub):
     assert issues(hass) == []
     await wait(hass)
     assert issues(hass) == []  # and nothing is raised afterwards
+
+
+async def test_a_rejected_password_is_not_reported_as_an_outage(hass, entry, hub):
+    hub.auth_failed = True  # the reauthentication flow already asks for a new password
+    OfflineIssue(hass, entry, hub).start()
+
+    await wait(hass)
+
+    assert issues(hass) == []
+
+
+async def test_a_password_rejected_while_the_timer_runs_is_not_reported(hass, entry, hub):
+    OfflineIssue(hass, entry, hub).start()
+
+    hub.auth_failed = True
+    await wait(hass)
+
+    assert issues(hass) == []
